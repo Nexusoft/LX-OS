@@ -1,0 +1,97 @@
+service TapNotificationHandler {
+  __implements__ { "../../../common/services/TapNotification.svc" }
+
+  decls __callee__ {
+    includefiles { "<stdio.h>" }
+    includefiles { "<unistd.h>" }
+    includefiles { "<stdlib.h>" }
+    includefiles { "<string.h>" }
+    includefiles { "<nexus/IPC.interface.h>" }
+    includefiles { "<nexus/interpose.h>" }
+    includefiles { "<assert.h>" }
+    includefiles { "<pthread.h>" }
+    includefiles { "taint.h" }
+
+    int tap_insertion_error = 0;
+    int g_notification_port_handle;
+
+    static TapNotificationSpec *TapNotificationSpec_copyOut(Call_Handle call_handle, struct VarLen all_taps) {
+      char *data = malloc(all_taps.len);
+      //char data[4096];
+      TapNotificationSpec *spec = (TapNotificationSpec *)data;
+      // printf("before transfer");
+      int result = IPC_TransferFrom(call_handle, all_taps.desc_num, data, 
+				    (unsigned int)all_taps.data, all_taps.len);
+      assert(result == 0);
+      return spec;
+    }
+    static void TapNotificationSpec_destroy(TapNotificationSpec *spec) {
+      free(spec);
+    }
+  }
+  __callee__ {
+    g_notification_port_handle = TapNotificationHandler_port_handle;
+  }
+  
+  interface lf_generate { OID_NONE; } lf_check { lf_oid == OID_NONE; } 
+  int Interference(__input__ struct VarLen existing_taps /* TapInterferenceSpec */,
+		   __output__ struct VarLen specified_order /* TapOrderSpec */) {
+    // XXX perhaps the taint notification always wants to be at the
+    // beginning of the processing chain?
+     printf("Interference!\n");
+    return 0;
+  }
+
+  interface lf_generate { OID_NONE; } lf_check { lf_oid == OID_NONE; } 
+  int Proposal(__input__ struct VarLen all_taps /* TapNotificationSpec */) {
+    printf("Proposal!\n");
+    int rval = 0;
+    TapNotificationSpec *spec = 
+      TapNotificationSpec_copyOut(call_handle, all_taps);
+    if(non_composable && spec->num_taps > 1) {
+      printf("multiple taps in proposal on tap, vetoing "); TapNotificationSpec_dump(spec);
+      rval = -1;
+      goto out_destroy;
+    }
+    if(do_sanity_checks) {
+      int found = 0;
+      int i;
+      for(i=0; i < spec->num_taps; i++) {
+	if(spec->taps[i] == g_wrap_pattern) {
+	  found = 1;
+	  break;
+	}
+      }
+      if(!found) {
+	printf("bad proposal, possibly a kernel bug (or proposal due to someone interposing on IPC of taint with other stuff!\n");
+	exit(-1);
+      }
+    }
+  out_destroy:
+    TapNotificationSpec_destroy(spec);
+    return rval;
+  }
+
+  interface lf_generate { OID_NONE; } lf_check { lf_oid == OID_NONE; } 
+  // Tell Pattern control channel that tap has been installed
+  void Modification(__input__ struct VarLen all_taps /* TapNotificationSpec */, 
+		   int did_insertion) {
+    if(!did_insertion) {
+      printf("Wrap insertion error! Analysis no longer complete!\n");
+      tap_insertion_error = 1;
+      exit(-1);
+    }
+    // printf("in modification (%d) ", pthread_self());
+    TapNotificationSpec *spec =
+      TapNotificationSpec_copyOut(call_handle, all_taps);
+    if(non_composable && spec->num_taps > 1) {
+      printf("modification: %d taps, need 1!\n", spec->num_taps);
+      exit(-1);
+    }
+    printf("New tap %d=>%d (channel = %d, length = %d)\n",
+	   spec->edge.source_ipd, spec->edge.dest_ipd, spec->edge.dest_port,
+	   spec->num_taps);
+    TapNotificationSpec_destroy(spec);
+    return;
+  }
+}

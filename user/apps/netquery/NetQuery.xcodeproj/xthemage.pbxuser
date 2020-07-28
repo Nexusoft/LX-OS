@@ -1,0 +1,868 @@
+// !$*UTF8*$!
+{
+	08FB7793FE84155DC02AAC07 /* Project object */ = {
+		activeArchitecture = i386;
+		activeBuildConfigurationName = Release;
+		activeExecutable = 0A4FF04C0D49868B00D4D147 /* rocket-router-20 */;
+		activeTarget = D28A88AD04BDD90700651E21 /* obj-test */;
+		addToTargets = (
+			D28A88AD04BDD90700651E21 /* obj-test */,
+		);
+		breakpoints = (
+			0A8BC5D90D450A2200F52357 /* malloc_error_break */,
+		);
+		codeSenseManager = 0A8BC5440D4504F100F52357 /* Code sense */;
+		executables = (
+			0A8BC5C40D4506E300F52357 /* obj-test */,
+			0AF4278E0D45BC37004FD6C9 /* rocket-router-0 */,
+			0AF427B00D45BD75004FD6C9 /* rocket-router-1 */,
+			0AF427670D459E48004FD6C9 /* rocket-router-3 */,
+			0AF428560D46BBFE004FD6C9 /* trie-test */,
+			0A4FEFD20D48E3B900D4D147 /* rocket-router-4 */,
+			0A4FF04C0D49868B00D4D147 /* rocket-router-20 */,
+		);
+		perUserDictionary = {
+			PBXConfiguration.PBXFileTableDataSource3.PBXExecutablesDataSource = {
+				PBXFileTableDataSourceColumnSortingDirectionKey = "-1";
+				PBXFileTableDataSourceColumnSortingKey = PBXExecutablesDataSource_NameID;
+				PBXFileTableDataSourceColumnWidthsKey = (
+					22,
+					300,
+					394,
+				);
+				PBXFileTableDataSourceColumnsKey = (
+					PBXExecutablesDataSource_ActiveFlagID,
+					PBXExecutablesDataSource_NameID,
+					PBXExecutablesDataSource_CommentsID,
+				);
+			};
+			PBXConfiguration.PBXFileTableDataSource3.PBXFileTableDataSource = {
+				PBXFileTableDataSourceColumnSortingDirectionKey = "-1";
+				PBXFileTableDataSourceColumnSortingKey = PBXFileDataSource_Filename_ColumnID;
+				PBXFileTableDataSourceColumnWidthsKey = (
+					20,
+					506,
+					20,
+					48,
+					43,
+					43,
+					20,
+				);
+				PBXFileTableDataSourceColumnsKey = (
+					PBXFileDataSource_FiletypeID,
+					PBXFileDataSource_Filename_ColumnID,
+					PBXFileDataSource_Built_ColumnID,
+					PBXFileDataSource_ObjectSize_ColumnID,
+					PBXFileDataSource_Errors_ColumnID,
+					PBXFileDataSource_Warnings_ColumnID,
+					PBXFileDataSource_Target_ColumnID,
+				);
+			};
+			PBXConfiguration.PBXTargetDataSource.PBXTargetDataSource = {
+				PBXFileTableDataSourceColumnSortingDirectionKey = "-1";
+				PBXFileTableDataSourceColumnSortingKey = PBXFileDataSource_Filename_ColumnID;
+				PBXFileTableDataSourceColumnWidthsKey = (
+					20,
+					466,
+					60,
+					20,
+					48,
+					43,
+					43,
+				);
+				PBXFileTableDataSourceColumnsKey = (
+					PBXFileDataSource_FiletypeID,
+					PBXFileDataSource_Filename_ColumnID,
+					PBXTargetDataSource_PrimaryAttribute,
+					PBXFileDataSource_Built_ColumnID,
+					PBXFileDataSource_ObjectSize_ColumnID,
+					PBXFileDataSource_Errors_ColumnID,
+					PBXFileDataSource_Warnings_ColumnID,
+				);
+			};
+			PBXPerProjectTemplateStateSaveDate = 223491369;
+			PBXWorkspaceStateSaveDate = 223491369;
+		};
+		perUserProjectItems = {
+			0A0CE4E20D4E2EE800FC6BF0 = 0A0CE4E20D4E2EE800FC6BF0 /* PBXBookmark */;
+			0A0CE57F0D4E6D2100FC6BF0 = 0A0CE57F0D4E6D2100FC6BF0 /* PBXBookmark */;
+			0A0CE5830D4E6D5E00FC6BF0 = 0A0CE5830D4E6D5E00FC6BF0 /* PBXBookmark */;
+			0A0CE5840D4E6E2D00FC6BF0 = 0A0CE5840D4E6E2D00FC6BF0 /* PBXBookmark */;
+			0A0CE5860D4E6EB300FC6BF0 = 0A0CE5860D4E6EB300FC6BF0 /* PBXBookmark */;
+			0A0CE5870D4E6EC400FC6BF0 = 0A0CE5870D4E6EC400FC6BF0 /* PBXBookmark */;
+			0A0CE58A0D4E708700FC6BF0 = 0A0CE58A0D4E708700FC6BF0 /* PBXTextBookmark */;
+			0A0CE58B0D4E708700FC6BF0 = 0A0CE58B0D4E708700FC6BF0 /* PBXTextBookmark */;
+			0A0CE58E0D4E708700FC6BF0 = 0A0CE58E0D4E708700FC6BF0 /* PBXTextBookmark */;
+			0A0CE5910D4E708700FC6BF0 = 0A0CE5910D4E708700FC6BF0 /* PBXTextBookmark */;
+			0A0CE5940D4E708700FC6BF0 = 0A0CE5940D4E708700FC6BF0 /* PBXTextBookmark */;
+			0A0CE5970D4E708700FC6BF0 = 0A0CE5970D4E708700FC6BF0 /* PBXTextBookmark */;
+			0A0CE59A0D4E708700FC6BF0 = 0A0CE59A0D4E708700FC6BF0 /* PBXTextBookmark */;
+			0A0CE59B0D4E708700FC6BF0 = 0A0CE59B0D4E708700FC6BF0 /* PBXTextBookmark */;
+		};
+		sourceControlManager = 0A8BC5430D4504F100F52357 /* Source Control */;
+		userBuildSettings = {
+		};
+	};
+	0A0CE4E20D4E2EE800FC6BF0 /* PBXBookmark */ = {
+		isa = PBXBookmark;
+		fRef = 0A8BC5960D45053C00F52357 /* rocket-router.cc */;
+	};
+	0A0CE57F0D4E6D2100FC6BF0 /* PBXBookmark */ = {
+		isa = PBXBookmark;
+		fRef = 0A8BC5900D45053C00F52357 /* nq_test.cc */;
+	};
+	0A0CE5830D4E6D5E00FC6BF0 /* PBXBookmark */ = {
+		isa = PBXBookmark;
+		fRef = 0A8BC5AA0D45053C00F52357 /* net_elements.hh */;
+	};
+	0A0CE5840D4E6E2D00FC6BF0 /* PBXBookmark */ = {
+		isa = PBXBookmark;
+		fRef = 0A8BC5790D45053C00F52357 /* scripting.cc */;
+	};
+	0A0CE5860D4E6EB300FC6BF0 /* PBXBookmark */ = {
+		isa = PBXBookmark;
+		fRef = 0AF427D70D464A24004FD6C9 /* Makefile */;
+	};
+	0A0CE5870D4E6EC400FC6BF0 /* PBXBookmark */ = {
+		isa = PBXBookmark;
+		fRef = 0A8BC5990D45053C00F52357 /* router-test.cc */;
+	};
+	0A0CE58A0D4E708700FC6BF0 /* PBXTextBookmark */ = {
+		isa = PBXTextBookmark;
+		fRef = 0A8BC59C0D45053C00F52357 /* router.cc */;
+		rLen = 1;
+		rLoc = 273;
+		rType = 1;
+	};
+	0A0CE58B0D4E708700FC6BF0 /* PBXTextBookmark */ = {
+		isa = PBXTextBookmark;
+		fRef = 0A8BC59C0D45053C00F52357 /* router.cc */;
+		name = "router.cc: 274";
+		rLen = 30;
+		rLoc = 9109;
+		rType = 0;
+		vrLen = 1662;
+		vrLoc = 8829;
+	};
+	0A0CE58E0D4E708700FC6BF0 /* PBXTextBookmark */ = {
+		isa = PBXTextBookmark;
+		fRef = 0A8BC5990D45053C00F52357 /* router-test.cc */;
+		name = "router-test.cc: 356";
+		rLen = 14;
+		rLoc = 10178;
+		rType = 0;
+		vrLen = 1446;
+		vrLoc = 9460;
+	};
+	0A0CE5910D4E708700FC6BF0 /* PBXTextBookmark */ = {
+		isa = PBXTextBookmark;
+		fRef = 0AF427D70D464A24004FD6C9 /* Makefile */;
+		name = "Makefile: 30";
+		rLen = 0;
+		rLoc = 924;
+		rType = 0;
+		vrLen = 1772;
+		vrLoc = 684;
+	};
+	0A0CE5940D4E708700FC6BF0 /* PBXTextBookmark */ = {
+		isa = PBXTextBookmark;
+		fRef = 0A8BC5AA0D45053C00F52357 /* net_elements.hh */;
+		name = "net_elements.hh: 187";
+		rLen = 4;
+		rLoc = 6548;
+		rType = 0;
+		vrLen = 1560;
+		vrLoc = 6542;
+	};
+	0A0CE5970D4E708700FC6BF0 /* PBXTextBookmark */ = {
+		isa = PBXTextBookmark;
+		fRef = 0A8BC5790D45053C00F52357 /* scripting.cc */;
+		name = "scripting.cc: 1";
+		rLen = 0;
+		rLoc = 0;
+		rType = 0;
+		vrLen = 1413;
+		vrLoc = 1654;
+	};
+	0A0CE59A0D4E708700FC6BF0 /* PBXTextBookmark */ = {
+		isa = PBXTextBookmark;
+		fRef = 0A8BC5900D45053C00F52357 /* nq_test.cc */;
+		name = "nq_test.cc: 1";
+		rLen = 0;
+		rLoc = 0;
+		rType = 0;
+		vrLen = 794;
+		vrLoc = 0;
+	};
+	0A0CE59B0D4E708700FC6BF0 /* PBXTextBookmark */ = {
+		isa = PBXTextBookmark;
+		fRef = 0A8BC5960D45053C00F52357 /* rocket-router.cc */;
+		name = "rocket-router.cc: 2177";
+		rLen = 15;
+		rLoc = 68107;
+		rType = 0;
+		vrLen = 1254;
+		vrLoc = 67485;
+	};
+	0A4FEFD20D48E3B900D4D147 /* rocket-router-4 */ = {
+		isa = PBXExecutable;
+		activeArgIndices = (
+			YES,
+			YES,
+			YES,
+		);
+		argumentStrings = (
+			4,
+			rocketfuel/2002/rocket/3967.cch,
+			rocketfuel/2002/weights/3967/latencies.intra,
+		);
+		autoAttachOnCrash = 1;
+		breakpointsEnabled = 1;
+		configStateDict = {
+			"PBXLSLaunchAction-0" = {
+				PBXLSLaunchAction = 0;
+				PBXLSLaunchStartAction = 1;
+				PBXLSLaunchStdioStyle = 2;
+				PBXLSLaunchStyle = 0;
+				class = PBXLSRunLaunchConfig;
+				commandLineArgs = (
+				);
+				displayName = "Executable Runner";
+				environment = {
+				};
+				identifier = com.apple.Xcode.launch.runConfig;
+				remoteHostInfo = "";
+				startActionInfo = "";
+			};
+		};
+		customDataFormattersEnabled = 1;
+		debuggerPlugin = GDBDebugging;
+		disassemblyDisplayState = 0;
+		dylibVariantSuffix = "";
+		enableDebugStr = 1;
+		environmentEntries = (
+		);
+		executableSystemSymbolLevel = 0;
+		executableUserSymbolLevel = 0;
+		launchableReference = 0A4FEFD30D48E3B900D4D147 /* rocket-router 4 */;
+		libgmallocEnabled = 0;
+		name = "rocket-router-4";
+		savedGlobals = {
+		};
+		sourceDirectories = (
+		);
+		startupPath = /Users/xthemage/Documents/Projects/netquery/code/topology;
+	};
+	0A4FEFD30D48E3B900D4D147 /* rocket-router 4 */ = {
+		isa = PBXFileReference;
+		lastKnownFileType = "compiled.mach-o.executable";
+		name = "rocket-router 4";
+		path = "rocket-router";
+		sourceTree = "<group>";
+	};
+	0A4FF00D0D493E2200D4D147 /* sim_flow_creation.cc */ = {
+		uiCtxt = {
+			sepNavIntBoundsRect = "{{0, 0}, {1076, 7966}}";
+			sepNavSelRange = "{6414, 0}";
+			sepNavVisRange = "{5312, 556}";
+			sepNavWindowFrame = "{{222, 15}, {1131, 863}}";
+		};
+	};
+	0A4FF04C0D49868B00D4D147 /* rocket-router-20 */ = {
+		isa = PBXExecutable;
+		activeArgIndices = (
+			YES,
+			YES,
+			YES,
+		);
+		argumentStrings = (
+			20,
+			rocketfuel/2002/rocket/3967.cch,
+			rocketfuel/2002/weights/3967/latencies.intra,
+		);
+		autoAttachOnCrash = 1;
+		breakpointsEnabled = 1;
+		configStateDict = {
+			"PBXLSLaunchAction-0" = {
+				PBXLSLaunchAction = 0;
+				PBXLSLaunchStartAction = 1;
+				PBXLSLaunchStdioStyle = 2;
+				PBXLSLaunchStyle = 0;
+				class = PBXLSRunLaunchConfig;
+				commandLineArgs = (
+				);
+				displayName = "Executable Runner";
+				environment = {
+				};
+				identifier = com.apple.Xcode.launch.runConfig;
+				remoteHostInfo = "";
+				startActionInfo = "";
+			};
+		};
+		customDataFormattersEnabled = 1;
+		debuggerPlugin = GDBDebugging;
+		disassemblyDisplayState = 0;
+		dylibVariantSuffix = "";
+		enableDebugStr = 1;
+		environmentEntries = (
+		);
+		executableSystemSymbolLevel = 0;
+		executableUserSymbolLevel = 0;
+		launchableReference = 0A4FF04D0D49868B00D4D147 /* rocket-router 4 */;
+		libgmallocEnabled = 0;
+		name = "rocket-router-20";
+		savedGlobals = {
+		};
+		sourceDirectories = (
+		);
+		startupPath = /Users/xthemage/Documents/Projects/netquery/code/topology;
+	};
+	0A4FF04D0D49868B00D4D147 /* rocket-router 4 */ = {
+		isa = PBXFileReference;
+		lastKnownFileType = "compiled.mach-o.executable";
+		name = "rocket-router 4";
+		path = "rocket-router";
+		sourceTree = "<group>";
+	};
+	0A4FF2400D4A766B00D4D147 /* sim-adapters.hh */ = {
+		uiCtxt = {
+			sepNavIntBoundsRect = "{{0, 0}, {1072, 1274}}";
+			sepNavSelRange = "{0, 0}";
+			sepNavVisRange = "{812, 1386}";
+			sepNavWindowFrame = "{{136, 15}, {1131, 863}}";
+		};
+	};
+	0A4FF2410D4A766B00D4D147 /* sim-rpc.hh */ = {
+		uiCtxt = {
+			sepNavIntBoundsRect = "{{0, 0}, {1072, 735}}";
+			sepNavSelRange = "{349, 0}";
+			sepNavVisRange = "{0, 1175}";
+			sepNavWindowFrame = "{{142, 15}, {1131, 863}}";
+		};
+	};
+	0A4FF2430D4A766B00D4D147 /* rocket-sim.hh */ = {
+		uiCtxt = {
+			sepNavIntBoundsRect = "{{0, 0}, {1072, 2996}}";
+			sepNavSelRange = "{5187, 0}";
+			sepNavVisRange = "{0, 1323}";
+			sepNavWindowFrame = "{{150, 14}, {1131, 863}}";
+		};
+	};
+	0A8BC5430D4504F100F52357 /* Source Control */ = {
+		isa = PBXSourceControlManager;
+		fallbackIsa = XCSourceControlManager;
+		isSCMEnabled = 0;
+		scmConfiguration = {
+			repositoryName = "GlubGlub-NetQuery";
+		};
+	};
+	0A8BC5440D4504F100F52357 /* Code sense */ = {
+		isa = PBXCodeSenseManager;
+		indexTemplatePath = "";
+	};
+	0A8BC54A0D45053C00F52357 /* attribute.c */ = {
+		uiCtxt = {
+			sepNavIntBoundsRect = "{{0, 0}, {914, 20300}}";
+			sepNavSelRange = "{226, 87}";
+			sepNavVisRange = "{0, 2039}";
+			sepNavWindowFrame = "{{305, 33}, {872, 845}}";
+		};
+	};
+	0A8BC54D0D45053C00F52357 /* attribute_trie.c */ = {
+		uiCtxt = {
+			sepNavIntBoundsRect = "{{0, 0}, {1010, 2506}}";
+			sepNavSelRange = "{4607, 0}";
+			sepNavVisRange = "{4454, 290}";
+			sepNavWindowFrame = "{{253, 30}, {1027, 848}}";
+		};
+	};
+	0A8BC5540D45053C00F52357 /* net.c */ = {
+		uiCtxt = {
+			sepNavIntBoundsRect = "{{0, 0}, {753, 8372}}";
+			sepNavSelRange = "{14206, 0}";
+			sepNavVisRange = "{13950, 409}";
+			sepNavWindowFrame = "{{49, 33}, {872, 845}}";
+		};
+	};
+	0A8BC5600D45053C00F52357 /* nq_ip.cc */ = {
+		uiCtxt = {
+			sepNavIntBoundsRect = "{{0, 0}, {1072, 735}}";
+			sepNavSelRange = "{0, 0}";
+			sepNavVisRange = "{0, 20}";
+			sepNavWindowFrame = "{{15, 10}, {1131, 863}}";
+		};
+	};
+	0A8BC5660D45053C00F52357 /* nq_transaction.cc */ = {
+		uiCtxt = {
+			sepNavIntBoundsRect = "{{0, 0}, {973, 3640}}";
+			sepNavSelRange = "{201, 0}";
+			sepNavVisRange = "{7019, 633}";
+		};
+	};
+	0A8BC5690D45053C00F52357 /* nq_tuple.cc */ = {
+		uiCtxt = {
+			sepNavIntBoundsRect = "{{0, 0}, {1129, 2352}}";
+			sepNavSelRange = "{3500, 0}";
+			sepNavVisRange = "{3141, 885}";
+		};
+	};
+	0A8BC5720D45053C00F52357 /* pickle.c */ = {
+		uiCtxt = {
+			sepNavIntBoundsRect = "{{0, 0}, {1154, 12082}}";
+			sepNavSelRange = "{68, 82}";
+			sepNavVisRange = "{0, 1364}";
+			sepNavWindowFrame = "{{77, 105}, {1213, 773}}";
+		};
+	};
+	0A8BC5790D45053C00F52357 /* scripting.cc */ = {
+		uiCtxt = {
+			sepNavIntBoundsRect = "{{0, 0}, {1072, 4158}}";
+			sepNavSelRange = "{0, 0}";
+			sepNavVisRange = "{1654, 1393}";
+			sepNavWindowFrame = "{{15, 10}, {1131, 863}}";
+		};
+	};
+	0A8BC57B0D45053C00F52357 /* socket.c */ = {
+		uiCtxt = {
+			sepNavIntBoundsRect = "{{0, 0}, {813, 6930}}";
+			sepNavSelRange = "{9996, 9}";
+			sepNavVisRange = "{10736, 1565}";
+			sepNavWindowFrame = "{{38, 7}, {872, 845}}";
+		};
+	};
+	0A8BC57E0D45053C00F52357 /* transaction.c */ = {
+		uiCtxt = {
+			sepNavIntBoundsRect = "{{0, 0}, {813, 4242}}";
+			sepNavSelRange = "{8447, 11}";
+			sepNavVisRange = "{7628, 1791}";
+			sepNavWindowFrame = "{{15, 28}, {872, 845}}";
+		};
+	};
+	0A8BC58B0D45053C00F52357 /* net-test.cc */ = {
+		uiCtxt = {
+			sepNavIntBoundsRect = "{{0, 0}, {1072, 798}}";
+			sepNavSelRange = "{0, 0}";
+			sepNavVisRange = "{43, 1123}";
+			sepNavWindowFrame = "{{225, 15}, {1131, 863}}";
+		};
+	};
+	0A8BC5900D45053C00F52357 /* nq_test.cc */ = {
+		uiCtxt = {
+			sepNavIntBoundsRect = "{{0, 0}, {1072, 735}}";
+			sepNavSelRange = "{0, 0}";
+			sepNavVisRange = "{0, 794}";
+			sepNavWindowFrame = "{{15, 10}, {1131, 863}}";
+		};
+	};
+	0A8BC5930D45053C00F52357 /* obj-test.cc */ = {
+		uiCtxt = {
+			sepNavIntBoundsRect = "{{0, 0}, {973, 9044}}";
+			sepNavSelRange = "{7453, 0}";
+			sepNavVisRange = "{7138, 629}";
+			sepNavWindowFrame = "{{15, 28}, {872, 845}}";
+		};
+	};
+	0A8BC5960D45053C00F52357 /* rocket-router.cc */ = {
+		uiCtxt = {
+			sepNavIntBoundsRect = "{{0, 0}, {1072, 40712}}";
+			sepNavSelRange = "{68107, 15}";
+			sepNavVisRange = "{67470, 1269}";
+			sepNavWindowFrame = "{{317, 15}, {1131, 863}}";
+		};
+	};
+	0A8BC5990D45053C00F52357 /* router-test.cc */ = {
+		uiCtxt = {
+			sepNavIntBoundsRect = "{{0, 0}, {1072, 6650}}";
+			sepNavSelRange = "{9885, 0}";
+			sepNavVisRange = "{9402, 1504}";
+			sepNavWindowFrame = "{{15, 10}, {1131, 863}}";
+		};
+	};
+	0A8BC59C0D45053C00F52357 /* router.cc */ = {
+		uiCtxt = {
+			sepNavIntBoundsRect = "{{0, 0}, {1072, 6678}}";
+			sepNavSelRange = "{9240, 0}";
+			sepNavVisRange = "{8829, 1647}";
+			sepNavWindowFrame = "{{15, 10}, {1131, 863}}";
+		};
+	};
+	0A8BC59E0D45053C00F52357 /* router.hh */ = {
+		uiCtxt = {
+			sepNavIntBoundsRect = "{{0, 0}, {1072, 1218}}";
+			sepNavSelRange = "{0, 0}";
+			sepNavVisRange = "{60, 1412}";
+			sepNavWindowFrame = "{{134, 15}, {1131, 863}}";
+		};
+	};
+	0A8BC5A30D45053C00F52357 /* attribute.hh */ = {
+		uiCtxt = {
+			sepNavIntBoundsRect = "{{0, 0}, {1072, 6146}}";
+			sepNavSelRange = "{0, 0}";
+			sepNavVisRange = "{0, 1664}";
+			sepNavWindowFrame = "{{15, 10}, {1131, 863}}";
+		};
+	};
+	0A8BC5A70D45053C00F52357 /* ip.hh */ = {
+		uiCtxt = {
+			sepNavIntBoundsRect = "{{0, 0}, {1072, 1330}}";
+			sepNavSelRange = "{0, 0}";
+			sepNavVisRange = "{0, 1369}";
+			sepNavWindowFrame = "{{15, 10}, {1131, 863}}";
+		};
+	};
+	0A8BC5AA0D45053C00F52357 /* net_elements.hh */ = {
+		uiCtxt = {
+			sepNavIntBoundsRect = "{{0, 0}, {1072, 3332}}";
+			sepNavSelRange = "{6548, 4}";
+			sepNavVisRange = "{6542, 1560}";
+			sepNavWindowFrame = "{{195, 15}, {1131, 863}}";
+		};
+	};
+	0A8BC5AD0D45053C00F52357 /* queue.h */ = {
+		uiCtxt = {
+			sepNavIntBoundsRect = "{{0, 0}, {1154, 2478}}";
+			sepNavSelRange = "{0, 0}";
+			sepNavVisRange = "{3117, 901}";
+			sepNavWindowFrame = "{{84, 37}, {1213, 773}}";
+		};
+	};
+	0A8BC5B10D45053C00F52357 /* transaction.h */ = {
+		uiCtxt = {
+			sepNavIntBoundsRect = "{{0, 0}, {813, 938}}";
+			sepNavSelRange = "{91, 23}";
+			sepNavVisRange = "{0, 1713}";
+			sepNavWindowFrame = "{{38, 7}, {872, 845}}";
+		};
+	};
+	0A8BC5C40D4506E300F52357 /* obj-test */ = {
+		isa = PBXExecutable;
+		activeArgIndices = (
+		);
+		argumentStrings = (
+		);
+		autoAttachOnCrash = 1;
+		breakpointsEnabled = 1;
+		configStateDict = {
+			"PBXLSLaunchAction-0" = {
+				PBXLSLaunchAction = 0;
+				PBXLSLaunchStartAction = 1;
+				PBXLSLaunchStdioStyle = 2;
+				PBXLSLaunchStyle = 0;
+				class = PBXLSRunLaunchConfig;
+				commandLineArgs = (
+				);
+				displayName = "Executable Runner";
+				environment = {
+				};
+				identifier = com.apple.Xcode.launch.runConfig;
+				remoteHostInfo = "";
+				startActionInfo = "";
+			};
+		};
+		customDataFormattersEnabled = 1;
+		debuggerPlugin = GDBDebugging;
+		disassemblyDisplayState = 0;
+		dylibVariantSuffix = "";
+		enableDebugStr = 1;
+		environmentEntries = (
+			{
+				active = YES;
+				name = MallocGuardEdges;
+				value = yes;
+			},
+		);
+		executableSystemSymbolLevel = 0;
+		executableUserSymbolLevel = 0;
+		launchableReference = 0A8BC5C50D4506E300F52357 /* obj-test */;
+		libgmallocEnabled = 0;
+		name = "obj-test";
+		savedGlobals = {
+		};
+		sourceDirectories = (
+		);
+		startupPath = "<<ProjectDirectory>>";
+		variableFormatDictionary = {
+			$cs = 1;
+			$ds = 1;
+			$eax = 1;
+			$ebp = 1;
+			$ebx = 1;
+			$ecx = 1;
+			$edi = 1;
+			$edx = 1;
+			$eflags = 1;
+			$eip = 1;
+			$es = 1;
+			$esi = 1;
+			$esp = 1;
+			$gs = 1;
+			$ss = 1;
+			addr = 1;
+			type = 1;
+			"type-unsigned int-NQ_Net_poll" = 1;
+		};
+	};
+	0A8BC5C50D4506E300F52357 /* obj-test */ = {
+		isa = PBXFileReference;
+		lastKnownFileType = "compiled.mach-o.executable";
+		path = "obj-test";
+		sourceTree = SOURCE_ROOT;
+	};
+	0A8BC5D90D450A2200F52357 /* malloc_error_break */ = {
+		isa = PBXSymbolicBreakpoint;
+		actions = (
+		);
+		breakpointStyle = 1;
+		continueAfterActions = 0;
+		countType = 0;
+		delayBeforeContinue = 0;
+		hitCount = 0;
+		ignoreCount = 0;
+		location = libSystem.B.dylib;
+		modificationTime = 223241393.938422;
+		state = 1;
+		symbolName = malloc_error_break;
+	};
+	0A8BC62E0D45605200F52357 /* trie.c */ = {
+		uiCtxt = {
+			sepNavIntBoundsRect = "{{0, 0}, {1094, 3696}}";
+			sepNavSelRange = "{7271, 0}";
+			sepNavVisRange = "{7083, 464}";
+			sepNavWindowFrame = "{{54, 30}, {1027, 848}}";
+		};
+	};
+	0A8BC62F0D4560B000F52357 /* trie.h */ = {
+		uiCtxt = {
+			sepNavIntBoundsRect = "{{0, 0}, {968, 720}}";
+			sepNavSelRange = "{487, 0}";
+			sepNavVisRange = "{0, 487}";
+			sepNavWindowFrame = "{{217, 29}, {1027, 848}}";
+		};
+	};
+	0AF427670D459E48004FD6C9 /* rocket-router-3 */ = {
+		isa = PBXExecutable;
+		activeArgIndices = (
+			YES,
+		);
+		argumentStrings = (
+			3,
+		);
+		autoAttachOnCrash = 1;
+		breakpointsEnabled = 1;
+		configStateDict = {
+			"PBXLSLaunchAction-0" = {
+				PBXLSLaunchAction = 0;
+				PBXLSLaunchStartAction = 1;
+				PBXLSLaunchStdioStyle = 2;
+				PBXLSLaunchStyle = 0;
+				class = PBXLSRunLaunchConfig;
+				commandLineArgs = (
+				);
+				displayName = "Executable Runner";
+				environment = {
+				};
+				identifier = com.apple.Xcode.launch.runConfig;
+				remoteHostInfo = "";
+				startActionInfo = "";
+			};
+		};
+		customDataFormattersEnabled = 1;
+		debuggerPlugin = GDBDebugging;
+		disassemblyDisplayState = 0;
+		dylibVariantSuffix = "";
+		enableDebugStr = 1;
+		environmentEntries = (
+		);
+		executableSystemSymbolLevel = 0;
+		executableUserSymbolLevel = 0;
+		launchableReference = 0AF427680D459E48004FD6C9 /* router */;
+		libgmallocEnabled = 0;
+		name = "rocket-router-3";
+		savedGlobals = {
+		};
+		sourceDirectories = (
+		);
+		startupPath = /Users/xthemage/Documents/Projects/netquery/code/topology/;
+	};
+	0AF427680D459E48004FD6C9 /* router */ = {
+		isa = PBXFileReference;
+		lastKnownFileType = "compiled.mach-o.executable";
+		name = router;
+		path = "rocket-router";
+		sourceTree = SOURCE_ROOT;
+	};
+	0AF4278E0D45BC37004FD6C9 /* rocket-router-0 */ = {
+		isa = PBXExecutable;
+		activeArgIndices = (
+			YES,
+			YES,
+			YES,
+		);
+		argumentStrings = (
+			0,
+			rocketfuel/2002/rocket/3967.cch,
+			rocketfuel/2002/weights/3967/latencies.intra,
+		);
+		autoAttachOnCrash = 1;
+		breakpointsEnabled = 1;
+		configStateDict = {
+			"PBXLSLaunchAction-0" = {
+				PBXLSLaunchAction = 0;
+				PBXLSLaunchStartAction = 1;
+				PBXLSLaunchStdioStyle = 2;
+				PBXLSLaunchStyle = 0;
+				class = PBXLSRunLaunchConfig;
+				commandLineArgs = (
+				);
+				displayName = "Executable Runner";
+				environment = {
+				};
+				identifier = com.apple.Xcode.launch.runConfig;
+				remoteHostInfo = "";
+				startActionInfo = "";
+			};
+		};
+		customDataFormattersEnabled = 1;
+		debuggerPlugin = GDBDebugging;
+		disassemblyDisplayState = 0;
+		dylibVariantSuffix = "";
+		enableDebugStr = 1;
+		environmentEntries = (
+		);
+		executableSystemSymbolLevel = 0;
+		executableUserSymbolLevel = 0;
+		launchableReference = 0AF4278F0D45BC37004FD6C9 /* rocket-router */;
+		libgmallocEnabled = 0;
+		name = "rocket-router-0";
+		savedGlobals = {
+		};
+		sourceDirectories = (
+		);
+		startupPath = /Users/xthemage/Documents/Projects/netquery/code/topology/;
+	};
+	0AF4278F0D45BC37004FD6C9 /* rocket-router */ = {
+		isa = PBXFileReference;
+		lastKnownFileType = "compiled.mach-o.executable";
+		path = "rocket-router";
+		sourceTree = SOURCE_ROOT;
+	};
+	0AF427B00D45BD75004FD6C9 /* rocket-router-1 */ = {
+		isa = PBXExecutable;
+		activeArgIndices = (
+			YES,
+			YES,
+			YES,
+		);
+		argumentStrings = (
+			1,
+			rocketfuel/2002/rocket/3967.cch,
+			rocketfuel/2002/weights/3967/latencies.intra,
+		);
+		autoAttachOnCrash = 1;
+		breakpointsEnabled = 1;
+		configStateDict = {
+			"PBXLSLaunchAction-0" = {
+				PBXLSLaunchAction = 0;
+				PBXLSLaunchStartAction = 1;
+				PBXLSLaunchStdioStyle = 2;
+				PBXLSLaunchStyle = 0;
+				class = PBXLSRunLaunchConfig;
+				commandLineArgs = (
+				);
+				displayName = "Executable Runner";
+				environment = {
+				};
+				identifier = com.apple.Xcode.launch.runConfig;
+				remoteHostInfo = "";
+				startActionInfo = "";
+			};
+		};
+		customDataFormattersEnabled = 1;
+		debuggerPlugin = GDBDebugging;
+		disassemblyDisplayState = 0;
+		dylibVariantSuffix = "";
+		enableDebugStr = 1;
+		environmentEntries = (
+		);
+		executableSystemSymbolLevel = 0;
+		executableUserSymbolLevel = 0;
+		launchableReference = 0AF427B10D45BD75004FD6C9 /* rocket-router */;
+		libgmallocEnabled = 0;
+		name = "rocket-router-1";
+		savedGlobals = {
+		};
+		sourceDirectories = (
+		);
+		startupPath = /Users/xthemage/Documents/Projects/netquery/code/topology/;
+	};
+	0AF427B10D45BD75004FD6C9 /* rocket-router */ = {
+		isa = PBXFileReference;
+		lastKnownFileType = "compiled.mach-o.executable";
+		path = "rocket-router";
+		sourceTree = SOURCE_ROOT;
+	};
+	0AF427D70D464A24004FD6C9 /* Makefile */ = {
+		uiCtxt = {
+			sepNavIntBoundsRect = "{{0, 0}, {926, 1372}}";
+			sepNavSelRange = "{924, 0}";
+			sepNavVisRange = "{684, 1772}";
+			sepNavWindowFrame = "{{280, 33}, {872, 845}}";
+		};
+	};
+	0AF428560D46BBFE004FD6C9 /* trie-test */ = {
+		isa = PBXExecutable;
+		activeArgIndices = (
+			YES,
+		);
+		argumentStrings = (
+			250000,
+		);
+		autoAttachOnCrash = 1;
+		breakpointsEnabled = 1;
+		configStateDict = {
+			"PBXLSLaunchAction-0" = {
+				PBXLSLaunchAction = 0;
+				PBXLSLaunchStartAction = 1;
+				PBXLSLaunchStdioStyle = 2;
+				PBXLSLaunchStyle = 0;
+				class = PBXLSRunLaunchConfig;
+				commandLineArgs = (
+				);
+				displayName = "Executable Runner";
+				environment = {
+				};
+				identifier = com.apple.Xcode.launch.runConfig;
+				remoteHostInfo = "";
+				startActionInfo = "";
+			};
+		};
+		customDataFormattersEnabled = 1;
+		debuggerPlugin = GDBDebugging;
+		disassemblyDisplayState = 0;
+		dylibVariantSuffix = "";
+		enableDebugStr = 1;
+		environmentEntries = (
+		);
+		executableSystemSymbolLevel = 0;
+		executableUserSymbolLevel = 0;
+		launchableReference = 0AF428570D46BBFE004FD6C9 /* trie-test */;
+		libgmallocEnabled = 0;
+		name = "trie-test";
+		savedGlobals = {
+		};
+		sourceDirectories = (
+		);
+		startupPath = "<<ProjectDirectory>>";
+		variableFormatDictionary = {
+		};
+	};
+	0AF428570D46BBFE004FD6C9 /* trie-test */ = {
+		isa = PBXFileReference;
+		lastKnownFileType = "compiled.mach-o.executable";
+		path = "trie-test";
+		sourceTree = SOURCE_ROOT;
+	};
+	D28A88AD04BDD90700651E21 /* obj-test */ = {
+		activeExec = 0;
+	};
+}

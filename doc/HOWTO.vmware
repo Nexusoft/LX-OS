@@ -1,0 +1,66 @@
+How to run Nexus in VMWare player or Workstation
+
+#### Boot option 1: boot Nexus from CD
+
+This version bypasses the network boot step, which means that you 
+will have to recreate the iso with each change to your sourcecode. 
+
+Note that VMWare picks up the new iso automatically on each boot:
+you do not have to reload the virtual cd tray manually.
+
+## Install
+Download and install the player. No special settings
+necessary.
+
+## Create .VMDK
+Create a new vmware (.vmdk) image. You can use an
+online service such as easyvmx.com for this purpose
+
+## Create the .iso image
+Issue a `make iso`. Note that you need to reload the
+virtual CD tray in VMWare each time you make a new image.
+
+## Boot
+When VMWare boots of the virtual CD it will ask you
+for a boot command. Add 
+
+	initrd=initrd.tar vga=791 server=$IP
+
+where $IP is the address of your TFTP server. Note
+that the VGA mode is NOT the usual 792.
+
+#### Boot option 2: boot GPXE from CD and fetch Nexus
+
+GPXE, the network bootloader, also generates a .iso target
+that should be able to load Nexus using BOOTP. As of 
+2009-10-14, this target appears broken.
+
+#### Debugging
+
+VMWare workstation (not player) supports executing the
+guest with a gdb remote connection. To enable debugging,
+add this line to your virtual machine's .vmx file:
+
+	debugStub.listen.guest32 = "TRUE"
+
+Then, at runtime, connect to the machine and control it
+from the debugging by issuing the following command in gdb:
+
+	file build/kernel/init/vmnexus
+	target remote localhost:8832
+
+If you want the virtual system to start waiting for
+the gdb to connect and hit 'continue', also add this line:
+
+	monitor.debugOnStartGuest32 = "TRUE"
+
+More information at
+
+	http://stackframe.blogspot.com/2007/04/debugging-linux-kernels-with.html
+
+#### Troubleshooting
+
+## Networking
+Until the userspace e1000 driver is reenabled, networking
+is not supported
+

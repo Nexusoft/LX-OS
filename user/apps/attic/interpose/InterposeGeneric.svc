@@ -1,0 +1,115 @@
+service InterposeGeneric {
+  decls {
+    includefiles { "<op_types.h>" }
+    includefiles { "\"nexus/ipc.h\"" }
+    includefiles { "\"nexus/transfer.h\"" }
+    includefiles { "\"nexus/interpose.h\"" }
+  }
+
+  decls __callee__ {
+    includefiles { "<stdlib.h>" }
+    includefiles { "<assert.h>" }
+    includefiles { "../ipctest/PingPong.interface.h" }
+    includefiles { "PingPong_Generic.interpose.h" }
+
+    // includefiles { "\"PingPong_Interpose.interpose.h\"" }
+
+    const int READ_PASSTHROUGH = 0,
+      PRINT_PASSTHROUGH = 1;
+  }
+
+  decls __callee__ {
+    int Interpose_processNextCommand(void) {
+      return InterposeGeneric_processNextCommand();
+    }
+    void Interpose_serverInit(void) {
+      InterposeGeneric_serverInit();
+    }
+    void Interpose_serverDestroy(void) {
+      InterposeGeneric_serverDestroy();
+    }
+
+    Port_Num ping_port_num;
+
+    enum PortType {
+      PortType_Unknown,
+      PortType_PingPong,
+    };
+
+    static enum PortType get_port_type(IPD_ID source, IPD_ID dest, Port_Num port_num) {
+      IPD_ID query_dsts[] = { source, dest };
+      const char *type_name = Reflection_GetPortType(dest, port_num);
+      if(type_name != NULL) {
+	// printf("(%d=>%s)", port_num, type_name);
+	if(strcmp(type_name, PingPong_svc_name) == 0) {
+	  return PortType_PingPong;
+	}
+      }
+      return PortType_Unknown;
+    }
+  }
+
+  __callee__ {
+  }
+
+  interface  __NoGenReturn__
+    lf_generate { OID_NONE; }
+  lf_check { 1; }
+  int IEvent_Call(struct IEvent_Info event_info, struct IEvent_Call_Info call_info, 
+		__input__ struct VarLen message) {
+    if(get_port_type(event_info.src, event_info.dst, call_info.port_num) == PortType_PingPong) {
+      printf("call match\n");
+      PingPong_Interpose_processCall(ipd_id, call_handle,
+				     &event_info, &call_info, message);
+    } else {
+      int cmd;
+      int cmd2;
+      int rv;
+      if(READ_PASSTHROUGH) {
+	rv = IPC_TransferFrom(call_handle,
+			      message.desc_num, 
+			      &cmd2, (__u32)message.data, sizeof(cmd2));
+	if(rv != 0) {
+	  printf("error %d getting cmd2 value\n", rv);
+	}
+	rv = IPC_Interposition_GetValue(call_handle,
+					&cmd, sizeof(cmd));
+	if(rv != 0) {
+	  printf("error %d getting cmd value\n", rv);
+	}
+	if(PRINT_PASSTHROUGH) {
+	  printf("call pass through (ipd %d=>%d, port = %d (%d), cmd = %d , %d (len=%d))\n",
+		 event_info.src, event_info.dst, call_info.port_num,
+		 call_info.port_num - FIRST_SYSCALL_IPCPORT, cmd, cmd2,
+		 call_info.message_len);
+	}
+      }
+      IPC_Interposition_CallPassThrough(call_handle, &call_info);
+    }
+    return 0;
+  }
+
+  interface  __NoGenReturn__
+    lf_generate { OID_NONE; }
+  lf_check { 1; }
+  int IEvent_Transfer(struct IEvent_Info event_info, struct IEvent_Transfer_Info transfer_info, __input__ struct VarLen data) {
+    int PingPong_Interpose_processTransfer(Call_Handle call_transfer, struct IEvent_Info *event_info, struct IEvent_Transfer_Info *transfer_info, struct VarLen data);
+    assert(data.desc_num == ACCUM_DESCNUM);
+    if(get_port_type(event_info.src, event_info.dst, transfer_info.port_num) == PortType_PingPong) {
+      printf("transfer match\n");
+      return 
+	PingPong_Interpose_processTransfer(call_handle, &event_info, &transfer_info, data);
+    } else {
+      // printf("transfer passing through (%d=>%d) ", event_info.src, event_info.dst);
+      char data;
+      if(READ_PASSTHROUGH) {
+	IPC_TransferFrom(call_handle, ACCUM_DESCNUM,
+			 &data, DESCRIPTOR_START, 1);
+	if(PRINT_PASSTHROUGH) {
+	  printf("'%x'\n", (int)data);
+	}
+      }
+      return IPC_Interposition_TransferPassThrough(call_handle);
+    }
+  }
+}

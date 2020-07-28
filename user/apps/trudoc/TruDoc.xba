@@ -1,0 +1,305 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="TruDoc" script:language="StarBasic">REM  *****  BASIC  *****
+REM
+REM OpenOffice macros implementing the front-end to Nexus TruDoc
+REM
+
+Function fnNewDoc(sDocType As String)
+	fnNewDoc = StarDesktop.loadComponentFromURL(&quot;private:factory/&quot; &amp; sDocType , &quot;_blank&quot;, 0, Array())
+End Function 
+
+Function fnGetDocSignature()
+	oDoc = ThisComponent
+	oDSS = createUnoService(&quot;com.sun.star.security.DocumentDigitalSignatures&quot;)
+	&apos;oDSS.showDocumentContentSignatures(oDoc.DocumentStorage, NULL)
+	oSigs = oDSS.verifyDocumentContentSignatures(oDoc.DocumentStorage, NULL)
+	For i = LBound(oSigs) to UBound(oSigs)
+        oSig = oSigs(i)
+&apos;        If oSig.SignatureIsValid Then
+&apos;	        MsgBox &quot;ValidSignature &quot; &amp; i &amp; &quot; = &quot; &amp; oSig.SignatureIsValid
+	        fnGetDocSignature = oSig
+	       	Exit Function
+&apos;	    End If
+	Next i
+End Function
+
+
+Sub CopyAsBlockQuote
+	oSrcDoc = ThisComponent
+	oSrcFrame = oSrcDoc.CurrentController.Frame
+	dispatcher = createUnoService(&quot;com.sun.star.frame.DispatchHelper&quot;)
+	dispatcher.executeDispatch(oSrcFrame, &quot;.uno:Copy&quot;, &quot;&quot;, 0, Array())
+
+	oSig = fnGetDocSignature()
+	If IsEmpty(oSig) Then
+		MsgBox &quot;Sorry, CopyAsBlockQuote only works on signed documents.&quot; &amp; CHR$(10) &amp; CHR$(10) &amp; _
+		 &quot;Use &apos;Digital Signatures&apos; in the &apos;File&apos; menu to sign this document, then try again.&quot;,  16
+		Exit Sub
+	End If
+	
+	if NOT IsEmpty(oSig.Signer) Then
+		oName = oSig.Signer.SubjectName
+		i = InStr(oName, &quot;CN=&quot;)
+	Else
+		i = -1
+	End If
+	If NOT (i &gt; 0) Then
+		MsgBox &quot;Sorry, the digital signature on this document is&quot; &amp; CHR$(10) &amp; _
+		&quot;missing the &apos;SubjectName&apos; (e.g. the CN field).&quot; &amp; CHR$(10) &amp; CHR$(10) &amp; _
+		&quot;Please get a correct certificate and re-sign the document.&quot;, 16
+	End If
+	oName = Right(oName, Len(oName) - i + 1 - 3)
+	i = InStr(oName, &quot;,&quot;)
+	If i &gt; 1 Then oName = Left(oName, i-1)	
+
+	oTitle = oSrcDoc.DocumentInfo.Title
+	For i = 0 to oSrcDoc.DocumentInfo.UserFieldCount
+		If oSrcDoc.DocumentInfo.GetUserFieldName(i) = &quot;Published&quot; Then
+			oDate = oSrcDoc.DocumentInfo.GetUserFieldValue(i)
+			 Exit For
+		End If
+	Next i
+	if IsEmpty(oTitle) Then oTitle = &quot;unknown&quot;
+	if IsEmpty(oDate) Then oDate = &quot;unknown&quot;
+
+	oURL = oSrcDoc.URL
+	oDigest = fnGetDigest(oURL)
+
+	oDoc = fnNewDoc(&quot;swriter&quot;)
+	
+	&apos;oPage = StarDesktop.CurrentComponent.drawPages(0)
+	
+	oFrame = oDoc.createInstance(&quot;com.sun.star.text.TextFrame&quot;)
+	oFrame.Width = 17000 &apos;oPage.Width * 0.9
+	oFrame.Height = 1000
+	oFrame.AnchorType = com.sun.star.text.TextContentAnchorType.AS_CHARACTER
+	oFrame.TopMargin = 100
+	oFrame.BottomMargin = 100
+	oFrame.Leftmargin = 100
+	oFrame.RightMargin = 100
+	oFrame.BorderDistance = 100
+	oFrame.HoriOrient = com.sun.star.text.HoriOrientation.NONE
+	oFrame.VertOrient = com.sun.star.text.VertOrientation.LINE_TOP
+	
+	oCurs = oDoc.Text.createTextCursor()
+	oDoc.Text.insertTextContent(oCurs, oFrame, False)	
+
+	oCurs.paraAdjust = com.sun.star.style.ParagraphAdjust.CENTER
+	oCurs = oFrame.createTextCursor()
+	oDoc.CurrentController.Select(oCurs)
+	dispatcher.executeDispatch(oDoc.CurrentController.Frame, &quot;.uno:Paste&quot;, &quot;&quot;, 0, Array())
+	oText = oCurs.Text
+	oText.insertControlCharacter(oCurs, com.sun.star.text.ControlCharacter.PARAGRAPH_BREAK, False)
+	oCurs.paraAdjust = com.sun.star.style.ParagraphAdjust.RIGHT
+	s = &quot;--&quot; &amp; oName
+	if NOT (oTitle = &quot;unknown&quot;) Then s = s &amp; &quot;, &quot; &amp; oTitle
+	if NOT (oDate = &quot;unknown&quot;) Then s = s &amp; &quot;, &quot; &amp; oDate	
+	oText.insertString(oCurs, s, false)
+
+	eol = CHR$(10)
+	s = &quot;Nexus TruDoc attests to this blockquote as follows:&quot; &amp; eol
+	s = s &amp; &quot; author=&quot; &amp; oName &amp; eol
+	s = s &amp; &quot; title=&quot; &amp; oTitle &amp; eol
+	s = s &amp; &quot; date=&quot; &amp; oDate &amp; eol
+	s = s &amp; &quot; key=&quot; &amp; oSig.Signer.SubjectName &amp; eol
+	s = s &amp; &quot; hash=&quot; &amp; &quot;1234567&quot; &amp; eol
+
+	dim args6(2) as new com.sun.star.beans.PropertyValue
+	args6(0).Name = &quot;Text&quot;
+	args6(0).Value = s
+	args6(1).Name = &quot;Author&quot;
+	args6(1).Value = &quot;&quot;
+	args6(2).Name = &quot;Date&quot;
+	args6(2).Value = &quot;&quot;
+	
+	dispatcher.executeDispatch(oSrcFrame, &quot;.uno:InsertAnnotation&quot;, &quot;&quot;, 0, args6())
+
+	oDoc.CurrentController.Select(oDoc.Text)
+	dispatcher.executeDispatch(oDoc.CurrentController.Frame, &quot;.uno:Copy&quot;, &quot;&quot;, 0, Array())
+	
+	&apos; todo: close the document
+	
+End Sub
+
+
+Function fnGetDigest(oURL as String)
+	n = Len(oURL)
+	For i = 1 to n
+		if InStr(Right(oURL, i), &quot;/&quot;) Then
+			oTmpFile = Left(oUrl, n-i) &amp; &quot;/tmp_sigs.xml&quot;
+			Exit For
+		End If
+	Next i
+	If IsEmpty(oTmpFile) Then
+		MsgBox &quot;Problem creating temp file.&quot;, 16
+		Exit Function
+	End If
+
+	UnZip( oURL, &quot;META-INF/documentsignatures.xml&quot;, oTmpFile )
+
+	sf = createUnoService(&quot;com.sun.star.ucb.SimpleFileAccess&quot;)
+	On Error Goto fichierKO
+	fileStream = sf.openFileRead(oTmpFile)
+	myTextFile = createUnoService(&quot;com.sun.star.io.TextInputStream&quot;)
+	myTextFile.InputStream = fileStream
+	myTextFile.Encoding = &quot;ISO-8859-15&quot;
+
+	Do while not myTextFile.IsEOF
+	  digest = myTextFile.readLine
+	  i = InStr(digest, &quot;&lt;Reference URI=&quot;&quot;content.xml&quot;&quot;&gt;&quot;)
+	  If i &gt; 0 Then
+	  	digest = Right(digest, Len(digest) - i + 1)
+	  	digest = Left(digest, InStr(digest, &quot;&lt;/DigestValue&gt;&quot;) - 1)
+	  	digest = Right(digest, Len(digest) - InStr(digest, &quot;&lt;DigestValue&gt;&quot;) - 13)
+	  	digest = Base64Decode(digest)
+	  	fnGetDigest = digest
+		MsgBox(digest)
+	  End If
+	Loop
+
+	fileStream.closeInput
+	myTextFile.closeInput
+	On Error Goto 0
+	fnGetDigest = &quot;123&quot;
+	Exit Function
+FichierKO:
+	Resume FichierKO2
+FichierKO2:
+On Error Resume Next
+	MsgBox &quot;File read error!&quot;, 16
+	fileStream.closeInput
+	myTextFile.closeInput
+	On Error Goto 0
+End Function
+
+Sub UnZip( sZipPackageUrl As String, sPkgSourceFile As String, sDestFile As String )   
+
+  Dim oZipPackage As Variant
+  oZipPackage = createUnoService(&quot;com.sun.star.packages.Package&quot;)
+  oZipPackage.initialize( Array( sZipPackageUrl ) )
+
+  Dim oZipPackageStream As Variant
+  oZipPackageStream = oZipPackage.getByHierarchicalName( sPkgSourceFile )
+
+  Dim xInputStream As Variant
+  xInputStream = oZipPackageStream.getInputStream()
+
+  Dim xSimpleFileAccess As Variant
+  xSimpleFileAccess = createUnoService( &quot;com.sun.star.ucb.SimpleFileAccess&quot; )
+
+  xSimpleFileAccess.WriteFile( ConvertToUrl( sDestFile ), xInputStream )
+
+End Sub 
+
+
+&apos; Convert a string into an array of bytes.
+&apos; Pass a string value to the cString parameter.
+&apos; The function returns an array of bytes, suitable
+&apos;  for writing to a com.sun.star.io.XOutputStream.
+&apos; This function is the opposite of ByteArrayToString().
+Function StringToByteArray( cString )
+   nNumBytes = Len( cString )
+   Dim aBytes(nNumBytes-1) As Integer
+   For i = 1 To nNumBytes
+      cChar = Mid( cString, i, 1 )
+      nByte = Asc( cChar )
+      nByte = IntegerToByte( nByte )
+      aBytes(i-1) = nByte
+   Next
+   StringToByteArray() = aBytes()
+End Function
+
+
+&apos; This function is the opposite of ByteToInteger().
+Function IntegerToByte( nByte )
+   If nByte &gt; 127 Then
+      nByte = nByte - 256
+   EndIf
+   IntegerToByte() = nByte
+End Function
+
+
+Const BASE64_ALPHABET = &quot;ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/&quot;
+
+&apos;----------
+&apos; This function is the opposite of Base64Encode().
+&apos; Pass in a string of printable characters from
+&apos;    the base64 alphabet.
+&apos;  Input should be multiple of 4 characters in length.
+&apos; Out comes a string of raw binary bytes.
+&apos; This does not handle whitespace in the input.
+&apos; See RFC 1521 for details of base64 encoding.
+&apos;
+Function Base64Decode( cBase64Text )
+   cOutput = &quot;&quot;
+   nLen = Len( cBase64Text )
+   i = 1
+   &apos; do while there&apos;s 4 or more characters to process
+   Do While nLen - i &gt;= 3
+      cFourChars = Mid( cBase64Text, i, 4 )
+      
+      &apos; An equal sign means fewer than 3 output bytes,
+      &apos;  we&apos;re at the end of the input stream.
+      If Right( cFourChars, 1 ) = &quot;=&quot; Then
+         If Right( cFourChars, 2 ) = &quot;==&quot; Then
+            &apos; Only 1 output byte instead of 3.
+            cFourChars = Left( cFourChars, 2 ) + &quot;AA&quot;
+            cOutput = cOutput + Left( Base64Decode4to3( cFourChars ), 2 )
+         Else
+            &apos; Only 2 output bytes instead of 3.
+            cFourChars = Left( cFourChars, 3 ) + &quot;A&quot;
+            cOutput = cOutput + Left( Base64Decode4to3( cFourChars ), 4 )
+         EndIf
+         Exit Do
+      EndIf
+      
+      &apos; Convet 4 chars to 3 binary bytes.
+      cOutput = cOutput + Base64Decode4to3( cFourChars )
+      i = i + 4
+   Loop
+   Base64Decode() = cOutput
+End Function
+
+&apos; Convert 4 base64 encoded printable characters into 3 binary bytes.
+Function Base64Decode4to3( cFourChars )
+   nInChar1 = Instr( 1, BASE64_ALPHABET, Mid( cFourChars, 1, 1 ), 0 ) - 1
+   nInChar2 = Instr( 1, BASE64_ALPHABET, Mid( cFourChars, 2, 1 ), 0 ) - 1
+   nInChar3 = Instr( 1, BASE64_ALPHABET, Mid( cFourChars, 3, 1 ), 0 ) - 1
+   nInChar4 = Instr( 1, BASE64_ALPHABET, Mid( cFourChars, 4, 1 ), 0 ) - 1
+   
+   nOutByte1 = nInChar1 * 4 + Int( nInChar2 / 16 )
+   nOutByte2 = (nInChar2 Mod 16) * 16 + Int( nInChar3 / 4 )
+   nOutByte3 = (nInChar3 Mod 4) * 64 + nInChar4
+
+   nOutStr1 = HexByte(nOutByte1)
+   nOutStr2 = HexByte(nOutByte2)
+   nOutStr3 = HexByte(nOutByte3)
+      
+   cThreeBytes = nOutStr1 &amp; nOutStr2 &amp; nOutStr3
+   Base64Decode4to3() = cThreeBytes
+End Function 
+
+Function PrintBytes( b )
+	n = Len(b)
+	s = &quot;&quot;
+	For i = 0 to n-1
+		v = (CInt(Mid(b, i, 1)) AND 255)
+		If v &lt; 16 Then
+			s = s &amp; &quot;0&quot; &amp; v
+		Else
+			s = s &amp; v
+		End If
+	Next i
+	PrintBytes = s
+End Function
+
+Function HexByte( b )
+	c =  &quot;0123456789ABCDEF&quot;
+	If (b &lt; 16) Then
+		HexByte = &quot;-0&quot; &amp; Mid(c, b_+ 1, 1)
+	Else
+		HexByte = &quot;-&quot; &amp; Mid(c, (b\16) + 1, 1) &amp; Mid(c, (b AND 15) + 1, 1)
+	End If
+End Function
+</script:module>

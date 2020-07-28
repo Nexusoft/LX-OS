@@ -1,0 +1,484 @@
+service FS {
+
+   /** NexusOS: Filesystem interface 
+    
+       ** Notice:
+
+       In userspace, you should almost always prefer the posix IO interface
+       over this.
+
+       ** Design:
+
+       All filesystems are implemented as IPC servers and can be contacted
+       through this client interface. Most calls are standard and self-
+       explanatory. 
+    
+       ** Interface: FS_[xxx] and nexusfs_[xxx]
+
+       The main FS functionality is offered through the IDL generated FS_
+       functions. The nexusfs_ offer a more convenient interface for 
+       operations that are tedious to encode in FS_ notation. Not all
+       FS_ functions need a nexusfs_ counterpart, however.
+
+       ** Mounting
+
+       To mount a filesystem, issue a nexusfs_mount(..) command and give the 
+       port controlling that FS. If the parent argument is empty, this FS will
+       be considered the root and FS_conn_handle (see below) will be updated
+       accordingly. The mount operation will create a connection to the port 
+       and store it in a lookup table. 
+       
+       ** Lookup
+
+       By default, all FS_[xxx] commands are sent over the connection 
+       FS_conn_handle to a fixed port, as a result of how the IDL generates 
+       code. We set this handle to point to the root filesystem. For all
+       other filesystems, you have to call the FS_[xxx]_ext functions,
+       which take a port as extra command. 
+     
+       The nexusfs_ functions are automatically routed to the correct
+       port; they learn the route by extracting the port number from the FSID
+    */
+
+  decls {
+    includefiles { "u:<string.h>" }
+    includefiles { "<nexus/commontypedefs.h>" }
+    includefiles { "\"nexus/fs.h\"" }
+	
+    /**** Support functions to simplify FS.svc calling ********/
+ 
+    int nexusfs_mount(FSID target, FSID fs_root);
+    int nexusfs_unmount(FSID target, FSID fs_root);
+    Connection_Handle nexusfs_getmount(FSID target);
+
+    FSID nexusfs_mkdir(FSID parent, const char *name);
+    FSID nexusfs_mk(FSID parent, const char *name, void *value);
+    FSID nexusfs_mk_bin(FSID parent, const char *name, void *value, int vlen);
+    int  nexusfs_unlink(FSID parent, const char *name);
+
+    int nexusfs_pin(FSID node);
+    int nexusfs_unpin(FSID node);
+    int nexusfs_truncate(FSID node, int len);
+    
+    FSID nexusfs_lookup(FSID parent, const char *name);
+    FSID nexusfs_lookup_mount(FSID parent, const char *name);
+  }
+
+  decls __caller__ {
+    includefiles { "<nexus/defs.h>",
+	    	   "u:<nexus/sema.h>",
+	    	   "k:<nexus/synch.h>",
+	    	   "k:<nexus/synch-inline.h>",
+	    	   "k:<nexus/user_compat.h>",
+    		   "<nexus/fs.h>" }
+	
+    	/** A lookup structure from port to handle */
+	
+	//IDL doesn't allow defines. will hardcode below
+	const static int FSPORTCOUNT = 10;
+
+    	struct mounttable_entry {
+		Port_Num port;
+		Connection_Handle handle;
+		int refcount;
+	};
+
+	/** XXX move mounttable to IPC. It is a generic port->handle table */
+
+	/** Lookup table from port to client connection.
+	    The table is a static array to avoid need for _init() calls;
+	    this does make it slow. */
+	static struct mounttable_entry mounttable[10 /* FSPORTCOUNT */];
+	static Sema mounttable_mutex = SEMA_MUTEX_INIT;
+
+        /* Associate a handle with a port. 
+	   Only one handle can be associated with any port.
+	   If the handle was already associated, increases refcount. 
+
+	   @return 0 on success. -1 on error */
+    	static int
+	__mounttable_add(Port_Num port_num, Connection_Handle handle)
+	{
+		int i;
+		
+		P(&mounttable_mutex);
+		// search for existing handle
+		for (i = 0; i < FSPORTCOUNT; i++) {
+			if (mounttable[i].port == port_num &&
+			    mounttable[i].refcount > 0) {
+				if (mounttable[i].handle != handle) {
+					// other handle found
+					V_nexus(&mounttable_mutex);
+					return -1;
+				}
+				else {
+					// same handle found
+					mounttable[i].refcount++;
+					V_nexus(&mounttable_mutex);
+					return mounttable[i].handle;
+				}
+			}
+		}
+
+		// add new
+		for (i = 0; i < FSPORTCOUNT; i++) {
+			if (!mounttable[i].refcount) {
+				mounttable[i].refcount = 1;
+				mounttable[i].port = port_num; 
+				mounttable[i].handle = handle;
+				V_nexus(&mounttable_mutex);
+				return 0;
+			}
+		}
+
+		V_nexus(&mounttable_mutex);
+		nxcompat_fprintf(stderr, "[fs] no room in fs mount table\n");
+		return -1;
+	}
+
+    	 /* Lookup a connection by port. */
+	 static Connection_Handle
+	__mounttable_find(Port_Num port_num)
+	{
+		Connection_Handle handle = INVALID_HANDLE;
+		int i;
+		
+		P(&mounttable_mutex);
+		for (i = 0; i < FSPORTCOUNT; i++) {
+			if (mounttable[i].port == port_num &&
+			    mounttable[i].refcount > 0) {
+				V_nexus(&mounttable_mutex);
+				return mounttable[i].handle;
+			}
+		}
+		V_nexus(&mounttable_mutex);
+		return INVALID_HANDLE;
+	}
+
+	 static Connection_Handle
+	__mounttable_find_or_add(Port_Num port_num)
+	{
+		Connection_Handle handle;
+
+		handle = __mounttable_find(port_num);
+		if (handle != INVALID_HANDLE)
+			return handle;
+
+		// create a new connection
+		handle = IPC_DoBind(port_num);
+		if (handle == INVALID_HANDLE)
+		  return INVALID_HANDLE;
+
+	        __mounttable_add(port_num, handle);
+		return handle;
+	}
+
+	 /* Reduce refcount on a handle.
+	    
+	    @return new reference count */
+	static int
+	__mounttable_del(Port_Num port_num)
+	{
+		int i, ret;
+		
+		P(&mounttable_mutex);
+		for (i = 0; i < FSPORTCOUNT; i++) {
+			if (mounttable[i].port == port_num &&
+			    mounttable[i].refcount > 0) {
+				assert(mounttable[i].refcount);
+				mounttable[i].refcount--;
+				
+				if (!mounttable[i].refcount)
+					mounttable[i].port = -1;
+				ret = mounttable[i].refcount;
+				V_nexus(&mounttable_mutex);
+				return ret;
+			}
+		}
+		V_nexus(&mounttable_mutex);
+		return -1;
+	}
+
+    	/** Mount a volume.
+	    Creates an IPC connection and stores that for later use. 
+	 
+	    @param target is the FSID of a valid directory, or FSID_EMPTY.
+	           In the latter case, the filesystem is taken as the root
+	           and FS_conn_handle is updated accordingly. 
+	 
+	    @param return 0 on success, an errorcode on failure. */
+        int 
+	nexusfs_mount(FSID parent, FSID child)
+	{
+	  Connection_Handle parent_handle, child_handle;
+
+	  // open connection to child IPC port
+	  child_handle = __mounttable_find_or_add(child.port);
+	  
+	  // If no parent, make this the new fs root node of the process.
+	  // All FS_xxx calls, as generated by IDL, route to FS_conn_handle.
+	  if (FSID_isNull(parent)) {
+	  	FS_conn_handle = child_handle;
+	  }
+	  else {
+		  // open connection to parent IPC port
+		  parent_handle = __mounttable_find_or_add(parent.port);
+		  if (parent_handle == INVALID_HANDLE)
+			    return -FS_INVALID;
+	  
+		// Call Mount to have the parent FS create the link
+		if (FS_Mount_ext(parent_handle, parent, child)) {
+		      // XXX close IPC connection
+		      return -FS_INVALID;
+		}
+	  }
+	  	 
+	  return 0;
+	}
+    
+	/** Reverse a mount operation. */
+	int nexusfs_unmount(FSID target, FSID fs_root)
+	{
+	  // disassociate the volume with the parent directory
+	  if (FSID_isDir(target))
+	 	 FS_Unmount_ext(__mounttable_find(target.port), target);
+	  
+	  // remove from mounttable if no more mount points are open
+	  // XXX add mountpoint reference counting. disable unmount for now
+#if 0
+	  if (!__mounttable_del(fs_root.port))
+	  	IPC_CloseConnection(handle);
+#endif
+	  return 0;
+	}
+
+	/** Return the handle. Works on any inode (not just the root) */
+    	Connection_Handle nexusfs_getmount(FSID target)
+	{
+	  return __mounttable_find(target.port);
+	}
+
+	int nexusfs_pin(FSID node)
+	{
+		return FS_Pin_ext(__mounttable_find_or_add(node.port), node);
+	}
+
+	int nexusfs_unpin(FSID node)
+	{
+		return FS_Unpin_ext(__mounttable_find_or_add(node.port), node);
+	}
+
+	int nexusfs_truncate(FSID node, int len)
+	{
+		return FS_Truncate_ext(__mounttable_find_or_add(node.port), node, len);
+	}
+
+	/** Create a directory */
+	FSID
+	nexusfs_mkdir(FSID parent, const char *name)
+	{
+	  return FS_Create_ext(__mounttable_find_or_add(parent.port), parent,
+			       (struct VarLen) {.data= (char*) name, .len=strlen(name) + 1}, 
+			       FS_NODE_DIR);
+	}
+
+	/** Create a file and write its initial contents */
+	FSID
+	nexusfs_mk_bin(FSID parent, const char *name, void *value, int vlen)
+	{
+	  FSID file;
+	  int nlen, ret;
+
+	  nlen = strlen(name) + 1;
+	  file = FS_Create_ext(__mounttable_find_or_add(parent.port), parent, 
+			       (struct VarLen) {.data= (char*) name, .len=nlen}, FS_NODE_FILE);
+	  if (!FSID_isValid(file))
+		  return file;
+	  
+	  if (vlen) {
+		  ret = FS_Write_ext(__mounttable_find_or_add(parent.port), file, 0, 
+				     (struct VarLen) {.data=value, .len=vlen}, vlen);
+		  if (ret < vlen) // nb: semantics are stronger than posix:write(..)
+			  return FSID_ERROR(ret);
+	  }
+
+	  return file;
+	}
+
+	/** Create a file and write its initial contents (\0 terminated) */
+	FSID
+	nexusfs_mk(FSID parent, const char *name, void *value)
+	{
+	  if (value)
+	    return nexusfs_mk_bin(parent, name, value, strlen(value) + 1);
+	  else
+	    return nexusfs_mk_bin(parent, name, NULL, 0);
+	}
+
+	/** Lookup operation */
+	FSID
+	nexusfs_lookup(FSID parent, const char *name)
+	{
+          return FS_Lookup_ext(__mounttable_find_or_add(parent.port), parent, 
+			       (struct VarLen) {.data = (char*) name, .len = strlen(name) + 1}, 0);
+	}
+
+	/** Near duplicate of nexusfs_lookup. 
+	    too lazy to change all its callers */
+	FSID
+	nexusfs_lookup_mount(FSID parent, const char *name)
+	{
+          return FS_Lookup_ext(__mounttable_find_or_add(parent.port), parent, 
+			       (struct VarLen) {.data = (char*) name, .len = strlen(name) + 1}, 1);
+	}
+
+	/** Unlink operation.
+	    @return 0 on success, errorcode <0 on failure */
+	int
+	nexusfs_unlink(FSID parent, const char *name)
+	{
+	  FSID child = nexusfs_lookup(parent, name);
+	  if (!FSID_isValid(child))
+		  return -1;
+	  return FS_Unlink_ext(__mounttable_find_or_add(parent.port), parent, child);
+	}
+
+  }
+
+  // The primary operations are:
+  //  For files: read, write, truncate, sync, size, and unlink.
+  //  For directories, readdir, create, lookup, mount, unmount, and unlink.
+  //
+  // Files and directories are referred to using FSIDs. These are opaque
+  // handles, and may be re-used by servers over time. Care must be taken to
+  // ensure that a file or directory's FSID, if held by some client, does not
+  // get re-used for some other file or directory until the client is done with
+  // the FSID. This is done by marking things as "busy".
+  //
+  // Pin and unpin are used to mark a file or directory as "busy".
+  //
+  // Any operation is permitted on a busy file. But, if a busy file is unlinked
+  // it becomes an orphan. An orphaned file can still be manipulated just like
+  // any other, although any operation on an orphan may result in FS_STALE, at
+  // the discretion of the filesystem. As soon as an orphaned file becomes
+  // non-busy, the file disappears and its FSID can be reclaimed for use by
+  // other objects.
+  //
+  // Directories can only be unlinked if they are empty and not mounted. If a
+  // directory is busy at the time unlinked is called, or has orphaned
+  // sub-directories, either the unlink request is rejected with error
+  // FS_BUSYDIR, or the directory itself becomes an orphan. An orphan cannot be
+  // modified in any way, and may return FS_STALE for any operation. Once all of
+  // the directories orphaned sub-directories finally disappear, and the
+  // directory becomes non-busy itself, then the directory disappears and its
+  // FSID can be reclaimed for use by other objects.
+  //
+  // Notice that if a filesystem uses sequentially increasing FSIDs, then both
+  // Pin and Unpin can be no-ops, and there is no need to keep track of orphans
+  // or the "busy" state of files or directories. Instead, any operation on a
+  // seemingly invalid file handle fails with FS_INVALID if the FSID was never
+  // yet used, or FS_STALE if the FSID was used at some point in the past. This
+  // is the strategy used by both Reflection and kernelfs.
+  //
+  // Directories can only be mounted if they are non-busy. Not all filesystems
+  // support Mount/Unmount.
+  //
+  // As a general rule, an FSID can only be stored long-term in an application
+  // if the FSID is pinned, or is known to be a non-empty directory. Otherwise,
+  // the FSID can become invalid without warning, or worse, suddenly be reused
+  // for newly created object.
+  //
+  // Normally, applications pin files and directories that are currently "open",
+  // as well as the (leaf node of the) current working directory. The parent
+  // directories from the current working directory or from an open directory
+  // need not be pinned, because they are non-empty and so will not be unlinked.
+  // The directory and parents for an open file need not be pinned, because the
+  // path will not be used again.
+  //
+  // Mounted directories introduces some complications. Lookup normally resolves
+  // mounts, and returns the (presumably root node) of the mounted file system.
+  // A stale FSID to the original, non-resolved FSID will still work as usual,
+  // however.  Thus Pin, Create, ReadDir, and Lookup all work on a mounted
+  // directory just as if the directory were not mounted at all. Normally, an
+  // application would prefer to use the resolved directory instead, but it is
+  // not always possible to efficiently detect a stale directory FSID.
+  
+  interface lf_generate { OID_NONE; } lf_check { 1; }
+  int Pin(FSID target_node) {
+    return 0;
+  }
+
+  interface lf_generate { OID_NONE; } lf_check { 1; }
+  int Unpin(FSID target_node) {
+    return 0;
+  }
+
+  interface lf_generate { OID_NONE; } lf_check { 1; }
+  FSID Create(FSID parent_node, 
+	    __input__ struct VarLen node_name, int nodeType) {
+    return FSID_ERROR(FS_UNSUPPORTED);
+  }
+
+  interface lf_generate { OID_NONE; } lf_check { 1; }
+  int Read(FSID target_node, int file_position, 
+	    __output__ struct VarLen dest, int count) {
+    return -FS_UNSUPPORTED;
+  }
+
+  /** Read the name of an item in a directory. 
+   
+      @param offset selects the number of the item to read.
+      @return 1 if there are more items, 0 if not or an negative errorcode on failure
+   
+      Note that this implementation may skip/repeat files if the
+      directory is changed in between readdir calls. This behavior
+      is accepted by the Posix/SUS standards. */
+  interface lf_generate { OID_NONE; } lf_check { 1; }
+  int 
+  ReadDir(FSID target_node, __output__ struct VarLen dest, int offset) {
+    return -FS_UNSUPPORTED;
+  }
+
+  interface lf_generate { OID_NONE; } lf_check { 1; }
+  int Write(FSID target_node, int file_position,
+	     __input__ struct VarLen source, int count) {
+    return -FS_UNSUPPORTED;
+  }
+
+  interface lf_generate { OID_NONE; } lf_check { 1; }
+  int Truncate(FSID target_node, int target_len) {
+    return -FS_UNSUPPORTED;
+  }
+
+  interface lf_generate { OID_NONE; } lf_check { 1; }
+  int Sync(FSID target_node) {
+    return -FS_UNSUPPORTED;
+  }
+
+  // should be generalized to stat() eventually
+  interface lf_generate { OID_NONE; } lf_check { 1; }
+  int Size(FSID target_node) {
+    return -FS_UNSUPPORTED;
+  }
+
+  interface lf_generate { OID_NONE; } lf_check { 1; }
+  FSID Lookup(FSID parent_node, __input__ struct VarLen node_name, int resolve_mounts) {
+    return FSID_ERROR(FS_UNSUPPORTED);
+  }
+
+  interface lf_generate { OID_NONE; } lf_check { 1; }
+  int Unlink(FSID parent_node, FSID child_node) {
+    return -FS_UNSUPPORTED;
+  }
+
+  interface lf_generate { OID_NONE; } lf_check { 1; }
+  int Mount(FSID target_node, FSID mount_node) {
+    return -FS_UNSUPPORTED;
+  }
+
+  interface lf_generate { OID_NONE; } lf_check { 1; }
+  int Unmount(FSID target_node) {
+    return -FS_UNSUPPORTED;
+  }
+}
+

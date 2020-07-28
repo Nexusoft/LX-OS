@@ -1,0 +1,128 @@
+diff -Nur openssl-0.9.8k-vanilla/crypto/Makefile openssl-0.9.8k/crypto/Makefile
+--- openssl-0.9.8k-vanilla/crypto/Makefile	2008-09-17 13:10:55.000000000 -0400
++++ openssl-0.9.8k/crypto/Makefile	2009-09-23 11:29:56.000000000 -0400
+@@ -5,9 +5,12 @@
+ DIR=		crypto
+ TOP=		..
+ CC=		cc
+-INCLUDE=	-I. -I$(TOP) -I../include
+-# INCLUDES targets sudbirs!
+-INCLUDES=	-I.. -I../.. -I../../include
++GCCHOME=      /usr/lib/gcc/$(shell gcc -dumpmachine)/$(shell gcc -dumpversion)
++NEXUSROOT=    $(shell pwd)/../../../../../
++SYSINCLUDES=  -nostdinc -isystem $(GCCHOME)/include -isystem $(GCCHOME)/include-fixed -isystem $(NEXUSROOT)/user/include
++INCLUDE=      -I. -I$(TOP) -I../include $(SYSINCLUDES)
++INCLUDES=     -I.. -I../.. -I../../include $(SYSINCLUDES)
++# INCLUDES targets subdirs!
+ CFLAG=		-g
+ MAKEDEPPROG=	makedepend
+ MAKEDEPEND=	$(TOP)/util/domd $(TOP) -MD $(MAKEDEPPROG)
+diff -Nur openssl-0.9.8k-vanilla/Makefile openssl-0.9.8k/Makefile
+--- openssl-0.9.8k-vanilla/Makefile	2009-03-25 09:11:43.000000000 -0400
++++ openssl-0.9.8k/Makefile	2009-09-23 11:33:34.000000000 -0400
+@@ -12,10 +12,10 @@
+ SHLIB_MAJOR=0
+ SHLIB_MINOR=9.8
+ SHLIB_EXT=
+-PLATFORM=dist
++PLATFORM=linux-elf
+ OPTIONS= no-camellia no-capieng no-cms no-gmp no-jpake no-krb5 no-mdc2 no-montasm no-rc5 no-rfc3779 no-seed no-shared no-zlib no-zlib-dynamic
+-CONFIGURE_ARGS=dist
+-SHLIB_TARGET=
++CONFIGURE_ARGS=linux-elf
++SHLIB_TARGET=linux-shared
+ 
+ # HERE indicates where this Makefile lives.  This can be used to indicate
+ # where sub-Makefiles are expected to be.  Currently has very limited usage,
+@@ -25,11 +25,12 @@
+ # INSTALL_PREFIX is for package builders so that they can configure
+ # for, say, /usr/ and yet have everything installed to /tmp/somedir/usr/.
+ # Normally it is left empty.
+-INSTALL_PREFIX=
+-INSTALLTOP=/usr/local/ssl
++NEXUSROOT=$(shell pwd)/../../../..
++INSTALL_PREFIX=$(NEXUSROOT)
++INSTALLTOP=/user
+ 
+ # Do not edit this manually. Use Configure --openssldir=DIR do change this!
+-OPENSSLDIR=/usr/local/ssl
++OPENSSLDIR=/user/share/ssl
+ 
+ # NO_IDEA - Define to build without the IDEA algorithm
+ # NO_RC4  - Define to build without the RC4 algorithm
+@@ -59,9 +60,12 @@
+ # equal 4.
+ # PKCS1_CHECK - pkcs1 tests.
+ 
+-CC= cc
+-CFLAG= -O
++CC= gcc
++CC_ARCH=$(shell gcc -dumpmachine)
++CC_VER=$(shell gcc -dumpversion)
+ DEPFLAG= -DOPENSSL_NO_CAMELLIA -DOPENSSL_NO_CAPIENG -DOPENSSL_NO_CMS -DOPENSSL_NO_GMP -DOPENSSL_NO_JPAKE -DOPENSSL_NO_MDC2 -DOPENSSL_NO_RC5 -DOPENSSL_NO_RFC3779 -DOPENSSL_NO_SEED
++INCFLAG= -nostdinc -isystem $(NEXUSROOT)/user/include/ -isystem /usr/lib/gcc/$(CC_ARCH)/$(CC_VER)/include -isystem /usr/lib/gcc/$(CC_ARCH)/$(CC_VER)/include-fixed -isystem $(NEXUSROOT)/common/include
++CFLAG= -g -O -fomit-frame-pointer -fno-stack-protector -march=i686 -Wall $(INCFLAG)
+ PEX_LIBS= 
+ EX_LIBS= 
+ EXE_EXT= 
+@@ -69,10 +73,10 @@
+ AR=ar $(ARFLAGS) r
+ ARD=ar $(ARFLAGS) d
+ RANLIB= /usr/bin/ranlib
+-PERL= /usr/bin/perl
++PERL= /usr/bin/env perl
+ TAR= tar
+ TARFLAGS= --no-recursion
+-MAKEDEPPROG=makedepend
++MAKEDEPPROG=gcc
+ 
+ # We let the C compiler driver to take care of .s files. This is done in
+ # order to be excused from maintaining a separate set of architecture
+@@ -114,7 +118,7 @@
+ # $(INSTALLTOP) for this build make be different so hard
+ # code the path.
+ 
+-FIPSLIBDIR=/usr/local/ssl/fips-1.0/lib/
++FIPSLIBDIR=/user/share/ssl/lib
+ 
+ # This is set to "y" if fipscanister.o is compiled internally as
+ # opposed to coming from an external validated location.
+@@ -133,8 +137,7 @@
+ 
+ BASEADDR=0xFB00000
+ 
+-DIRS=   crypto ssl engines apps test tools
+-SHLIBDIRS= crypto ssl
++DIRS=   crypto ssl 
+ 
+ # dirs in crypto to build
+ SDIRS=  \
+@@ -613,7 +616,12 @@
+ dist_pem_h:
+ 	(cd crypto/pem; $(MAKE) -e $(BUILDENV) pem.h; $(MAKE) clean)
+ 
+-install: all install_docs install_sw
++#install: all install_docs install_sw
++install: libcrypto.a libssl.a
++	@echo "Installing openssl libraries in $(NEXUSROOT)/user/lib"
++	@cp libcrypto.a libssl.a $(NEXUSROOT)/user/lib/
++	@echo "Installing openssl headers in $(NEXUSROOT)/user/include"
++	@cp -rL include/openssl $(NEXUSROOT)/user/include
+ 
+ install_sw:
+ 	@$(PERL) $(TOP)/util/mkdir-p.pl $(INSTALL_PREFIX)$(INSTALLTOP)/bin \
+diff -Nur openssl-0.9.8k-vanilla/ssl/Makefile openssl-0.9.8k/ssl/Makefile
+--- openssl-0.9.8k-vanilla/ssl/Makefile	2008-09-17 13:11:09.000000000 -0400
++++ openssl-0.9.8k/ssl/Makefile	2009-09-23 10:36:47.000000000 -0400
+@@ -5,7 +5,10 @@
+ DIR=	ssl
+ TOP=	..
+ CC=	cc
+-INCLUDES= -I../crypto -I$(TOP) -I../include $(KRB5_INCLUDES)
++GCCHOME=	/usr/lib/gcc/$(shell gcc -dumpmachine)/$(shell gcc -dumpversion)
++NEXUSROOT=	$(shell pwd)/../../../../../
++SYSINCLUDES=	-nostdinc -isystem $(GCCHOME)/include -isystem $(GCCHOME)/include-fixed -isystem $(NEXUSROOT)/user/include
++INCLUDES= -I../crypto -I$(TOP) -I../include $(KRB5_INCLUDES) $(SYSINCLUDES)
+ CFLAG=-g
+ MAKEFILE=	Makefile
+ AR=		ar r

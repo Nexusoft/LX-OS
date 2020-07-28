@@ -1,0 +1,4 @@
+
+TARGET := $(d)/igeneric
+OBJS := $(d)/itest.o $(p)/ipctest/PingPong.client.o $(d)/PingPong_Generic.interpose.o $(d)/InterposeGeneric.server.o
+include Makefile.app

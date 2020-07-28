@@ -1,0 +1,5 @@
+TARGET := $(d)/taint
+OBJS := $(d)/taint.o $(d)/InterposeEventDriver.server.o $(d)/TapNotificationHandler.server.o
+#include Makefile.app
+include Makefile.app_efence
+

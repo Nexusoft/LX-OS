@@ -1,0 +1,15 @@
+transaction begin
+tuple id 1
+attribute name raw_tester op write value yo
+attribute name raw_tester op read
+tuple id 2
+tuple id 3
+transaction commit
+transaction begin
+tuple id 1
+attribute name raw_tester op write value wordup
+dump
+transaction abort
+transaction begin
+attribute name raw_tester op read
+transaction abort

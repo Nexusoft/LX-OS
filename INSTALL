@@ -1,0 +1,70 @@
+Nexus Installation Instructions
+
+#### Install
+
+run `make` in the top level directory. If the build stops before
+completing (probably at IPC.interface.h), run `make` again.
+
+copy a boot images build/boot/stage1/ to the destination host. The LiveCD
+image is nexus.iso. The nexus-gpxe targets are all variants of the same
+network boot approach: the iso boots from a CD, bzImage can be inserted
+in a bootloader such as GRUB and usb copied to a USB stick.  Both iso
+images have been tested. The USB may or may not work; you can also use
+a tool such as 'unetbootin' to write an iso to a bootable USB stick.
+
+Optionally, run an NFS server on your development host and have it point
+to $NEXUS/build/boot/bin. Don't worry if this directory does not yet
+exist. It will after a succesful build.
+
+
+#### Prerequisites
+
+Nexus has to be built on a 32-bit platform (because of libgcc resolving)!
+All standard version from Ubuntu 9.04 (Jaunty) have been known to work.
+
+gcc
+binutils
+flex
+bison
+patch
+mkisofs		(in archlinux, get package 'cdrkit')
+syslinux	(for GPXE)
+
+#### Build 
+
+run `make` in the top level directory to create the Nexus. Or
+use any of the following subgoals: 
+
+setup:			setup the build subdirectory (see Features, below)
+build-essentials:	compile libc and openssl
+idl:			generate C source files from IDL files
+tools:			create build support tools (GPXE network boot)
+
+user:			build all userspace
+libs:			build userspace libraries
+apps:			build applications
+udriver:		build userspace drivers
+
+kernel:			build all kernel (bzImage)
+kcore:			build only core kernel objects
+kdriver:		build only kernel drivers
+
+clean:			remove intermediate files
+distclean:		destroy the build subdirectory
+
+#### Features
+
+- Building takes place in a subdirectory `build' that is automatically
+  created and shadows the main repository. This makes it easy to 
+  discern tracked from untracked code. All files tracked by git are
+  hard linked, so changed made in build/... will be found by git.
+
+- gcc and c++ are not part of the repository. Because the build
+  process generates all code from scratch, no version clashes can
+  occur or need to be guarded against.
+
+#### Known Issues
+
+- Build stops prematurely, requires 2nd `make` to continue
+
+

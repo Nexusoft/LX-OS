@@ -1,0 +1,21 @@
+CFLAGS=-g -D__LINUX__ -Wall
+
+all:  .dep func-wrapper.crt #tax-server
+
+.dep: $(ALL_SRC)
+	gcc -M $^ > $@
+
+include .dep
+
+# tax-server is an SSL test
+tax-server.o: exec-func.c
+	gcc $(CFLAGS) -c -o $@ $^ 
+ssl-linux.o: ssl.c
+	gcc $(CFLAGS) -c -o $@ $^
+tax-server: tax-server.o ssl-linux.o
+	gcc $(CFLAGS) -o $@ $^ -lssl
+
+func-wrapper.crt:
+	openssl genrsa -out func-wrapper.key 2048
+	openssl req -new -x509 -config cert.cfg  -days 10000 -key func-wrapper.key -out func-wrapper.crt
+

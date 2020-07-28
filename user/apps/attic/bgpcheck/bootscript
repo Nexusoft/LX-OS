@@ -1,0 +1,16 @@
+# Someone please do put something meaningful here
+# tpm
+# vdir
+# ddrm
+ntp_sync
+wexec tcpmgr
+wexec simplefs -name fsroot
+wexec nfs *:/local/nexusdir -mount /nfs
+#wexec get_pubek /nfs/ek.public.pem
+#wexec certmaker
+#tftp_fetch_tpmcerts tpm_platform.crt tpm_platform.crt tpm_platform.crt
+#wexec nskgen
+#setnsk
+#exec i810_audio
+#exec explorer
+exec nbgp /nfs/standard.nbgpconf

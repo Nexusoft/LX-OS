@@ -1,0 +1,16 @@
+//this is something stupid
+
+service TCPMgr {
+  secure_channel bar {
+    int baz(int x) {
+    }
+    secure_channel qux {
+      int q1(int x) {
+      }
+    }
+  }
+  int foo(int x) {
+  }
+}
+
+//this is something stupid

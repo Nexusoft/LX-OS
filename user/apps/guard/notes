@@ -1,0 +1,83 @@
+
+For SOSP:
+
+orcon policies:
+ originator creates file, sets policy for the file
+ high level policy goal:
+	only those programs that know the secret of X can get access
+	and only before 5 pm
+ policy encoding:
+	gf = [[$1 requesting readFile]] and [[knowsSecret($1, X)]] and [[clk < 5pm]]
+	f1 = group:clocks controls [[clk]]
+	f2 = hash:ntphash => group:clocks
+	f3 = nexus:nexus => group:clocks
+	f4 = lf:dansorconlf controls [[knowsSecret($1, $2)]]
+ policy hints:
+	requestor should run dan's orcon lf with parameter X, and should pass the following code to the server "split_and; ...";
+
+ high level policy goal:
+	only alan can read the file
+ policy encoding:
+	gf = [[$1 requesting readFile]] and [[runningOnBehalfOf(user:alan)]]
+
+How to encode? Depends on how we think about and define principals, predicates, labels, interposition, reference monitors, guards, etc.
+
+ In the logic:
+  A principal is something that can appear on the left side of a "says", and can speak for other principals.
+  A predicate is something that is true or false depending on the state of the system, written using a predicate language. The predicate language
+  has notions of variables, integers, memory, etc., but does not explicitly have notions of says, speaksfor, or other logic constructs.
+
+ Representation:
+  There are a set of constructors which turn strings into principals.
+   key:pem
+   ipd:num
+   hash:hhh - the group of instances of programs with hash hhh
+   ipc:num ??
+   group:name
+   user:dan
+   nexus:nexus
+  There are labeling functions. A labeling function LF is not a principal, nor a predicate. Instead, it is just a transformation on some state. It takes the state of an IPD as input,
+   and produces some output. We call this output a label. The kernel maintains the provenance of a label, such that the receiver can tell from which IPD and by which LF the output was generated.
+   When a program sees label L = <stmt, ipd, LF>, it treats this as a formula "LF says stmt(ipd)", and it can describe its trust in the LF as, for example,
+	 "LF controls [[isTypeSafe(*)]]"
+	or
+	 "LF controls * => LF/x"
+
+ LF, which are small code modules designed to generate true predicates.
+    LF.invoke(ipd) returns a statement: LF says ....
+    The statement is often of the form: LF says [[...ipd...]], some predicate over the state of the ipd
+	or often: LF says ipd => LF/... on ..., a delegation
+
+	[[LF_1(ipd:num) == val]] at various points in time
+     should be viewed as partial predicates that can be evaluated over an ipd, and are used to build predicates, typically of the form
+    Why are labeling functions useful? Why are they distinct?
+  There are other ways to build a predicate, as well, that involve evaluation of stae in multiple ipds, or ther kernel, etc.
+
+ In practice:
+  IPDs - an IPD is a principal, represented by ipd:num, or by a channel.
+  Label: a label is a representation of some state of an ipd, and can be used to make a predicate
+
+We currently have:
+ labels
+ keys
+ tpm
+ kernel
+ ipds
+ channels
+ interposition
+ reference monitors
+ rewriters
+ loggers
+ guards
+ servers
+ clients
+
+
+Thoughts on labels and labeling functions, predicates and principals:
+There is a close relationship between principals, and predicates computed over principals. Say we
+have a predicate "isTypeSafe" that can be evaluated over an IPD. So "isTypeSafe(ipd)" is a
+formula, and is either true or false. This induces a sort of "group" of IPDs for which the
+predicate is true. We might say "ipd_group(isTypeSafe)" to mean the group of ipds for which
+"isTypeSafe(ipd)" is true. So then we can say "ipd => ipd_group(isTypeSafe)" to mean the same
+thing as "isTypeSafe(ipd)". Not recognizing this equivalence has been a source of confusion for me.
+

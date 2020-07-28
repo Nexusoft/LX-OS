@@ -1,0 +1,21 @@
+CFLAGS_$(d) := -Werror
+
+TARGET := $(d)/ca
+OBJS := $(d)/ca.o $(d)/common.o #$(d)/certs/tpmcerts.o
+include Makefile.app_linux_tpm
+
+TARGET := $(d)/nexusca
+OBJS := $(d)/nexusca.o $(d)/common.o #$(d)/certs/tpmcerts.o
+include Makefile.app_linux_tpm
+
+TARGET := $(d)/nexuscertskeleton
+OBJS := $(d)/nexuscertskeleton.o #$(d)/certs/tpmcerts.o
+include Makefile.app_linux_tpm
+
+TARGET := $(d)/keytest
+OBJS := $(d)/keytest.o #$(d)/certs/tpmcerts.o
+include Makefile.app_linux_tpm
+
+TARGET := $(d)/get_pubek
+OBJS := $(d)/get_pubek.o 
+include Makefile.app

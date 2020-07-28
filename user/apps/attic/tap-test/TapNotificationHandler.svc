@@ -1,0 +1,99 @@
+service TapNotificationHandler {
+  __implements__ { "../../../common/services/TapNotification.svc" }
+
+  decls __callee__ {
+    includefiles { "<stdio.h>" }
+    includefiles { "<unistd.h>" }
+    includefiles { "<stdlib.h>" }
+    includefiles { "<string.h>" }
+    includefiles { "<nexus/IPC.interface.h>" }
+    includefiles { "<nexus/interpose.h>" }
+    includefiles { "<assert.h>" }
+    includefiles { "<pthread.h>" }
+    includefiles { "all-null.h" }
+    includefiles { "<nexus/test-support.h>" }
+
+    int tap_insertion_error = 0;
+    int g_notification_port_handle;
+
+  }
+  __callee__ {
+    g_notification_port_handle = TapNotificationHandler_port_handle;
+  }
+  
+  interface lf_generate { OID_NONE; } lf_check { lf_oid == OID_NONE; } 
+  int Interference(__input__ struct VarLen existing_taps /* TapInterferenceSpec */,
+		   __output__ struct VarLen specified_order /* TapOrderSpec */) {
+    // XXX perhaps the taint notification always wants to be at the
+    // beginning of the processing chain?
+     printf("Interference!\n");
+    return 0;
+  }
+
+  interface lf_generate { OID_NONE; } lf_check { lf_oid == OID_NONE; } 
+  int Proposal(__input__ struct VarLen all_taps /* TapNotificationSpec */) {
+    printf("Proposal!\n");
+    return 0;
+  }
+
+  interface lf_generate { OID_NONE; } lf_check { lf_oid == OID_NONE; } 
+  // Tell Pattern control channel that tap has been installed
+  void Modification(__input__ struct VarLen all_taps /* TapNotificationSpec */, 
+		   int did_insertion) {
+    if(!did_insertion) {
+      // want to print out the latest version of num_vetoes, so do the
+      // update before doing the output handling
+      num_vetoes++;
+    }
+
+#define PING() printf("(%d)", __LINE__);
+    switch(veto_check_mode) {
+    case NO_CHECK:
+      break;
+    case NO_VETOES:
+      // Success if a veto is not seen
+      if(!did_insertion) {
+PING();
+	// Repeatedly write veto notification
+	char comment[80];
+	sprintf(comment, "saw %d vetoes", num_vetoes);
+	Regtest_write_result(ALL_NULL_VETO_FNAME, -1, comment);
+      } else {
+	if(!saw_veto) {
+PING();
+	  // Repeated
+	  char comment[80];
+	  sprintf(comment, "saw %d vetoes", num_vetoes);
+	  Regtest_write_result(ALL_NULL_VETO_FNAME, 0, comment);
+	}
+      }
+      break;
+    case HAS_VETO:
+      // Success if a veto is seen
+      if(!did_insertion) {
+PING();
+	// Repeatedly write veto notification
+	char comment[80];
+	sprintf(comment, "saw %d vetoes", num_vetoes);
+	Regtest_write_result(ALL_NULL_VETO_FNAME, 0, comment);
+      } else {
+	if(!saw_veto) {
+PING();
+	  // Repeated
+	  char comment[80];
+	  sprintf(comment, "saw %d vetoes", num_vetoes);
+	  Regtest_write_result(ALL_NULL_VETO_FNAME, -1, comment);
+	}
+      }
+      break;
+    default:
+      printf("unknown veto check mode %d!\n", veto_check_mode);
+      assert(0);
+    }
+    // do saw_veto update after so we can detect 0=> transition in switch stmt
+    if(!did_insertion) {
+      saw_veto = 1;
+    }
+    return;
+  }
+}

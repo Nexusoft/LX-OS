@@ -1,0 +1,48 @@
+TARGET := $(d)/nbgp
+
+NBGP_CORE := $(d)/core/bgp.o \
+             $(d)/core/bgpcheck.o \
+             $(d)/core/nbgp.o \
+             $(d)/core/nbgp-process.o \
+             $(d)/core/nbgp-overlay.o \
+             $(d)/core/nbgp-dispatcher.o \
+             $(d)/core/nbgp-commands.o \
+             $(d)/core/nbgp-policy.o \
+             $(d)/core/policy_specification.o \
+             $(d)/core/grassroots.o
+
+NBGP_RUNTIME := $(d)/runtime/minipipe.o \
+                $(d)/runtime/minisocket.o \
+                $(d)/runtime/pipedsocket.o \
+                $(d)/runtime/socket.o \
+                $(d)/runtime/runtime.o \
+
+NBGP_EXTERN_UTIL := $(d)/util/reassemble.o
+
+NBGP_INTERN_UTIL := $(d)/util/common.o \
+                    $(d)/util/nexussync.o \
+                    $(d)/util/optionlist.o \
+                    $(d)/util/debug.o \
+                    $(d)/util/filebuffer.o \
+                    $(d)/core/testsuite.o \
+                    $(d)/enc/openssl_compat.o \
+                    $(d)/enc/sec_storage.o \
+                    compat/Profile.user.o \
+                    apps/wpss/libwpss.o
+
+# These are all hacks to get around bugs in Nexus.
+# Most are now obsolete.  Wipe them out when time permits.
+NBGP_UTIL_HACKS := $(d)/util/nexusbio.o \
+                   $(d)/util/ghetto_pcap.o \
+                   $(d)/util/g_tl.o \
+                   $(d)/util/safe_malloc.o
+
+OBJS := $(NBGP_CORE) \
+        $(NBGP_RUNTIME) \
+        $(NBGP_INTERN_UTIL) \
+        $(NBGP_EXTERN_UTIL) \
+        $(NBGP_UTIL_HACKS)
+CFLAGS_$(d)/core := -O3
+LIBS_$(d)/nbgp := lib/libstdc++.a lib/libssl.a lib/libm.a
+include Makefile.app
+#include Makefile.app_efence

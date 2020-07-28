@@ -1,0 +1,8 @@
+IPBGP_FILE: nlr/denv-bgptable.txt
+TEXT_FILE: nlr/denv24.src
+: TEXT_FILE: nlr/denv25.src
+: TEXT_FILE: nlr/denv26-b.src
+: TEXT_FILE: nlr/denv26.src
+: TEXT_FILE: nlr/denv27.src
+: TEXT_FILE: nlr/denv28.src
+: TEXT_FILE: nlr/denv29.src

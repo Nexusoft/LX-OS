@@ -1,0 +1,47 @@
+#### Nexus sources directory layout
+
+last update on November 30th, 2009
+
+## Overview
+
+Most sourcecode is divided into kernel-only, userspace-only or common trees.
+Internally, these three trees mimic each other as much as possible, so that
+user drivers live in user/drivers and kernel drivers in kernel/drivers, for
+instance.
+
+## Tree
+
+
+build				automatically generated copy of . in which compilation takes place
+	boot			the final bootable images (and intermediate binary objects)
+		bin		nexus applications
+		initrd		the source for the initial ramdisk initrd.tar
+		isoroot		the sources for the iso: vmnexuz and initrd.tar
+		stage1		bootable images, among which nexus.iso, nexus-gpxe.iso
+
+common				code common to user and kernel space
+	packages		external packages, such as linux headers. 
+	services		Nexus .svc files: services that run over IPC. 
+	syscalls		Nexus .sc system calls: kernel-only services that run over IPC.
+	[...]			the rest is straightforward: include, test, ...
+
+kernel				code only in the kernel
+	core			threads, scheduling, ...
+	drivers			linux derived device drivers
+	init			linux derived boot logic
+	ipc			code that implements the IPC subsystem
+	[...]
+
+user				code only in userspace
+	apps			applications written directly for Nexus
+	drivers			Linux derived device drivers that run as user processes
+	packages		external open source software. Usually the original .tgz file plus Nexus patch and Makefile
+
+tools				tools used during build
+	doxygen			configuration file to generate doxygen manual from sourcecode
+	gpxe			tool to boot nexus over the network (formerly etherboot)
+	idlgen			IDL process that generates C sourcecode from .svc and .sc files
+	isolinux		support for building .iso bootable cdrom images
+	packages		external software that is not compiled, such as GPLed sources
+	vmware			sample vmware config file suitable for running nexus
+

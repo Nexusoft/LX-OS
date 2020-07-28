@@ -1,0 +1,10 @@
+
+## Threading
+
+Nexus has its own pthread implementation, but reuses the libc headers. To
+make this work, we compile libc with pthreads (so that the headers will be
+installed) but do not link against libpthread.a
+
+To have compilation succeed, all structures must contain their original
+fields. We can extend the structures if needed: this is done for mutexes.
+

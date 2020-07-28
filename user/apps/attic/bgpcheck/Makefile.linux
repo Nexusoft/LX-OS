@@ -1,0 +1,157 @@
+CFLAGS := -O3 -g -Wall -Werror -DNOT_NEXUS -I./
+CXXFLAGS := $(CFLAGS)
+LDLIBS = -lpthread -lssl -lcrypto#-lpcap
+
+CLEANFILES := 
+APPS := 
+
+all: linuxapps
+linux: linuxapps
+
+################### LINUX Support
+# Core NBGP files used by the linux tools
+
+LINUX_SUPPORT := $(patsubst %,tools/linux_build/%, \
+  common.o bgp.o safe_malloc.o openssl_compat.o grassroots.o )
+CLEANFILES    += tools/linux_build/*.o
+
+tools/linux_build/common.o: util/common.cc include/util/common.h
+	$(CXX) $(CXXFLAGS) -g -c -o $@ util/common.cc
+
+tools/linux_build/safe_malloc.o: util/safe_malloc.c include/util/safe_malloc.h
+	$(CC) $(CCFLAGS) -g -c -o $@ util/safe_malloc.c
+
+tools/linux_build/bgp.o: core/bgp.c include/nbgp/bgp.h
+	$(CC) $(CCFLAGS) -g -c -o $@ core/bgp.c
+
+tools/linux_build/grassroots.o: core/grassroots.cc include/nbgp/grassroots.h
+	$(CXX) $(CCFLAGS) -g -c -o $@ core/grassroots.cc
+
+tools/linux_build/openssl_compat.o: enc/openssl_compat.cc include/enc/openssl_compat.h
+	$(CXX) $(CCFLAGS) -g -c -o $@ enc/openssl_compat.cc
+
+
+################### virtual_overlay
+# Virtual NBGP peer.
+# An implementation of the NBGP overlay protocol for linux.  Doesn't actually
+# do anything except echo the overlay traffic to the console.
+
+APPS       += tools/virtual_overlay
+CLEANFILES += tools/src/virtual_overlay/*.o
+
+VIRTUALOVERLAY_F := tools/src/virtual_overlay/minipipe.o \
+                    tools/src/virtual_overlay/minisslsocket.o \
+                    tools/src/virtual_overlay/testoverlay.cc
+
+tools/virtual_overlay: $(VIRTUALOVERLAY_F) $(LINUX_SUPPORT)
+	$(CXX) $(CXXFLAGS) $(LDLIBS) -o $@ $(VIRTUALOVERLAY_F) $(LINUX_SUPPORT)
+
+
+################### bgpdump
+# NBGP testing tool
+# Reads in a variety of different routing table dump/update formats
+# and either translates them into a different format or sends them to
+# NBGP or a proper BGP router.
+
+APPS       += tools/bgpdump
+BGPDUMP_F  := tools/src/virtual_overlay/minipipe.o \
+              tools/src/virtual_overlay/minisslsocket.o
+
+tools/bgpdump: tools/src/bgpdump/bgpdump.h tools/src/bgpdump/bgpdump.cc $(BGPDUMP_F) $(LINUX_SUPPORT)
+	$(CXX) $(CXXFLAGS) $(LDLIBS) -o $@ tools/src/bgpdump/bgpdump.cc $(BGPDUMP_F) $(LINUX_SUPPORT)
+
+
+################### burst
+# Simplified version of bgpdump.
+# Reads in a routing table, waits for a BGP peer to connect and 
+# sends the routing table to it.
+
+APPS       += tools/burst
+
+tools/burst: tools/src/burst/burst.h tools/src/burst/burst.cc $(LINUX_SUPPORT)
+	$(CXX) $(CXXFLAGS) $(LDLIBS) -o $@ tools/src/burst/burst.cc $(LINUX_SUPPORT)
+
+
+################### plutofilter
+# Pluto/BGP intermediary.
+# Connects to a specified pluto BGP feed and sets up a BGP server echoing
+# all updates sent by the pluto feed with the pluto headers stripped off.
+
+APPS       += tools/plutofilter
+CLEANFILES += tools/src/plutofilter/*.o
+
+tools/plutofilter: tools/src/plutofilter/plutofilter.c $(LINUX_SUPPORT)
+	$(CC) $(CFLAGS) -o tools/src/plutofilter/plutofilter.o -c tools/src/plutofilter/plutofilter.c
+	$(CXX) $(CXXFLAGS) $(LDLIBS) -o $@ tools/src/plutofilter/plutofilter.o $(LINUX_SUPPORT)
+
+################### tcpcast
+# A quick little hack that simulates one side of a TCP conversation
+
+APPS       += tools/tcpcast
+
+tools/tcpcast: tools/src/tcpcast/tcpcast.cc
+	$(CXX) $(CXXFLAGS) $(LDLIBS) -o $@ tools/src/tcpcast/tcpcast.cc
+
+
+################### grassroots
+# A tool to manipulate information useful to grassroots
+
+APPS       += tools/grassroots
+
+tools/grassroots: tools/src/grassroots/grassroots.cc $(LINUX_SUPPORT)
+	$(CXX) $(CXXFLAGS) $(LDLIBS) -o $@ tools/src/grassroots/grassroots.cc $(LINUX_SUPPORT) 
+
+################### mrt_optimize
+# A tool to convert MRT_DUMP files into a more compact MRT_BGP_UPDATE format
+# by locating messages with identical attribute instances and merging them together
+
+APPS       += tools/mrt_optimize
+
+tools/mrt_optimize: tools/src/mrt_optimize/mrt_optimize.cc $(LINUX_SUPPORT)
+	$(CXX) $(CXXFLAGS) $(LDLIBS) -o $@ tools/src/mrt_optimize/mrt_optimize.cc $(LINUX_SUPPORT) 
+
+################### data processing commands
+
+ROUTEVIEWSDIR = data/Routeviews-Oregon
+ROUTEVIEWSINPUTS = $(wildcard $(ROUTEVIEWSDIR)/updates*.bz2)
+ROUTEVIEWSOUTPUTS = $(patsubst $(ROUTEVIEWSDIR)/%.bz2,%, $(ROUTEVIEWSINPUTS))
+
+tools/inputs/rib.20080201.1545.bz2: data $(ROUTEVIEWSDIR)/rib.20080201.1545.bz2
+	cp $(ROUTEVIEWSDIR)/rib.20080201.1545.bz2 tools/inputs/rib.20080201.1545.bz2
+
+NLRDATAFILES = denv24 denv25 denv26 denv26-b denv27 denv28 denv29
+NLRINPUTS = $(patsubst %,data/nlr/nlr-bgp/%, $(NLRDATAFILES) )
+NLROUTPUTS = $(patsubst %,tools/inputs/%.src, $(NLRDATAFILES) )
+#CLEANFILES += $(NLROUTPUTS) tools/inputs/nlr.src tools/inputs/denv-bgptable.txt tools/inputs/updates/*
+
+$(NLROUTPUTS): 
+	@echo ----------------------------------------------------------
+	echo ME: 216.24.191.226 > $@
+	tools/cisco-bgp-debug-parse.rb $(patsubst tools/inputs/%.src,data/nlr/nlr-bgp/%, $@) >> $@
+
+data: 
+	svn co svn://glubglub/experiments/nbgptracedata
+	mv nbgptracedata data
+
+tools/inputs/denv-bgptable.txt: data data/nlr/denv-bgptable.txt
+	cd data; svn up;
+	cp data/nlr/denv-bgptable.txt tools/inputs/
+	
+tools/inputs/nlr.src: tools/inputs/denv-bgptable.txt $(NLROUTPUTS)
+	@echo ----------------------------------------------------------
+	echo IPBGP_FILE: tools/inputs/denv-bgptable.txt > $@
+	tools/build-cumulative-dumpsource.sh $(NLROUTPUTS) >> $@
+	cd tools/inputs; ../bgpdump -u -t nlr.src
+
+# trying to make the dataset will invoke an svn checkout of glubglub/experiments/nbgptracedata
+routeviews: tools/inputs/rib.20080201.1545.bz2
+nlr: tools/inputs/nlr.src
+bgpdumpdata: routeviews nlr
+
+################### build commands
+
+linuxapps: $(APPS)
+
+clean: linuxclean
+linuxclean:
+	rm -f $(CLEANFILES) $(APPS)

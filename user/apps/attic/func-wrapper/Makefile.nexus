@@ -1,0 +1,43 @@
+CFLAGS_$(d) := -Werror
+
+TARGET := $(d)/exec-func
+OBJS :=  $(TARGET).o $(d)/WrapStream.server.o $(d)/FuncInterposeDriver.server.o $(d)/ssl.o
+LIBS_$(TARGET) := lib/libssl.a
+include Makefile.app
+
+TARGET := $(d)/calc-taxes
+OBJS :=  $(TARGET).o $(d)/WrapStream.client.o
+include Makefile.app
+
+CFLAGS_$(d)/ssl-linux.o := -D__LINUX__
+
+TARGET := $(d)/tax-client
+OBJS := $(d)/tax-client.o $(d)/ssl-linux.o
+LIBS_$(TARGET) := lib/libssl.a
+include Makefile.app_linux_tpm
+
+### Cloud application
+
+TARGET := $(d)/cloud-launcher
+OBJS = $(d)/cloud-launcher.o $(d)/Cloud.server.o $(d)/ssl.o
+LIBS_$(TARGET) := lib/libssl.a
+include Makefile.app
+
+TARGET := $(d)/cpu-job
+OBJS := $(d)/cpu-job.o $(d)/Cloud.client.o $(d)/ssl.o
+LIBS_$(TARGET) := lib/libssl.a
+include Makefile.app
+
+TARGET := $(d)/cloud-client
+OBJS := $(d)/cloud-client.o $(d)/ssl-linux.o
+LIBS_$(TARGET) := lib/libssl.a
+include Makefile.app_linux_tpm
+
+TARGET := $(d)/form-parse
+OBJS := $(d)/form-parse.o compat/timing.o
+include Makefile.app_linux_tpm
+
+TARGET := $(d)/form-print
+OBJS := $(d)/form-print.o
+include Makefile.app_linux_tpm
+

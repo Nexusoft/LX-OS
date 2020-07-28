@@ -1,0 +1,107 @@
+service Cloud {
+  decls {
+    includefiles { "<string.h>" }
+    includefiles { "<fcntl.h>" }
+    includefiles { "<unistd.h>" }
+    includefiles { "<nexus/LabelStore.interface.h>" }
+    includefiles { "<nexus/sema.h>" }
+
+    IDL_EXTERNS(Cloud);
+
+    extern IPD_ID cloud_child;
+    extern int process_started;
+  }
+
+  decls __callee__ {
+    includefiles { "<nexus/ipc.h>"}
+    includefiles { "<nexus/formula.h>"}
+    includefiles { "<nexus/guard.h>" }
+    includefiles { "<nexus/debug.h>" }
+    includefiles { "<errno.h>" }
+    includefiles { "ssl.h" }
+    includefiles { "cloud.h" }
+
+    includefiles { "<openssl/ssl.h>" }
+    includefiles { "<openssl/err.h>" }
+
+    IDL_SERVER_VARDEFS(Cloud);
+
+    extern int dbg;
+    struct _ign {
+#define printf_dbg(x...) if(dbg)printf(x)
+    };
+
+    enum Cloud_state {
+      WAITING = 0,
+      STARTED,
+    } Cloud_state = WAITING;
+
+    extern Port_Handle *interpose_port_handle_p;
+    extern int g_child_ipd;
+    extern SSL *data_ssl;
+    int process_started = 0;
+  }
+
+  decls __caller__ {
+    includefiles { "\"../nameserver/NS.interface.h\""}
+    includefiles { "<nexus/formula.h>" }
+    includefiles { "<nexus/guard.h>" }
+    includefiles { "<nexus/debug.h>" }
+  }
+
+  __callee__ {
+    int err;
+    if((err = NS_clientInit()) != 0) {
+      printf("Cloud server could not connect to name server (%d)\n", err);
+      return;
+    }
+    Reflection_SetPortType(Cloud_server_port_num, Cloud_svc_name);
+  }
+
+  ~__callee__ {
+    NS_SimpleUnregister(registerCtx);
+  }
+
+  __caller__ {
+    extern int g_cloud_port_num;
+    Cloud_client_port_num = g_cloud_port_num;
+    
+    IDL_BINDREQUEST(Cloud);
+    return 0;
+  }
+
+  interface lf_generate { OID_NONE; } lf_check { 1; }
+  int ProcessStarted(int num_labels, __input__ struct VarLen ext_labels) {
+    if(ipd_id != g_child_ipd) {
+      printf("Invalid source ipd (%d,%d)!\n", ipd_id, g_child_ipd);
+      return -1;
+    }
+    printf("Process started called\n");
+    if(Cloud_state != WAITING) {
+      printf("Process started called in invalid state (%d)!\n", Cloud_state);
+      return -1;
+    }
+
+    int i;
+    unsigned char *all_labels = malloc(ext_labels.len);
+    unsigned char *next_label = all_labels;
+    int err = IPC_TransferFrom(call_handle, ext_labels.desc_num, all_labels, 
+			       (unsigned int)ext_labels.data, ext_labels.len);
+    if(err < 0) {
+      printf("Could not get labels from subprocess!\n");
+      return -1;
+    }
+    // 
+    for(i=0;
+	i < num_labels; 
+	i++, next_label += der_msglen(next_label)) {
+      SignedFormula *this_label = (SignedFormula *)next_label;
+      send_label(data_ssl, this_label);
+    }
+
+    process_started = 1;
+    Cloud_state = STARTED;
+    return 0;
+  }
+}
+

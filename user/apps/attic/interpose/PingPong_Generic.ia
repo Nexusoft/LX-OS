@@ -1,0 +1,340 @@
+service PingPong_Generic {
+  __interpose_on__ { "../ipctest/PingPong.svc" }
+
+  decls {
+    typedef enum {
+      Interposition_Passthrough,
+      Interposition_Modify,
+      Interposition_Replace,
+      Interposition_Drop,
+    } InterpositionMode;
+    typedef enum {
+      Replacement_Identity,
+      Replacement_Constant,
+      Replacement_Add,
+      Replacement_Multiply,
+    } ReplacementMode;
+
+    typedef struct {
+      InterpositionMode interposition_mode;
+      ReplacementMode replacement_mode;
+    } FullMode;
+
+    extern FullMode Call_mode;
+    extern FullMode TransferTo_mode;
+    extern FullMode TransferFrom_mode;
+
+    void PingPong_Interpose_processCall(IPD_ID ipd_id, Call_Handle call_handle, struct IEvent_Info *event_info, struct IEvent_Call_Info *call_info, struct VarLen message);
+
+    void parse_cmdline(int argc, char **argv);
+  }
+  
+  decls __callee__ {
+    includefiles { "<op_types.h>" }
+    includefiles { "<nexus/ipc.h>" }
+    includefiles { "<nexus/interpose.h>" }
+    includefiles { "<assert.h>" }
+    includefiles { "<string.h>" }
+    includefiles { "<stdlib.h>" }
+    includefiles { "\"../ipctest/PingPong.interface.h\"" }
+    includefiles { "PingPong_Generic.interpose.h" }
+    includefiles { "itest.h" }
+    includefiles { "generic-mapping.h" }
+
+
+    FullMode Call_mode;
+    FullMode TransferTo_mode;
+    FullMode TransferFrom_mode;
+
+    const int CONST = 837;
+    const int ADD = 73;
+    const int MULTIPLY = 100;
+
+    struct IEvent_Info *dbg_only_curr_event_info;
+
+    static void computeNewValues(ReplacementMode replacement_mode, int *target_array, int count,
+				int const_value, int add_value, int multiply_value) {
+      int i;
+      for(i=0; i < count; i++) {
+	int *target = &target_array[i];
+	switch(replacement_mode) {
+	case Replacement_Identity:
+	  // do nothing
+	  break;
+	case Replacement_Constant:
+	  printf("constant ");
+	  *target = const_value;
+	  break;
+	case Replacement_Add:
+	  *target += add_value;
+	  break;
+	case Replacement_Multiply:
+	  *target *= multiply_value;
+	  break;
+	}
+      }
+    }
+
+    typedef enum {
+      CALL,
+      TRANSFER,
+    } GenericHandlerType;
+
+    static int generic_handler(Call_Handle call_handle,
+			GenericHandlerType type, 
+			FullMode mode, 
+			struct IEvent_Call_Info *call_info,
+			struct IEvent_Transfer_Info *transfer_info, 
+			int const_value, int add_value, int multiply_value) {
+      int err;
+      char *accum = NULL;
+      int *mod_target = NULL;
+      int mod_count;
+      int transfer_len;
+      switch(type) {
+      case CALL: {
+	transfer_len = sizeof(struct PingPong_ping_Args) + sizeof(int);
+	accum = calloc(transfer_len, 1);
+	struct PingPong_ping_Args *input_value = 
+	  (struct PingPong_ping_Args *)(accum + sizeof(int));
+	mod_target = &input_value->seq;
+	mod_count = 1;
+	err = IPC_Interposition_GetValue(call_handle,
+				     accum, transfer_len);
+	if(err != 0) {
+	  printf("get value error %d!\n", err);
+	}
+	if(0) {
+	  printf("Call got %p %d (%p %x)\n",
+		 input_value->__rbuf, input_value->seq,
+		 input_value->__rbuf, input_value->seq);
+	}
+	break;
+      }
+      case TRANSFER: {
+	transfer_len = transfer_info->len;
+	mod_target = (int *)(accum = calloc(transfer_len, 1));
+	mod_count = transfer_len / sizeof(int);
+	err = IPC_Interposition_GetValue(call_handle,
+					 mod_target, transfer_len);
+	if(err != 0) {
+	  printf("get value error %d!\n", err);
+	}
+	printf("Transfer: got value %d %d %d (%d)\n", 
+	       mod_target[0], mod_target[1], mod_target[2], transfer_len);
+
+	if(transfer_info->desc_num == 0) {
+	  assert(transfer_info->direction == ToCaller);
+	  printf("result transfer\n");
+	  mod_count = 0;
+	} else if(transfer_info->desc_num == 2) {
+	  // do not interpose on the original input for check
+	  assert(transfer_info->direction == FromCaller);
+	  printf("orig in\n");
+	  mod_count = 0;
+	}
+	break;
+      }
+      default:
+	// unsupported type!
+	assert(0);
+      }
+      int i;
+      assert(mod_count == 0 || accum != NULL);
+      assert(mod_count == 0 || mod_target != NULL);
+      switch(mode.interposition_mode) {
+      case Interposition_Passthrough:
+	printf("%d passthrough\n", type);
+	if(type == TRANSFER) {
+	  printf("%d pass-through (%d %d, dir = %d, len = %d)\n", type,
+		 TransferFrom_mode.interposition_mode, TransferTo_mode.interposition_mode,
+		 transfer_info->direction,
+		 transfer_len);
+	  IPC_Interposition_TransferPassThrough(call_handle);
+	} else {
+	  IPC_Interposition_CallPassThrough(call_handle, call_info);
+	}
+	break;
+      case Interposition_Modify: {
+	if(transfer_info != NULL) {
+	  printf("type=%d direction=%d modify\n", type, transfer_info->direction);
+	}
+	computeNewValues(mode.replacement_mode, mod_target, mod_count,
+			const_value, add_value, multiply_value);
+	err = IPC_Interposition_ModifyValue(call_handle,
+					    accum, transfer_len);
+	if(err != 0) {
+	  printf("modify value error %d!\n", err);
+	}
+	if(type == TRANSFER) {
+	  err = IPC_Interposition_TransferPassThrough(call_handle);
+	} else {
+	  err = IPC_Interposition_CallPassThrough(call_handle, call_info);
+	}
+	if(err != 0) {
+	  printf("passthrough value error %d!\n", err);
+	}
+	break;
+      }
+      case Interposition_Replace: {
+	printf("%d replace ", type);
+	if(type == CALL) {
+	  printf("Inserting replacement IPC not yet supported!\n");
+	  assert(0);
+	} else {
+	  if(transfer_info->desc_num != RESULT_DESCNUM) {
+	    computeNewValues(mode.replacement_mode, mod_target, mod_count,
+			     const_value, add_value, multiply_value);
+	    printf("Modify desc=%d ", transfer_info->desc_num);
+	  }
+	  if(transfer_info->direction == FromCaller) {
+	    err = IPC_TransferTo(call_handle, DEST_DESCNUM,
+		 DESCRIPTOR_START, mod_target, transfer_info->len);
+	  } else {
+	    err = IPC_TransferTo(call_handle, 
+		 MAKE_WRAPPEE_DESCNUM(transfer_info->desc_num),
+		 (unsigned int) transfer_info->dest, mod_target, transfer_info->len);
+	  }
+	  if(err != 0) {
+	    printf("modify value error %d!\n", err);
+	  }
+	  err = IPC_Interposition_TransferDrop(call_handle);
+	  if(err != 0) {
+	    printf("drop error %d!\n", err);
+	  }
+	}
+	break;
+      }
+      case Interposition_Drop: {
+	printf("%d drop\n", type);
+	if(type == CALL) {
+	  err = IPC_Interposition_CallDrop(call_handle, call_info);
+	} else {
+	  err = IPC_Interposition_TransferDrop(call_handle);
+	}
+	if(err != 0) {
+	  printf("drop error\n");
+	}
+	break;
+      }
+      default:
+	assert(0);
+      }
+      if(accum != NULL) {
+	free(accum);
+      }
+      return err;
+    }
+
+    void PingPong_Interpose_processCall(IPD_ID ipd_id, Call_Handle call_handle, struct IEvent_Info *event_info, struct IEvent_Call_Info *call_info, struct VarLen message) {
+      // ServerProcessorType type, 
+      PingPong_Generic_processCall(ipd_id, call_handle, 
+				   call_info->is_async ?
+				   SERVERPROCESSOR_ASYNC :
+				   SERVERPROCESSOR_SYNC,
+				   event_info, call_info, message);
+    }
+  }
+
+  __interpose__ PingPong_ping __Call__ {
+    *howHandled = ALREADYRETURNED;
+    return generic_handler(call_handle, CALL, Call_mode, call_info, NULL, CONST, ADD, MULTIPLY);
+  }
+
+  __interpose__ PingPong_ping2 __Call__ {
+    *howHandled = ALREADYRETURNED;
+    return generic_handler(call_handle, CALL, Call_mode, call_info, NULL, CONST, ADD, MULTIPLY);
+  }
+
+  __interpose__ PingPong_xping __Call__ {
+    int err;
+    printf("xping not supported!\n");
+    *howHandled = ALREADYRETURNED;
+    return IPC_Interposition_CallPassThrough(call_handle, call_info);
+  }
+
+  __interpose__ PingPong_xping2 __Call__ {
+    *howHandled = ALREADYRETURNED;
+    // printf("got ping, passing through\n");
+    return generic_handler(call_handle, CALL, Call_mode, call_info, NULL, CONST, ADD, MULTIPLY);
+  }
+
+  __interpose__ PingPong_exit __Call__ {
+    *howHandled = ALREADYRETURNED;
+    return IPC_Interposition_CallPassThrough(call_handle, call_info);
+  }
+
+  decls {
+    int PingPong_Interpose_processTransfer(Call_Handle call_handle, struct IEvent_Info *event_info, struct IEvent_Transfer_Info *transfer_info, struct VarLen data);
+  }
+  decls __callee__ {
+    int PingPong_Interpose_processTransfer(Call_Handle call_handle, struct IEvent_Info *event_info, struct IEvent_Transfer_Info *transfer_info, struct VarLen data) {
+      return generic_handler(call_handle, TRANSFER, (transfer_info->direction == FromCaller) ? 
+		      TransferFrom_mode : TransferTo_mode,
+		      NULL,
+		      transfer_info,
+		      CONST, ADD, MULTIPLY);
+    }
+
+    void parse_cmdline(int argc, char **argv) {
+      int i;
+      printf("Args: ");
+      for(i=0; i < argc; i++) {
+	printf("%s ", argv[i]);
+      }
+      printf("\n");
+
+      if(argc != 1 + 4) {
+	printf("usage: igeneric <target ipd> <call mode> <transferfrom mode> <transferto mode>\n");
+	exit(-1);
+      }
+      struct {
+	FullMode *target_mode;
+	char *name;
+#define DEF(X) { &X, #X }
+      } parse_table[] = {
+	DEF(Call_mode),
+	DEF(TransferTo_mode),
+	DEF(TransferFrom_mode),
+      };
+      for(i=0; i < 3; i++) {
+	FullMode *target = parse_table[i].target_mode;
+	char *target_name = parse_table[i].name;
+
+	char *str = argv[2 + i];
+	int val;
+	if(strlen(str) != 2) {
+	  printf("Invalid argv value %s @ %d (%s)\n", str, i, target_name); 
+	  exit(-1);
+	}
+	val = Mapping_find(interposition_table, str[0] - '0');
+	switch((InterpositionMode)val) {
+	case -1:
+	  printf("Invalid first character of argv '%c'\n", str[0]);
+	  exit(-1);
+	  break;
+	case Interposition_Passthrough:
+	case Interposition_Modify:
+	case Interposition_Replace:
+	case Interposition_Drop:
+	  target->interposition_mode = val;
+	  break;
+	default:
+	  assert(0);
+	}
+	val = Mapping_find(replacement_table, str[1] - '0');
+	switch(val) {
+	case -1:
+	  printf("Invalid second character of argv '%c'\n", str[1]);
+	  exit(-1);
+	  break;
+	default:
+	  target->replacement_mode = val;
+	  break;
+	}
+	printf("Mode[%d]: %d %d\n", i, target->interposition_mode,
+	       target->replacement_mode);
+      }
+    }
+  }
+}

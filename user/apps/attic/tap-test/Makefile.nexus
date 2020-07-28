@@ -1,0 +1,9 @@
+TARGET := $(d)/all-null
+OBJS := $(d)/all-null.o $(d)/InterposeEventDriver.server.o $(d)/TapNotificationHandler.server.o
+include Makefile.app
+
+TARGET := $(d)/tst-pcap
+OBJS :=  $(d)/tst-pcap.o $(d)/PcapInterposeEventDriver.server.o $(d)/TapNotificationHandler.server.o compat/netcomp-components.o drivers/compat/skbuff.o
+
+include Makefile.app
+

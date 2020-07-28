@@ -1,0 +1,28 @@
+filter: ANY
+filter: AS7007
+filter: AS1234
+	AS4567 %
+filter: AS1234 %
+filter: AS1 or AS2 and AS3
+filter: (AS1 or AS2) and AS3
+filter: AS1 or (AS2 and AS3)
+filter: AS1 AS2
+	AS3
++ AS4
+  AS5
+filter: <AS1>
+filter: <^(AS1 | AS-FOO~{5,} | AS-BAR)+$>
+filter: <[^AS1-AS2 AS5 AS9-AS20 AS-FOO]>
+filter: AS1 AND community(NO_EXPORT)
+import: from AS2
+	action pref = 10; med = 0; community.append(10250, 3561:10);
+	accept { 128.9.0.0/16 }
+import: from AS2 action pref = 1;
+	from AS3 action pref = 2;
+	accept AS4
+import: from AS2 7.7.7.2 at 7.7.7.1 action pref = 1;
+	from AS2 action pref = 2;
+	accept AS4
+export: to AS2 action med = 5; community .= { 70 };
+	announce AS4
+export: to AS-FOO announce ANY

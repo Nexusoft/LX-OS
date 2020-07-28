@@ -1,0 +1,73 @@
+service InterposeEventDriver {
+  decls {
+    includefiles { "<op_types.h>" }
+    includefiles { "<nexus/ipc.h>" }
+    includefiles { "<nexus/transfer.h>" }
+    includefiles { "<nexus/interpose.h>" }
+
+    struct CallInfo {
+      struct IEvent_Info event_info;
+      struct IEvent_Call_Info call_info;
+    };
+
+    IDL_EXTERNS(InterposeEventDriver);
+  }
+
+  decls __callee__ {
+    // includefiles { "\"PingPong_Interpose.interpose.h\"" }
+    includefiles { "<pthread.h>" }
+    includefiles { "<nexus/util.h>" }
+    includefiles { "<stdio.h>" }
+    includefiles { "<nexus/IPC.interface.h>" }
+    includefiles { "<assert.h>" }
+    includefiles { "<string.h>" }
+    includefiles { "\"taint.h\"" }
+
+    IDL_SERVER_VARDEFS(InterposeEventDriver);
+  }
+
+  __callee__ {
+  }
+
+  interface __NoGenReturn__
+    lf_generate { OID_NONE; }
+  lf_check { 1; }
+  int IEvent_Call(struct IEvent_Info event_info, struct IEvent_Call_Info call_info, 
+		__input__ struct VarLen message) {
+    // Exchange between caller & callee, since caller will get a return value
+    if(event_info.src != 0 && event_info.dst != 0) {
+      // No taint passing between kernel and user
+      IPD_PropagateTaints(event_info.src, event_info.dst);
+      IPD_PropagateTaints(event_info.dst, event_info.src);
+    }
+    IPC_Interposition_CallPassThrough(call_handle, &call_info);
+    // printf("event call got to end (%d:%d) ", (int)pthread_self(), call_info.channel_num);
+    return 0;
+  }
+
+  interface __NoGenReturn__
+    lf_generate { OID_NONE; }
+  lf_check { 1; }
+  int IEvent_Transfer(struct IEvent_Info event_info, struct IEvent_Transfer_Info transfer_info, __input__ struct VarLen data) {
+    printf("top of transfer\n");
+    int real_src, real_dest;
+    switch(transfer_info.direction) {
+    case FromCaller:
+      real_src = event_info.src;
+      real_dest = event_info.dst;
+      break;
+    case ToCaller:
+      real_src = event_info.dst;
+      real_dest = event_info.src;
+      break;
+    default:
+      printf("bad transfer direction!\n");
+      assert(0);
+    }
+    printf("{{transfer %d=>%d }}", real_src, real_dest);
+    IPD_PropagateTaints(real_src, real_dest);
+    printf("after transfer propagate\n");
+    IPC_Interposition_TransferPassThrough(call_handle);
+    return 0;
+  }
+}

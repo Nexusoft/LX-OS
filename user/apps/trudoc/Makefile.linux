@@ -1,0 +1,21 @@
+
+all: aas_send aas_recv
+
+#CFLAGS:=-idirafter ../../include -g3
+CFLAGS:=-g3 -Wall -Werror
+
+%.o: %.c aas_common.c $(wildcard *.h)
+	gcc $(CFLAGS) -c -o $@ $<
+
+aas_linux: aas.o odf_x.o odf_sign.o
+	gcc -L ../../compat -o $@ ../../compat/base64.o $^ -lcrypto
+
+aas_send: aas_send.o pzip.o
+	gcc -L ../../compat -o $@ ../../compat/base64.o $^ -lcrypto
+
+aas_recv: aas_recv.o pzip.o
+	gcc -L ../../compat -o $@ ../../compat/base64.o $^ -lcrypto
+
+clean:
+	rm -f *.o aas_linux ass_recv aas_send aas
+

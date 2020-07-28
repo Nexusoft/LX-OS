@@ -1,0 +1,70 @@
+service TapNotification_RejectAll {
+  __implements__ { "../../../common/services/TapNotification.svc" }
+
+  decls {
+    void TapNotification_RejectAll_initializeNotificationHandler(void);
+    extern int g_TapNotification_RejectAll_port_handle;
+  }
+  decls __callee__ {
+    includefiles { "<stdio.h>", "<unistd.h>", "<nexus/IPC.interface.h>",
+	"<pthread.h>", "<string.h>", "<assert.h>" }
+    int g_TapNotification_RejectAll_port_handle;
+
+#define NUM_NOTIFICATION_THREADS (8)
+    static pthread_t notification_thread[NUM_NOTIFICATION_THREADS];
+
+    static void *notification_thread_handler(void *ctx) {
+      while(1) {
+	TapNotification_RejectAll_processNextCommand();
+      }
+    }
+
+    void TapNotification_RejectAll_initializeNotificationHandler(void) {
+      if(g_TapNotification_RejectAll_port_handle == 0) {
+	// Allocate a channel for listening to notification update
+	// XXX hold this back until we have a convenient way of starting
+	// up the processing thread
+	TapNotification_RejectAll_serverInit();
+	/* printf("Forking notification thread to process notification channel %d\n",
+	   g_TapNotification_RejectAll_port_handle); */
+	int i;
+	for(i=0; i < NUM_NOTIFICATION_THREADS; i++) {
+	  int rv = pthread_create(&notification_thread[i], NULL,
+				  notification_thread_handler, (void *)i);
+	  assert(rv == 0);
+	  if(rv != 0) {
+	    printf("Error forking notification thread\n");
+	    return;
+	  }
+	}
+      }
+    }
+
+  }
+  __callee__ {
+    g_TapNotification_RejectAll_port_handle = TapNotification_RejectAll_port_handle;
+  }
+  
+  interface lf_generate { OID_NONE; } lf_check { lf_oid == OID_NONE; } 
+  int Interference(__input__ struct VarLen existing_taps /* TapInterferenceSpec */,
+		   __output__ struct VarLen specified_order /* TapOrderSpec */) {
+    printf("TapNotification received interference\n");
+    return 0;
+  }
+
+  interface lf_generate { OID_NONE; } lf_check { lf_oid == OID_NONE; } 
+  int Proposal(__input__ struct VarLen all_taps /* TapNotificationSpec */) {
+    printf("TapNotification received proposal, rejecting!\n");
+    return -1;
+  }
+
+  interface lf_generate { OID_NONE; } lf_check { lf_oid == OID_NONE; } 
+  // Tell Pattern control channel that tap has been installed
+  void Modification(__input__ struct VarLen all_taps /* TapNotificationSpec */, 
+		   int did_insertion) {
+    if(!did_insertion) {
+      printf("TapNotification veto!\n");
+    }
+    return;
+  }
+}

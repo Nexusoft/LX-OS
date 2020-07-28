@@ -1,0 +1,43 @@
+#### Debugging the Nexus in qemu and gdb
+
+Warning: this is broken for at least some Qemu installations. The default
+Qemu on Ubuntu 9.04 does not export the correct videocard, triggering an
+assertion.
+
+A better solution is to debug using VMWare. See that HOWTO.
+
+## 1: start the Nexus in Qemu
+
+After having installed qemu (a simple `apt-get install qemu` on ubuntu),
+start it with the following command (from the nexus rootdir):
+
+	qemu -s -S -no-kqemu -m 512 -kernel build/boot/isoroot/vmnexuz \
+			            -initrd build/boot/isoroot/initrd.tar \
+			            -append “vga=792” /dev/null
+
+This starts the nexus kernel as GPXE would. Two remarks:
+1) -S makes the CPU pause, so that you can start if from gdb
+   -s opens connection to gdb over network port 1234
+2) the /dev/null is our replacement for a disk image. 
+
+
+## 2: attach gdb
+
+start gdb with the kernel image with symbols
+
+	gdb build/kernel/init/vmnexus
+
+and in gdb issue
+
+	target remote localhost:1234
+
+# Tip
+To make it easier to reissue the set, combine them:
+
+	gdb  --eval-command="target remote localhost:1234" build/kernel/init/vmnexus
+
+
+## TODO:
+
+Add support for networking and TFTP root. Qemu can expose both
+a BOOTP and TFTP server.

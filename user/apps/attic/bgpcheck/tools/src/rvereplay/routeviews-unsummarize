@@ -1,0 +1,15 @@
+#!/usr/bin/perl
+
+undef $/;
+$buf = <>;
+my $size = length($buf);
+my $p = 0;
+while ($p < $size) {
+	my $block = substr($buf, $p, 100);
+	($len, @pfx[0..3], @nexthop[0..3], $origin, $path_len) = unpack "C9aC", $block;
+	$block = substr($buf, $p+11, 2*$path_len);
+	@path = unpack "v*", $block;
+	print "", (join'.', @pfx), "/$len -> ", (join'.', @nexthop), " path={ ",
+		(join' ', @path), " } origin=$origin\n";
+	$p += 11 + 2*$path_len;
+}

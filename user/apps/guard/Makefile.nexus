@@ -1,0 +1,22 @@
+
+
+#.SECONDARY: $(d)/strictlogic.tab.c $(d)/strictlogic.tab.h $(d)/strictlogic.yy.c
+
+#%.tab.o: %.y
+#%.yy.o: %.y
+
+#%.tab.c %.tab.h: %.y
+#	bison -v -o $*.tab.c $<
+#
+#%.yy.c: %.lex %.tab.h
+#	flex -o$@ $<
+
+#TARGET := $(d)/demo
+#OBJS := $(d)/demo.o $(d)/guard.o $(d)/eval.o $(d)/form.o $(d)/cred.o $(d)/auth.o $(d)/logic.yy.o $(d)/logic.tab.o $(p)/nnfs/xdr.o $(p)/svm/nexus-gdb.o
+#CFLAGS_$(d) := -DNEXUS
+#include Makefile.app
+
+#TARGET := $(d)/demoparse
+#OBJS := $(d)/demoparse.o $(p)/svm/nexus-gdb.o $(d)/guard.o $(d)/eval.o $(d)/cred.o #$(d)/auth.o
+#CFLAGS_$(d) := -DNEXUS
+#include Makefile.app

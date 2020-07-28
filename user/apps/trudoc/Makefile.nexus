@@ -1,0 +1,22 @@
+
+#TARGET := $(d)/aas_recv
+#OBJS := $(d)/aas.o $(d)/odf_sign.o $(d)/odf_x.o
+#include Makefile.app_linux_tpm
+
+TARGET := $(d)/aas_send
+OBJS := $(d)/aas_send.o $(d)/pzip.o
+include Makefile.app_linux_tpm
+
+TARGET := $(d)/aas_recv
+OBJS := $(d)/aas_recv.o $(d)/pzip.o $(d)/prin.o $(d)/aas_eval.o $(d)/pol.o $(d)/qc.o $(d)/odf_sign.o $(d)/pxslt.o $(d)/odf_x.o
+include Makefile.app_linux_tpm
+
+TARGET := $(d)/odf2docbook
+OBJS := $(d)/odf2docbook.o $(d)/aas_eval.o $(d)/prin.o $(d)/pol.o $(d)/qc.o $(d)/pzip.o $(d)/odf_sign.o $(d)/pxslt.o $(d)/odf_x.o
+include Makefile.app_linux_tpm
+
+#TARGET := $(d)/xslt
+#OBJS := $(d)/xsltl.o
+#LIBS_$(d)/xsltl := lib/libxalan-c.a lib/libxalanMsg.a lib/libxerces-c.a lib/libxerces-depdom.a lib/libstdc++.a lib/libm.a
+#CFLAGS_$(d)/xslt.o := -I include/xalanc/nls
+#include Makefile.app

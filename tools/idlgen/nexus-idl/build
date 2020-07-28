@@ -1,0 +1,4 @@
+PATH=/home/ashieh/bin32:${PATH}
+
+make "$@"
+

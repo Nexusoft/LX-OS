@@ -1,0 +1,39 @@
+
+CC = gcc
+CFLAGS = -m64 -Wall -g -Wno-unused -Werror -idirafter ../../../common/include
+LDFLAGS = -lcrypto
+
+all: linux demoparse.linux
+
+linux:
+	@if [ ! -e linux ]; then mkdir linux; fi
+
+
+HDR = auth.h eval.h guard.h hintcode.h auth.h opencred.h cred.h linux/vector.h formula.h
+OBJ = linux/demo.o linux/guard.o linux/eval.o linux/form.o linux/cred.o linux/auth.o linux/strictlogic.yy.o linux/strictlogic.tab.o
+
+linux/%.o: %.c
+	export GCC_DEFAULT=1; gcc $(CFLAGS) -c -o $@ $<
+
+linux/%.o: linux/%.c
+	export GCC_DEFAULT=1; gcc $(CFLAGS) -c -o $@ $<
+
+#demo.linux: $(OBJ)
+#	export GCC_DEFAULT=1; gcc $(CFLAGS) $(LDFLAGS) -o $@ $^
+
+demoparse.linux: linux/demoparse.o linux/formula.o linux/strictlogic.yy.o linux/strictlogic.tab.o linux/base64.o
+	export GCC_DEFAULT=1; gcc $(CFLAGS) $(LDFLAGS) -o $@ $^
+
+%.c: $(HDR)
+
+%.tab.o: %.y
+%.yy.o: %.y
+
+%.tab.c %.tab.h: %.y $(HDR)
+	bison -v $<
+
+%.yy.c: %.lex %.tab.h $(HDR)
+	flex -o$@ $<
+
+clean:
+	rm -rf linux/*.o *.o *.tab.c *.yy.c demo.linux demoparse.linux

@@ -1,0 +1,17 @@
+
+## OPEN
+
+20091210			Networking is slow at around 3Mbps. CPU load is not 100%: find out the blockage
+20091207			DNS lookup does not work (at the socket level)
+					The resolv.c file in uclibc uses /etc/hosts and /etc/resolv.conf,
+					neither of which exists. If we hardcode a bypass, it uses poll(),
+					which is also not supported. FIX: get poll working (and add files).
+20091203			VMWare player 3.0 cannot boot : does not support any of our VESA modes
+20091124			ELF files are occasionally dirty. could be a significant memory issue? (longstanding)
+
+## CLOSED
+
+20091123	20091130	nxlibc_syscall_select does not support network sockets
+20091119	20091130	thread reaping has memory error. current workaround is not to free some data (longstanding)
+20091116	20091118	process kill while waiting on timer (kernel/core/clock.c) causes segfault when timer fires
+

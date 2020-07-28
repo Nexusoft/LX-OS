@@ -1,0 +1,10 @@
+exec net-e1000.drv
+usleep 5000				# wait until driver is ready
+netopen 
+usleep 5000
+#exec minserver.app
+usleep 5000				# wait until server is ready
+#exec minclient.app
+exec guard_svc.app
+exec explorer.app
+

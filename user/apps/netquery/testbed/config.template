@@ -1,0 +1,6 @@
+export NODEID=1
+export ETH=eth5
+
+NQ_NAME=router1
+#NQ_FLAGS="-n 128.84.227.11:3359"
+

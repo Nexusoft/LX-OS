@@ -1,0 +1,29 @@
+
+ZEBRA=/local/ashieh/nq-linux/user/apps/netquery/quagga-0.99.8/zebra/.libs/zebra
+BGP=/local/ashieh/nq-linux/user/apps/netquery/quagga-0.99.8/bgpd/.libs/bgpd
+
+killall zebra
+killall bgpd
+
+if [ -z "$MYIP"  ]; then
+	MYIP=128.84.227.11
+fi
+
+if [ -z "$MYPORT"  ]; then
+	MYPORT=3359
+fi
+
+ifconfig eth2.2 0
+ifconfig eth2.3 0
+ifconfig eth2.100 0
+ifconfig eth2.101 0
+
+nq="-n $MYIP:$MYPORT"
+#nq=
+cmdline="$ZEBRA -f $node/etc/zebra.conf --nl-bufsize 200000 $nq --nq-name $NAME "
+
+echo $cmdline
+$cmdline > /tmp/zebra.stdout 2>&1 &
+
+sleep 1
+$BGP -f $node/etc/bgpd.conf -d

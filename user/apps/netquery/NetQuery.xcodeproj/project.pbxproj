@@ -1,0 +1,273 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 44;
+	objects = {
+
+/* Begin PBXFileReference section */
+		0A4FF00D0D493E2200D4D147 /* sim_flow_creation.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = sim_flow_creation.cc; sourceTree = "<group>"; };
+		0A4FF2400D4A766B00D4D147 /* sim-adapters.hh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = "sim-adapters.hh"; sourceTree = "<group>"; };
+		0A4FF2410D4A766B00D4D147 /* sim-rpc.hh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = "sim-rpc.hh"; sourceTree = "<group>"; };
+		0A4FF2430D4A766B00D4D147 /* rocket-sim.hh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = "rocket-sim.hh"; sourceTree = "<group>"; };
+		0A8BC54A0D45053C00F52357 /* attribute.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = attribute.c; sourceTree = "<group>"; };
+		0A8BC54D0D45053C00F52357 /* attribute_trie.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = attribute_trie.c; sourceTree = "<group>"; };
+		0A8BC54E0D45053C00F52357 /* ip.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ip.cc; sourceTree = "<group>"; };
+		0A8BC5510D45053C00F52357 /* marshall.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = marshall.cc; sourceTree = "<group>"; };
+		0A8BC5540D45053C00F52357 /* net.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = net.c; sourceTree = "<group>"; };
+		0A8BC5570D45053C00F52357 /* netquery-cc.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = "netquery-cc.cc"; sourceTree = "<group>"; };
+		0A8BC55A0D45053C00F52357 /* netquery.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = netquery.c; sourceTree = "<group>"; };
+		0A8BC55D0D45053C00F52357 /* nq_exceptions.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = nq_exceptions.cc; sourceTree = "<group>"; };
+		0A8BC5600D45053C00F52357 /* nq_ip.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = nq_ip.cc; sourceTree = "<group>"; };
+		0A8BC5630D45053C00F52357 /* nq_net_elements.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = nq_net_elements.cc; sourceTree = "<group>"; };
+		0A8BC5660D45053C00F52357 /* nq_transaction.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = nq_transaction.cc; sourceTree = "<group>"; };
+		0A8BC5690D45053C00F52357 /* nq_tuple.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = nq_tuple.cc; sourceTree = "<group>"; };
+		0A8BC56C0D45053C00F52357 /* nq_util.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = nq_util.cc; sourceTree = "<group>"; };
+		0A8BC56F0D45053C00F52357 /* optionlist.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = optionlist.cc; sourceTree = "<group>"; };
+		0A8BC5720D45053C00F52357 /* pickle.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = pickle.c; sourceTree = "<group>"; };
+		0A8BC5730D45053C00F52357 /* queue.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = queue.c; sourceTree = "<group>"; };
+		0A8BC5760D45053C00F52357 /* remote_trigger.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = remote_trigger.c; sourceTree = "<group>"; };
+		0A8BC5790D45053C00F52357 /* scripting.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = scripting.cc; sourceTree = "<group>"; };
+		0A8BC57B0D45053C00F52357 /* socket.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = socket.c; sourceTree = "<group>"; };
+		0A8BC57E0D45053C00F52357 /* transaction.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = transaction.c; sourceTree = "<group>"; };
+		0A8BC5810D45053C00F52357 /* util-c.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "util-c.c"; sourceTree = "<group>"; };
+		0A8BC5840D45053C00F52357 /* util.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = util.cc; sourceTree = "<group>"; };
+		0A8BC5870D45053C00F52357 /* uuid.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = uuid.c; sourceTree = "<group>"; };
+		0A8BC58B0D45053C00F52357 /* net-test.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = "net-test.cc"; sourceTree = "<group>"; };
+		0A8BC58E0D45053C00F52357 /* netqueryd.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = netqueryd.cc; sourceTree = "<group>"; };
+		0A8BC5900D45053C00F52357 /* nq_test.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = nq_test.cc; sourceTree = "<group>"; };
+		0A8BC5930D45053C00F52357 /* obj-test.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = "obj-test.cc"; sourceTree = "<group>"; };
+		0A8BC5960D45053C00F52357 /* rocket-router.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = "rocket-router.cc"; sourceTree = "<group>"; };
+		0A8BC5990D45053C00F52357 /* router-test.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = "router-test.cc"; sourceTree = "<group>"; };
+		0A8BC59C0D45053C00F52357 /* router.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = router.cc; sourceTree = "<group>"; };
+		0A8BC59E0D45053C00F52357 /* router.hh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = router.hh; sourceTree = "<group>"; };
+		0A8BC5A20D45053C00F52357 /* attribute.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = attribute.h; path = nq/attribute.h; sourceTree = "<group>"; };
+		0A8BC5A30D45053C00F52357 /* attribute.hh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = attribute.hh; path = nq/attribute.hh; sourceTree = "<group>"; };
+		0A8BC5A40D45053C00F52357 /* boost_util.hh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = boost_util.hh; path = nq/boost_util.hh; sourceTree = "<group>"; };
+		0A8BC5A50D45053C00F52357 /* exceptions.hh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = exceptions.hh; path = nq/exceptions.hh; sourceTree = "<group>"; };
+		0A8BC5A60D45053C00F52357 /* gcmalloc.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = gcmalloc.h; path = nq/gcmalloc.h; sourceTree = "<group>"; };
+		0A8BC5A70D45053C00F52357 /* ip.hh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = ip.hh; path = nq/ip.hh; sourceTree = "<group>"; };
+		0A8BC5A80D45053C00F52357 /* marshall.hh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = marshall.hh; path = nq/marshall.hh; sourceTree = "<group>"; };
+		0A8BC5A90D45053C00F52357 /* net.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = net.h; path = nq/net.h; sourceTree = "<group>"; };
+		0A8BC5AA0D45053C00F52357 /* net_elements.hh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = net_elements.hh; path = nq/net_elements.hh; sourceTree = "<group>"; };
+		0A8BC5AB0D45053C00F52357 /* netquery.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = netquery.h; path = nq/netquery.h; sourceTree = "<group>"; };
+		0A8BC5AC0D45053C00F52357 /* optionlist.hh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = optionlist.hh; path = nq/optionlist.hh; sourceTree = "<group>"; };
+		0A8BC5AD0D45053C00F52357 /* queue.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = queue.h; path = nq/queue.h; sourceTree = "<group>"; };
+		0A8BC5AE0D45053C00F52357 /* remote_trigger.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = remote_trigger.h; path = nq/remote_trigger.h; sourceTree = "<group>"; };
+		0A8BC5AF0D45053C00F52357 /* scripting.hh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = scripting.hh; path = nq/scripting.hh; sourceTree = "<group>"; };
+		0A8BC5B00D45053C00F52357 /* socket.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = socket.h; path = nq/socket.h; sourceTree = "<group>"; };
+		0A8BC5B10D45053C00F52357 /* transaction.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = transaction.h; path = nq/transaction.h; sourceTree = "<group>"; };
+		0A8BC5B20D45053C00F52357 /* transaction.hh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = transaction.hh; path = nq/transaction.hh; sourceTree = "<group>"; };
+		0A8BC5B30D45053C00F52357 /* tuple.hh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = tuple.hh; path = nq/tuple.hh; sourceTree = "<group>"; };
+		0A8BC5B40D45053C00F52357 /* util.hh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = util.hh; path = nq/util.hh; sourceTree = "<group>"; };
+		0A8BC5B50D45053C00F52357 /* uuid.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = uuid.h; path = nq/uuid.h; sourceTree = "<group>"; };
+		0A8BC62E0D45605200F52357 /* trie.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = trie.c; sourceTree = "<group>"; };
+		0A8BC62F0D4560B000F52357 /* trie.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = trie.h; path = nq/trie.h; sourceTree = "<group>"; };
+		0AF427D70D464A24004FD6C9 /* Makefile */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.make; path = Makefile; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		08FB7794FE84155DC02AAC07 /* NetQuery */ = {
+			isa = PBXGroup;
+			children = (
+				0AF427D70D464A24004FD6C9 /* Makefile */,
+				0A8BC5490D45053C00F52357 /* client */,
+				0A8BC58A0D45053C00F52357 /* apps */,
+				0A8BC5A00D45053C00F52357 /* include */,
+			);
+			name = NetQuery;
+			sourceTree = "<group>";
+		};
+		0A8BC5490D45053C00F52357 /* client */ = {
+			isa = PBXGroup;
+			children = (
+				0A8BC54A0D45053C00F52357 /* attribute.c */,
+				0A8BC54D0D45053C00F52357 /* attribute_trie.c */,
+				0A8BC54E0D45053C00F52357 /* ip.cc */,
+				0A8BC5510D45053C00F52357 /* marshall.cc */,
+				0A8BC5540D45053C00F52357 /* net.c */,
+				0A8BC5570D45053C00F52357 /* netquery-cc.cc */,
+				0A8BC55A0D45053C00F52357 /* netquery.c */,
+				0A8BC55D0D45053C00F52357 /* nq_exceptions.cc */,
+				0A8BC5600D45053C00F52357 /* nq_ip.cc */,
+				0A8BC5630D45053C00F52357 /* nq_net_elements.cc */,
+				0A8BC5660D45053C00F52357 /* nq_transaction.cc */,
+				0A8BC5690D45053C00F52357 /* nq_tuple.cc */,
+				0A8BC56C0D45053C00F52357 /* nq_util.cc */,
+				0A8BC56F0D45053C00F52357 /* optionlist.cc */,
+				0A8BC5720D45053C00F52357 /* pickle.c */,
+				0A8BC5730D45053C00F52357 /* queue.c */,
+				0A8BC5760D45053C00F52357 /* remote_trigger.c */,
+				0A8BC5790D45053C00F52357 /* scripting.cc */,
+				0A8BC57B0D45053C00F52357 /* socket.c */,
+				0A8BC57E0D45053C00F52357 /* transaction.c */,
+				0A8BC5810D45053C00F52357 /* util-c.c */,
+				0A8BC5840D45053C00F52357 /* util.cc */,
+				0A8BC5870D45053C00F52357 /* uuid.c */,
+				0A8BC62E0D45605200F52357 /* trie.c */,
+			);
+			path = client;
+			sourceTree = "<group>";
+		};
+		0A8BC58A0D45053C00F52357 /* apps */ = {
+			isa = PBXGroup;
+			children = (
+				0A4FF00D0D493E2200D4D147 /* sim_flow_creation.cc */,
+				0A8BC58B0D45053C00F52357 /* net-test.cc */,
+				0A8BC58E0D45053C00F52357 /* netqueryd.cc */,
+				0A8BC5900D45053C00F52357 /* nq_test.cc */,
+				0A8BC5930D45053C00F52357 /* obj-test.cc */,
+				0A8BC5960D45053C00F52357 /* rocket-router.cc */,
+				0A8BC5990D45053C00F52357 /* router-test.cc */,
+				0A8BC59C0D45053C00F52357 /* router.cc */,
+				0A8BC59E0D45053C00F52357 /* router.hh */,
+				0A4FF2400D4A766B00D4D147 /* sim-adapters.hh */,
+				0A4FF2410D4A766B00D4D147 /* sim-rpc.hh */,
+				0A4FF2430D4A766B00D4D147 /* rocket-sim.hh */,
+			);
+			path = apps;
+			sourceTree = "<group>";
+		};
+		0A8BC5A00D45053C00F52357 /* include */ = {
+			isa = PBXGroup;
+			children = (
+				0A8BC62F0D4560B000F52357 /* trie.h */,
+				0A8BC5A20D45053C00F52357 /* attribute.h */,
+				0A8BC5A30D45053C00F52357 /* attribute.hh */,
+				0A8BC5A40D45053C00F52357 /* boost_util.hh */,
+				0A8BC5A50D45053C00F52357 /* exceptions.hh */,
+				0A8BC5A60D45053C00F52357 /* gcmalloc.h */,
+				0A8BC5A70D45053C00F52357 /* ip.hh */,
+				0A8BC5A80D45053C00F52357 /* marshall.hh */,
+				0A8BC5A90D45053C00F52357 /* net.h */,
+				0A8BC5AA0D45053C00F52357 /* net_elements.hh */,
+				0A8BC5AB0D45053C00F52357 /* netquery.h */,
+				0A8BC5AC0D45053C00F52357 /* optionlist.hh */,
+				0A8BC5AD0D45053C00F52357 /* queue.h */,
+				0A8BC5AE0D45053C00F52357 /* remote_trigger.h */,
+				0A8BC5AF0D45053C00F52357 /* scripting.hh */,
+				0A8BC5B00D45053C00F52357 /* socket.h */,
+				0A8BC5B10D45053C00F52357 /* transaction.h */,
+				0A8BC5B20D45053C00F52357 /* transaction.hh */,
+				0A8BC5B30D45053C00F52357 /* tuple.hh */,
+				0A8BC5B40D45053C00F52357 /* util.hh */,
+				0A8BC5B50D45053C00F52357 /* uuid.h */,
+			);
+			path = include;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXLegacyTarget section */
+		D28A88AD04BDD90700651E21 /* obj-test */ = {
+			isa = PBXLegacyTarget;
+			buildArgumentsString = "$(ACTION)";
+			buildConfigurationList = 1DEB918F08733D9F0010E9CD /* Build configuration list for PBXLegacyTarget "obj-test" */;
+			buildPhases = (
+			);
+			buildToolPath = /usr/bin/make;
+			dependencies = (
+			);
+			name = "obj-test";
+			passBuildSettingsInEnvironment = 1;
+			productName = NetQuery;
+		};
+/* End PBXLegacyTarget section */
+
+/* Begin PBXProject section */
+		08FB7793FE84155DC02AAC07 /* Project object */ = {
+			isa = PBXProject;
+			buildConfigurationList = 1DEB919308733D9F0010E9CD /* Build configuration list for PBXProject "NetQuery" */;
+			compatibilityVersion = "Xcode 3.0";
+			hasScannedForEncodings = 1;
+			mainGroup = 08FB7794FE84155DC02AAC07 /* NetQuery */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				D28A88AD04BDD90700651E21 /* obj-test */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin XCBuildConfiguration section */
+		1DEB919008733D9F0010E9CD /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COPY_PHASE_STRIP = NO;
+				DEBUGGING_SYMBOLS = YES;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_ENABLE_FIX_AND_CONTINUE = YES;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				OPTIMIZATION_CFLAGS = "-O0";
+				OTHER_CFLAGS = "";
+				OTHER_LDFLAGS = "";
+				PRODUCT_NAME = "obj-test";
+				ZERO_LINK = YES;
+			};
+			name = Debug;
+		};
+		1DEB919108733D9F0010E9CD /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COPY_PHASE_STRIP = YES;
+				GCC_ENABLE_FIX_AND_CONTINUE = NO;
+				INCLUDEPATH = "-I/sw/include";
+				LDLIBRARYPATH = "-L/sw/lib";
+				OTHER_CFLAGS = "";
+				OTHER_LDFLAGS = "";
+				PRODUCT_NAME = NetQuery;
+				ZERO_LINK = NO;
+			};
+			name = Release;
+		};
+		1DEB919408733D9F0010E9CD /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				GCC_WARN_ABOUT_RETURN_TYPE = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				PREBINDING = NO;
+				SDKROOT = "$(DEVELOPER_SDK_DIR)/MacOSX10.5.sdk";
+			};
+			name = Debug;
+		};
+		1DEB919508733D9F0010E9CD /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = (
+					ppc,
+					i386,
+				);
+				GCC_WARN_ABOUT_RETURN_TYPE = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				PREBINDING = NO;
+				SDKROOT = "$(DEVELOPER_SDK_DIR)/MacOSX10.5.sdk";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		1DEB918F08733D9F0010E9CD /* Build configuration list for PBXLegacyTarget "obj-test" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1DEB919008733D9F0010E9CD /* Debug */,
+				1DEB919108733D9F0010E9CD /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		1DEB919308733D9F0010E9CD /* Build configuration list for PBXProject "NetQuery" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1DEB919408733D9F0010E9CD /* Debug */,
+				1DEB919508733D9F0010E9CD /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 08FB7793FE84155DC02AAC07 /* Project object */;
+}

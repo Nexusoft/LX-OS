@@ -1,0 +1,5 @@
+The various drivers use these Linux header files:
+
+* user drivers use linux-headers-$(VER)-legacy.tbz2
+* kernel core sources use linux-headers-$(VER)-kernel.tbz2
+* kernel drivers use these as well as linux-headers-$(VER)-kdrivers.tbz2

@@ -1,0 +1,34 @@
+#!/bin/bash
+
+# see if ca is already running
+
+pkill -x ca 2>/dev/null
+pkill -x nexusca 2>/dev/null
+
+p=`netstat -naep 2>/dev/null | grep -m 1 ":5893[ 	]" | grep -v "LAST_ACK"`
+if [ "$p" ]; then
+  echo "A process appears to be running on the tpm ca port (port 5893)" 1>&2
+  echo "$p" 1>&2
+  echo "You need to kill this process manually if you want to start a fresh ca" 1>&2
+else
+  ./ca certs/ca.private.pem certs/tpm_identity_extensions.cnf >|ca.output 2>&1 
+  if [ $? -ne 0 ]; then
+    cat ca.output 1>&2
+    echo "error running nexus ca" 1>&2
+  fi
+  echo "ca is running; output is in `pwd`/ca.output"
+fi
+
+p=`netstat -naep 2>/dev/null | grep -m 1 ":5892[ 	]" | grep -v "LAST_ACK"`
+if [ "$p" ]; then
+  echo "A process appears to be running on the nexus ca port (port 5892)" 1>&2
+  echo "$p" 1>&2
+  echo "You need to kill this process manually if you want to start a fresh nexus ca" 1>&2
+else
+  ./nexusca certs/nexusca.private.pem certs/ca.crt certs/vetting_extensions.cnf >|nexusca.output 2>&1
+  if [ $? -ne 0 ]; then
+    cat nexusca.output 1>&2
+    echo "error running nexus ca" 1>&2
+  fi
+  echo "nexus ca is running; output is in `pwd`/nexusca.output"
+fi

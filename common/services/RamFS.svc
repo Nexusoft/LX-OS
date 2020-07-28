@@ -1,0 +1,728 @@
+service RamFS {
+  __implements__ { "FS.svc" }
+
+  /* NexusOS: RamFS provides an in-memory filesystem. Its main 
+     	      purpose is to reflect Posix IO calls to other filesystems. */
+
+  decls {
+    includefiles { "<nexus/defs.h>",
+	    	   "<nexus/fs.h>",
+	           "<nexus/syscall-defs.h>",
+		   "k:<linux/string.h>", 
+		   "k:<nexus/defs.h>", 
+		   "k:<nexus/machineprimitives.h>", 
+		   "<nexus/Thread.interface.h>",
+		   "k:<nexus/synch.h>" }
+    
+    FSID RamFS_new(int listen_port);
+    void RamFS_new_dynamic(void);
+  }
+
+  decls __callee__ {
+
+    includefiles { "u:<stdlib.h>", 
+	    	   "u:<stdio.h>", 
+		   "u:<string.h>", 
+		   "u:<assert.h>",
+                   "<linux/compiler.h>",
+                   "<nexus/util.h>",
+    		   "<nexus/vector.h>",
+                   "<nexus/hashtable.h>",
+                   "<nexus/dlist.h>",
+                   "u:<pthread.h>" }
+
+    includefiles { "k:<nexus/user_compat.h>" }
+    includefiles { "k:<nexus/ipd.h>" }
+    includefiles { "<nexus/ipc.h>" }
+    includefiles { "u:<nexus/sema.h>" }
+    includefiles { "k:\"IPC.interface.h\"" }
+    includefiles { "k:<nexus/thread.h>" }
+    includefiles { "k:<nexus/synch-inline.h>" }
+
+	struct RamFS_Ctx;
+
+	/** An object in the RamFS filesystem, either a file or a directory. 
+	 
+	    We have only one struct, but it has an anonymous union with fields that
+	    are valid either for a file or for a directory. It is ESSENTIAL to only
+	    use the object consistently in one way. 
+	 
+	    Originally, these were two separate object types, but this approach 
+	    caused many simple FS operations (e.g.,lookup) to perform duplicate 
+	    actions. No more, but now it is possible to accidentally treat a
+	    dir as a file and vice versa.
+	 
+	    use FSID_isDir(..) to verify the type of an inode
+
+	    XXX separate pin accounting per process to 
+	    	support rollback on unclean exit */
+	struct RamFS_Inode {
+	  FSID id;
+	  struct RamFS_Inode *parent;
+	  int pin; 				///< number of pin requests
+	  Sema mutex;				///< for file ops that must be atomic
+	  char *name;
+
+	  union {
+		  // valid for RamFS_Dir
+		  struct {
+			struct RamFS_Ctx* _fsid_ctx;	///< fs structure
+			int ver;			///< number of children
+			FSID mnt;			///< fs mounted here
+			PointerVector subdirs;
+			PointerVector files;
+		  };
+		  // valid for RamFS_File
+		  struct {
+			char *data;
+			int len; 		///< length of data
+			int dlen;		///< length of the databuffer. >= len
+		  };
+	  };
+	};
+
+	typedef struct RamFS_Inode RamFS_Inode;
+	typedef struct RamFS_Inode RamFS_File;
+	typedef struct RamFS_Inode RamFS_Dir;
+
+	/** Filesystem structure. 
+
+	Holds fast hash-based lookup to all directories and files 
+	as well as pointer to root directory of the tree */
+	struct RamFS_Ctx {
+	  Sema mutex;
+	  int port;
+	  RamFS_Dir *root;
+	  struct HashTable *dir_table; 		///< node_id => RamFS_Dir
+	  struct HashTable *file_table; 	///< node_id => RamFS_File
+	  unsigned int next_id;			///< source of 'unique' node_ids
+	};
+	
+	typedef struct RamFS_Ctx RamFS_Ctx;
+
+    /** Hack: since requests are sent to a port, each port is connected
+        one-to-one to a context. In userspace, the port structure cannot
+	be accessed, so we need another lookup mechanism.
+        
+	For now, we only allow a single filesystem per process. XXX fix */
+    static RamFS_Ctx *RamFS_local_root;
+
+    /** Internal functions. There should be no reason to call these;
+        use FS.svc interfaces (below), instead. ****/
+    
+    /** callback used to look up an inode by name */
+    static int 
+    __RamFS_matchname(void *entry, void* arg) 
+    {
+      return strcmp(((RamFS_Inode *) entry)->name, arg) ? 0 : 1;
+    }
+
+    static RamFS_File *
+    RamFS_findfile(RamFS_Dir *dir, char *name) 
+    {
+      RamFS_File *file;
+      
+      P(&dir->_fsid_ctx->mutex);
+      file = PointerVector_iterate(&dir->files, __RamFS_matchname, name);
+      V_nexus(&dir->_fsid_ctx->mutex);
+      return file;
+    }
+
+    static RamFS_Dir *
+    RamFS_finddir(RamFS_Dir *dir, char *name) 
+    {
+      RamFS_Dir *child;
+      
+      P(&dir->_fsid_ctx->mutex);
+      child = PointerVector_iterate(&dir->subdirs, __RamFS_matchname, name);
+      V_nexus(&dir->_fsid_ctx->mutex);
+      return child;
+    }
+
+    static RamFS_Inode *
+    RamFS_findnode(RamFS_Dir *dir, char *name)
+    {
+      RamFS_Inode *child;
+
+      child = RamFS_finddir(dir, name);
+      if (child)
+        return child;
+
+      return RamFS_findfile(dir, name);
+    }
+
+    /** mkdir */
+    static RamFS_Dir *
+    RamFS_mkdir(RamFS_Ctx *ctx, RamFS_Dir *parent, char *name) 
+    {
+      RamFS_Dir *newdir;
+
+      // allocate and initialize the structure
+      newdir = nxcompat_calloc(1, sizeof(RamFS_Dir));
+      newdir->name = strdup(name);
+      newdir->ver = 1;
+      newdir->parent = parent;
+      newdir->mutex = SEMA_MUTEX_INIT;
+      PointerVector_init(&newdir->subdirs, 4, 0);
+      PointerVector_init(&newdir->files, 4, 0);
+
+      P(&ctx->mutex);
+      newdir->id = FSID_DIR(ctx->port, ctx->next_id++);
+      newdir->_fsid_ctx = ctx;
+      if (parent) {
+	PointerVector_append(&parent->subdirs, newdir);
+	parent->ver++;
+      }
+
+      hash_insert(ctx->dir_table, &newdir->id, newdir);
+      V_nexus(&ctx->mutex);
+      return newdir;
+    }
+    
+    /** Create a file */
+    static RamFS_File *
+    RamFS_mk(RamFS_Dir *parent, char *name, char *data, int datalen) 
+    {
+      RamFS_Ctx *ctx;
+      RamFS_File *file;
+      int len;
+ 
+      // create file and fill in local variables
+      file = nxcompat_calloc(1, sizeof(RamFS_File));
+      file->name = strdup(name);
+      file->dlen = datalen;
+      file->len = datalen;
+      file->parent = parent;
+      file->mutex = SEMA_MUTEX_INIT;
+      
+      // copy data
+      if (datalen) {
+	      file->data = nxcompat_alloc(file->dlen);
+	      memcpy(file->data, data, file->dlen);
+      }
+
+      // connect to fs and fill in dependent variables
+      ctx = parent->_fsid_ctx;
+      assert(ctx);
+      P(&ctx->mutex);
+      file->id = FSID_FILE(ctx->port, ctx->next_id++);
+
+      // attach to parent
+      file->parent->ver++;
+      PointerVector_append(&parent->files, file);
+      hash_insert(ctx->file_table, &file->id, file);
+      V_nexus(&ctx->mutex);
+
+      return file;
+    }
+
+    static void 
+    _rm(RamFS_File *file) 
+    {
+      RamFS_Ctx *ctx = file->parent->_fsid_ctx;
+      assert(file && file->parent);
+      
+      // remove from shared structures
+      PointerVector_delete(&file->parent->files, file);
+      hash_delete(ctx->file_table, &file->id);
+      file->parent->ver--;
+
+      // dealloc
+      if (file->dlen) 
+	      nxcompat_free(file->data);
+      nxcompat_free(file);
+    }
+
+    /* rmdir (recursive)  */
+    static void 
+    _rmdir(RamFS_Dir *dir) 
+    {
+      RamFS_Ctx *ctx = dir->_fsid_ctx;
+      int i;
+
+      // recursively remove children
+      assert(dir && dir->parent);
+      for (i = PointerVector_len(&dir->subdirs) - 1; i >= 0; i--)
+	_rmdir((RamFS_Dir *)PointerVector_nth(&dir->subdirs, i));
+      for (i = PointerVector_len(&dir->files) - 1; i >= 0; i--)
+	_rm((RamFS_File *)PointerVector_nth(&dir->files, i));
+      
+      // remove from shared structures
+      PointerVector_delete(&dir->parent->subdirs, dir);
+      hash_delete(ctx->dir_table, &dir->id);
+      dir->parent->ver--;
+      
+      // dealloc
+      PointerVector_dealloc(&dir->subdirs);
+      PointerVector_dealloc(&dir->files);
+      nxcompat_free(dir);
+    }
+
+    static void 
+    RamFS_rmdir(RamFS_Dir *dir) 
+    {
+      RamFS_Ctx *ctx = dir->_fsid_ctx;
+      P(&ctx->mutex);
+      _rmdir(dir);
+      V_nexus(&ctx->mutex);
+    }
+
+    static void  
+    RamFS_rm(RamFS_File *f) 
+    {
+      RamFS_Ctx *ctx = f->parent->_fsid_ctx;
+      P(&ctx->mutex);
+      _rm(f);
+      V_nexus(&ctx->mutex);
+    }
+
+    /** Return the file or directory with the given id 
+     
+        @param search_dir toggles whether to search for a directory
+        @param search_file toggles whether to search for a file */
+    static RamFS_Inode *
+    __getinode(FSID id, int search_dir, int search_file) 
+    {
+      RamFS_Ctx *ctx;
+      RamFS_Inode *object;
+      
+      ctx = RamFS_local_root; // XXX: hack, see variable declaration
+      object = NULL;
+
+      P(&ctx->mutex);
+      // look for a directory 
+      if (search_dir)
+        object = hash_findItem(ctx->dir_table, &id);
+      // look for a file
+      if (search_file && !object)
+      	object = hash_findItem(ctx->file_table, &id);
+      V_nexus(&ctx->mutex);
+      return object;
+    }
+    
+    static RamFS_Dir *
+    RamFS_getdir(FSID id) 
+    {
+      return __getinode(id, 1, 0);
+    }
+
+    static RamFS_File *
+    RamFS_getfile(FSID id) 
+    {
+      return __getinode(id, 0, 1);
+    }
+
+    static RamFS_Inode *
+    RamFS_getinode(FSID id) 
+    {
+      return __getinode(id, 1, 1);
+    }
+
+ /** Create a new filesystem. 
+  
+     @param start_server also starts server threads */
+    FSID 
+    RamFS_new(int listen_port) {
+      RamFS_Ctx *ctx;
+      IPC_Port *port;
+      
+      // create new context
+      ctx = nxcompat_calloc(1, sizeof(RamFS_Ctx));
+      ctx->mutex = SEMA_MUTEX_INIT;
+      ctx->dir_table = hash_new(4, sizeof(FSID));
+      ctx->file_table = hash_new(4, sizeof(FSID));
+      
+      // create a port to listen on
+      ctx->port = listen_port;
+#ifdef __KERNEL__
+      ctx->port = IPC_CreatePort(&ctx->port);
+      assert(ctx->port > 0);
+      assert(listen_port <= 0 || listen_port == ctx->port);
+      RamFS_port_handle = ctx->port; // override the port set in serverInit()
+#else
+      // HACK: in userspace, serverInit() will assign a port
+      ctx->port = RamFS_port_handle;
+#endif
+
+      // create root dir
+      ctx->root = RamFS_mkdir(ctx, NULL, ""); 
+
+      // setup port handlers
+      // in userspace, this function should have been called through
+      // ipc_server_run(..), which starts the handler threads.
+#ifdef __NEXUSKERNEL__
+      
+	/** a wrapper to match the callback typedef  */
+      void __processor(void *t) 
+      {
+        RamFS_kernelProcessNextCommand(SERVERPROCESSOR_SYNC, 
+	          ((KernelServerProcessorData) {.caller_thread = t}));
+      }
+
+      
+      IPCPort_setKernelHandlers(IPCPort_find(ctx->port), kernelIPD, 
+		      		__processor, kernel_bind_accept_all);
+#endif
+
+      RamFS_local_root = ctx;
+      return ctx->root->id;
+    }
+
+    /** Simplified version of _new for call from standardized daemon.c */
+    void
+    RamFS_new_dynamic() {
+    	RamFS_new(0);
+    }
+  }
+
+  /**** RamFS implementation of the FS.svc iface ********/
+
+  interface lf_generate { OID_NONE; } lf_check { 1; }
+  FSID Create(FSID parent_node, 
+	      __input__ struct VarLen node_name, int nodeType) {
+    RamFS_Dir *parent;
+    RamFS_Inode *inode;
+
+    // validate input
+    if (nodeType != FS_NODE_DIR && nodeType != FS_NODE_FILE)
+      return FSID_ERROR(FS_INVALID);
+
+    if (node_name.len > MAX_FNAME_LEN || node_name.len <= 1)
+      return FSID_ERROR(FS_INVALID);
+
+    // lookup parent node
+    parent = RamFS_getdir(parent_node);
+    if (!parent)
+      return FSID_ERROR(FS_NOTFOUND);
+
+    // copy name from caller
+    char name[MAX_FNAME_LEN];
+    if (IPC_TransferFrom(call_handle, node_name.desc_num,
+			 name, (unsigned) node_name.data, node_name.len) != 0)
+      return FSID_ERROR(FS_ACCESSERROR);
+    name[node_name.len - 1] = '\0';
+
+    // check for duplicate names
+    if (RamFS_findnode(parent, name))
+      return FSID_ERROR(FS_ALREADYPRESENT);
+
+    if (nodeType == FS_NODE_DIR) 
+      inode = RamFS_mkdir(parent->_fsid_ctx, parent, name);
+    else
+      inode = RamFS_mk(parent, name, NULL, 0);
+    if (!inode)
+      return FSID_ERROR(FS_INVALID);
+
+    return inode->id;
+  }
+
+  interface lf_generate { OID_NONE; } lf_check { 1; }
+  int Unlink(FSID parent_node, FSID child_node) {
+    RamFS_Dir *dir;
+    RamFS_File *file;
+
+    // is it a file? then `rm`
+    file = RamFS_getfile(child_node);
+    if (file) {
+    	RamFS_rm(file);
+	return 0;
+    }
+
+    // is it a dir? then `rmdir` unless holding a mounted fs
+    dir = RamFS_getdir(child_node);
+    if (dir) {
+    	if (!FSID_isNull(dir->mnt))
+		return FS_INVALID;
+
+    	RamFS_rmdir(dir);
+	return 0;
+    }
+
+    // nothing valid found to remove
+    return -FS_NOTFOUND;
+  }
+
+  interface lf_generate { OID_NONE; } lf_check { 1; }
+  int ReadDir(FSID target_node, __output__ struct VarLen data, int offset) 
+  {
+    RamFS_Dir *dir;
+    char *name;
+    int ndirs, nfiles, nlen;
+
+    // check input
+    if  (offset < 0)
+      return -FS_INVALID;
+
+    // find the directory
+    dir = RamFS_getdir(target_node);
+    if (!dir)
+      return -FS_NOTFOUND;
+
+    ndirs = PointerVector_len(&dir->subdirs);
+    nfiles = PointerVector_len(&dir->files);
+
+    P(&dir->_fsid_ctx->mutex);
+    // read the next entry: dir?
+    if (offset < ndirs) {
+            name = ((RamFS_Dir *) PointerVector_nth(&dir->subdirs, offset))->name;
+    }
+    else {
+      // read the next entry: file?
+      if (offset < ndirs + nfiles)
+	name = ((RamFS_File *) PointerVector_nth(&dir->files, offset - ndirs))->name;
+      else
+        goto error_locked;	
+    } 
+    
+    // will the name fit?
+    nlen = strlen(name);
+    if (data.len < nlen + 1)
+      goto error_locked;	
+
+    // transfer name
+    if (IPC_TransferTo(call_handle, data.desc_num, (unsigned int) data.data, name, nlen + 1))
+      goto error_locked;
+
+    V_nexus(&dir->_fsid_ctx->mutex);
+    return (offset < ndirs + nfiles - 1) ? 1 : 0;
+
+error_locked:
+    V_nexus(&dir->_fsid_ctx->mutex);
+    return -FS_INVALID;
+  }
+
+  interface lf_generate { OID_NONE; } lf_check { 1; }
+  int Read(FSID target_node, int file_position, 
+      __output__ struct VarLen dest, int count) 
+  {
+    RamFS_File *file;
+
+    if (!count)
+      return 0;
+    
+    // find file
+    file = RamFS_getfile(target_node);
+    if (!file)
+      return -FS_INVALID;
+
+    // calculate maximum number of bytes to copy
+    count = min(count, file->len - file_position);
+    if (count < 0)
+      return -FS_INVALID;
+    if (!count)
+      return 0;
+
+    // read 
+    if (IPC_TransferTo(call_handle, dest.desc_num, (unsigned int) dest.data, 
+		       file->data + file_position, count))
+      return -FS_ACCESSERROR;
+
+    return count;
+  }
+
+  interface lf_generate { OID_NONE; } lf_check { 1; }
+  int Write(FSID target_node, int file_position,
+	     __input__ struct VarLen source, int count) 
+  {
+       
+    RamFS_File *file;
+    char *newdata;
+    int newlen;
+
+    // find file
+    file = RamFS_getfile(target_node);
+    if (!file)
+      return -FS_INVALID;
+
+    if (!count)
+      return 0;
+
+    // reallocate to make room
+    newlen = file_position + count;
+    if (newlen > file->dlen) {
+	// create larger buffer
+	newlen += min(512, count); /* overprovision a bit */
+    	newdata = nxcompat_alloc(newlen);
+	if (!newdata)
+		return -FS_NOMEM;
+	memcpy(newdata, file->data, file->len);
+
+	// replace buffers
+	P(&file->mutex);
+	nxcompat_free(file->data);
+	file->data = newdata;
+	file->dlen = newlen;
+	V_nexus(&file->mutex);
+    }
+
+    // write 
+    if (IPC_TransferFrom(call_handle, source.desc_num, 
+		         file->data + file_position,
+			 (unsigned int) source.data, count)) 
+      return -FS_ACCESSERROR;
+
+    // update length
+    file->len = max(file->len, file_position + count);
+
+    return count;
+  }
+
+  interface lf_generate { OID_NONE; } lf_check { 1; }
+  int Truncate(FSID target_node, int target_len) 
+  {
+    RamFS_File *file;
+
+    // find file
+    file = RamFS_getfile(target_node);
+    if (!file)
+      return -FS_INVALID;
+
+    if (target_len) {
+	    file->len = target_len;
+	    return 0;
+    }
+
+    // truncate
+    P(&file->mutex);
+    nxcompat_free(file->data);
+    file->dlen = 0;
+    file->len = 0;
+    V_nexus(&file->mutex);
+
+    return 0;
+  }
+
+  interface lf_generate { OID_NONE; } lf_check { 1; }
+  int Sync(FSID target_node) 
+  {
+    RamFS_File *file;
+
+    // find file
+    file = RamFS_getfile(target_node);
+    if (!file)
+      return -FS_INVALID;
+
+    // sync is a NOOP on a memory filesystem
+    return 0;
+  }
+
+  interface lf_generate { OID_NONE; } lf_check { 1; }
+  int Size(FSID target_node) 
+  {
+    RamFS_File *file;
+
+    file = RamFS_getfile(target_node);
+    if (!file)
+      return -FS_INVALID;
+
+    return file->data ? file->len : 0;
+  }
+
+  /** Find a child of the given node by name. */
+  interface lf_generate { OID_NONE; } lf_check { 1; }
+  FSID Lookup(FSID parent_node, __input__ struct VarLen node_name, int resolve_mounts) 
+  {
+    RamFS_Dir *parent, *dir;
+    RamFS_File *file;
+    FSID id;
+    char *name;
+
+    if (node_name.len > MAX_FNAME_LEN || node_name.len <= 1)
+      return FSID_ERROR(FS_INVALID);
+
+    // read the filename
+    name = nxcompat_alloc(node_name.len);
+    if(IPC_TransferFrom(call_handle, node_name.desc_num,
+	    name, (unsigned) node_name.data, node_name.len))
+	return FSID_ERROR(FS_ACCESSERROR);
+    name[node_name.len - 1] = '\0'; // should be part of data, but be safe
+
+    // find the parent node
+    parent = RamFS_getdir(parent_node);
+    if (!parent) {
+      nxcompat_free(name);
+      return FSID_ERROR(FS_INVALID);
+    }
+
+    // is directory?
+    dir = RamFS_finddir(parent, name);
+    if (dir) {
+      // special case: is mount point?
+      if (resolve_mounts && FSID_isDir(dir->mnt))
+        id = dir->mnt;
+      else
+        id = dir->id;
+    }
+    else {
+      // is file?
+      file = RamFS_findfile(parent, name);
+      if (file)
+        id = file->id;
+      else
+        id = FSID_ERROR(FS_NOTFOUND);
+    }
+    
+    nxcompat_free(name);
+    return id;
+  }
+
+  interface lf_generate { OID_NONE; } lf_check { 1; }
+  int Pin(FSID target_node) 
+  {
+    RamFS_Inode *inode;
+
+    inode = RamFS_getinode(target_node);
+    if (!inode)
+	    return -1;
+
+    inode->pin++;
+    return 0;
+  }
+
+  interface lf_generate { OID_NONE; } lf_check { 1; }
+  int Unpin(FSID target_node) 
+  {
+    RamFS_Inode *inode;
+
+    inode = RamFS_getinode(target_node);
+    if (!inode)
+      return -1;
+
+    if (!inode->pin) {
+      nxcompat_printf("[ramfs] error: trying to decrement pin below 0\n");
+      return -1;
+    }
+
+    inode->pin--;
+    return 0;
+  }
+  
+  interface lf_generate { OID_NONE; } lf_check { 1; }
+  int Mount(FSID target_node, FSID mount_node) 
+  {
+    RamFS_Dir *parent, *child;
+    parent = RamFS_getdir(target_node);
+    if (!parent) 
+	return -FS_NOTFOUND;
+    if (!memcmp(&target_node, &mount_node, sizeof(FSID)))
+	return -FS_INVALID;
+
+    parent->mnt = mount_node;
+    return 0;
+  }
+    
+
+  interface lf_generate { OID_NONE; } lf_check { 1; }
+  int Unmount(FSID parent_node) 
+  { 
+    RamFS_Dir *parent;
+
+    parent = RamFS_getdir(parent_node);
+    if (!parent)
+    	return -FS_NOTFOUND;
+
+    parent->mnt = FSID_EMPTY;
+    return 0;
+  }
+}
+  

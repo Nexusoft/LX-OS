@@ -1,0 +1,350 @@
+service Jukeboxctl {
+  decls{
+    includefiles { "<string.h>" }
+    includefiles { "<fcntl.h>" }
+    includefiles { "<unistd.h>" }
+    includefiles { "jukeboxctl.h" }
+    includefiles { "<nexus/LabelStore.interface.h>" }
+    includefiles { "<nexus/sema.h>" }
+
+    IDL_EXTERNS(Jukeboxctl);
+
+    struct stupid {
+#define JCTL_NOERROR (0)
+#define JCTL_DENIED (1)
+#define JCTL_SIGERROR (2)
+#define JCTL_ACCESSERROR (3)
+    };
+
+  }
+
+  decls __callee__ {
+    includefiles { "\"../mplayer_nexus/MPlayerRM.interface.h\""}
+    includefiles { "\"../mplayer_nexus/mplayerrm-hash.h\"" } /* todo: move */
+    includefiles { "<nexus/ipc.h>"}
+    includefiles { "<nexus/reflection.h>"}
+    includefiles { "<nexus/formula.h>"}
+    includefiles { "<nexus/guard.h>" }
+    includefiles { "<nexus/debug.h>" }
+
+    IDL_SERVER_VARDEFS(Jukeboxctl);
+
+    struct HashTable *ipdTable;
+    struct Sema ipdTable_mutex = SEMA_MUTEX_INIT;
+    static Form *nsk = NULL;
+
+    int findIPD(IPD_ID ipd_id) {
+      return (int)hash_findItem(ipdTable, (char *)&ipd_id);
+    }
+
+    int jukebox_check_ipd(IPD_ID ipd) {
+      P(&ipdTable_mutex);
+      if(findIPD(ipd)) {
+	V_nexus(&ipdTable_mutex);
+	return 1;
+      }
+      V_nexus(&ipdTable_mutex);
+      return 0;
+    }
+
+  }
+
+  decls __caller__ {
+    includefiles { "\"../nameserver/NS.interface.h\""}
+    includefiles { "\"../mplayer_nexus/MPlayerRM.interface.h\""}
+    includefiles { "<nexus/formula.h>" }
+    includefiles { "<nexus/guard.h>" }
+    includefiles { "<nexus/debug.h>" }
+
+    int connect_and_authenticate_to_jukebox(int export_labels) {
+      /* proof generation code from email.c */
+      IPD_ID me = IPC_GetMyIPD_ID();
+      MPlayerRM_SelectTarget(me);
+
+      Form *wstmt;
+      Formula *wstmtder;
+      Formula *hashcredder;
+      Cred *wcredcred, *hashcredcred;
+
+      unsigned char hashcred[4000], wcred[4000];
+      struct VarLen vl_hashcred = {
+	.data = hashcred,
+	.len = 4000,
+      }, vl_wcred = {
+	.data = wcred,
+	.len = 4000,
+      };
+
+      int jctl_id = Jukeboxctl_GetName(0);
+      if (jctl_id <= 0) {
+	printf("get jctl name failed (%d %d)\n", __ipcResultCode, jctl_id);
+	return -1;
+      }
+      printf("jctl_id = %d\n", jctl_id);
+
+      int res;
+
+      res = MPlayerRM_GetWrapperHashCredential(vl_hashcred, export_labels);
+      if(__ipcResultCode != 0 || res < 0) {
+	printf("failed GetWrapperHashCredential (%d %d)\n", __ipcResultCode, res);
+	return -1;
+      }
+
+      res = MPlayerRM_GetIAmWrappingCredential(vl_wcred, export_labels);
+      if(__ipcResultCode != 0 || res < 0) {
+	printf("failed GetIAmWrappingCredential (%d %d)\n", __ipcResultCode, res);
+	return -1;
+      }
+
+      unsigned char namebuf[4096];
+
+      if (export_labels) {
+	printf("Export labels\n");
+	writefile("hashcred.der", hashcred, der_msglen(hashcred));
+	// debug: check credentials
+	SignedFormula *sf = (SignedFormula *)hashcred;
+	if (signedform_verify(sf) < 0) {
+	  printf("hashcred did not verify\n"); 
+	  return -1;
+	}
+
+	writefile("wcred.der", wcred, der_msglen(wcred));
+	sf = (SignedFormula *)wcred;
+	if (signedform_verify(sf) < 0) {
+	  printf("wcred did not verify\n"); 
+	  return -1;
+	}
+
+	hashcredder = signedform_get_formula((SignedFormula *)hashcred);
+	wstmtder = signedform_get_formula((SignedFormula *)wcred);
+
+	wcredcred = new_cred_signed((SignedFormula *)wcred);
+	hashcredcred = new_cred_signed((SignedFormula *)hashcred);
+      } else {
+	printf("Not export labels\n");
+	FSID label = *(FSID *)hashcred;
+	printf("hash label id = "); FSID_print(label); printf("\n");
+	hashcredcred = new_cred_label(label);
+	int len = LabelStore_Label_Read(label, hashcred, 4000, NULL);
+	if (len <= 0) {
+	  printf("can't read hash credential label\n");
+	  return -1;
+	}
+	printf("read %d bytes for hashcred\n", len);
+
+	label = *(FSID *)wcred;
+	printf("wrap label id = "); FSID_print(label); printf("\n");
+	wcredcred = new_cred_label(label);
+	len = LabelStore_Label_Read(label, wcred, 4000, NULL);
+	if (len <= 0) {
+	  printf("can't read wrap credential label\n");
+	  return -1;
+	}
+	printf("read %d bytes for wcred\n", len);
+
+	wstmtder = (Formula *)wcred;
+
+	// modify hashcred by adding (Jukeboxctl) nsk on it
+
+	printf("Getting name for Jukeboxctl ipd %d...\n", jctl_id);
+	len = LabelStore_Get_IPD_Name(jctl_id, namebuf, sizeof(namebuf), NULL);
+	printf("done: got %d bytes\n", len);
+	if (len <= 0) { printf("error\n"); return -1; }
+	Form *jctl = form_from_der((Formula *)namebuf);
+	if (!jctl) { printf("error\n"); return -1; }
+	char *jctl_namestr = form_to_pretty(jctl, 0);
+	printf("jctl_name = %s\n", jctl_namestr);
+	assert(jctl->tag == F_TERM_CSUB && jctl->left->tag == F_TERM_DER);
+
+	Form *hc = form_from_der((Formula *)hashcred);
+	//hc = form_new(F_STMT_SAYS, form_dup(jctl->left), 0, hc);
+	hashcredder = form_to_der(hc);
+      }
+
+      char *pretty = form_to_pretty(form_from_der(hashcredder), 80);
+      printf("hashcred = %s\n", pretty);
+      free(pretty);
+
+      wstmt = form_from_der(wstmtder);
+      pretty = form_to_pretty(wstmt, 80);
+      printf("wcred = %s\n", pretty);
+      free(pretty);
+
+      int my_id = IPC_GetMyIPD_ID();
+      printf("Getting name for own ipd %d...\n", my_id);
+      int len = LabelStore_Get_IPD_Name(my_id, namebuf, sizeof(namebuf), NULL);
+      printf("done: got %d bytes\n", len);
+      if (len <= 0) { printf("error\n"); return -1; }
+      Form *self = form_from_der((Formula *)namebuf);
+      if (!self) { printf("error\n"); return -1; }
+      char *self_namestr = form_to_pretty(self, 0);
+      printf("self_name = %s\n", self_namestr);
+
+      assert(self->tag == F_TERM_CSUB);
+      assert(self->left->tag == F_TERM_DER);
+      Form *nsk = form_dup(self->left);
+
+      printf("Getting name for Jukeboxctl ipd %d...\n", jctl_id);
+      len = LabelStore_Get_IPD_Name(jctl_id, namebuf, sizeof(namebuf), NULL);
+      printf("done: got %d bytes\n", len);
+      if (len <= 0) { printf("error\n"); return -1; }
+      Form *jctl = form_from_der((Formula *)namebuf);
+      if (!jctl) { printf("error\n"); return -1; }
+      char *jctl_namestr = form_to_pretty(jctl, 0);
+      printf("jctl_name = %s\n", jctl_namestr);
+
+      Form *kernel_name, *wrapper_name, *target_name;
+      if(form_scan(wstmt, "%{term} says %{term} says IAmWrapping(%{term}) = 1",
+		   &kernel_name, &wrapper_name, &target_name) != 0) {
+	printf("Bad formula format\n");
+	assert(0);
+      }
+#if 0
+      assert(wstmt->tag == F_STMT_SAYS);
+      assert(wstmt->right->tag == F_STMT_SAYS);
+      assert(wstmt->right->right->tag == F_TERM_APPLY);
+#endif
+
+      _Grounds *pg = malloc(sizeof(_Grounds));
+      //pg->hints = "leaf 0; leaf 1; leaf 2; andi; andi;";
+      pg->hints = "assume* 0; assume* 1; assume* 2; andi; andi;";
+      pg->argc = 3;
+      pg->args = malloc(pg->argc * sizeof(Formula *));
+      pg->args[0] = form_to_der(form_fmt("%{term} says ConnectToJukebox() = 1", self));
+      pg->args[1] = wstmtder;
+      pg->args[2] = hashcredder;
+      pg->numleaves = 2;
+      pg->leaves = malloc(pg->numleaves * sizeof(Cred *));
+      pg->leaves[0] = wcredcred;
+      pg->leaves[1] = hashcredcred;
+
+      struct VarLen upg;
+      upg.data = grounds_serialize(pg, &upg.len);
+      writefile("upg.bin", upg.data, upg.len);
+
+      printf("calling Jukeboxctl.Connect ... grounds is %d bytes\n", upg.len);
+      if (Jukeboxctl_Connect(0, upg) != 0) {
+	printf("can't connect... \n");
+	return -1;
+      }
+      printf("connected to jukebox\n");
+      return 0;
+    }
+  }
+
+  __callee__ {
+    int err;
+    if((err = NS_clientInit()) != 0) {
+      printf("Jukeboxctl server could not connect to name server (%d)\n", err);
+      return;
+    }
+    IDL_REGISTER(Jukeboxctl);
+
+    ipdTable = hash_new(128, sizeof(IPD_ID));
+    Reflection_SetPortType(Jukeboxctl_server_port_num, Jukeboxctl_svc_name);
+  }
+
+  ~__callee__ {
+    NS_SimpleUnregister(registerCtx);
+  }
+
+  __caller__ {
+    IDL_LOOKUP(Jukeboxctl);
+    IDL_BINDREQUEST(Jukeboxctl);
+    return 0;
+  }
+
+  interface lf_generate { OID_NONE; } lf_check { 1; }
+  int Connect(int ignored, __input__ struct VarLen upgvl) {
+    /* credentials checking from SpamFreeAttestationService */
+    int err;
+    _Grounds *pg = NULL;
+    if (upgvl.len > 0) {
+      char *upg = malloc(upgvl.len);
+      if( (err = IPC_TransferFrom(call_handle, upgvl.desc_num, 
+			    upg, (unsigned int)upgvl.data, upgvl.len)) != 0) {
+	printf("can't pull upg\n");
+	return -JCTL_ACCESSERROR;
+      }
+      pg = grounds_deserialize(upg, upgvl.len);
+      printf("deserialized %d bytes into grounds %p\n", upgvl.len, pg);
+      free(upg);
+    }
+
+    if (!pg) {
+      printf("denied: missing grounds\n");
+      return -JCTL_DENIED;
+    }
+
+    // manually generated policy:
+    // i says ConnectToJukebox()
+    // and
+    // j says IAmWrapping(i)
+    // and
+    // nsk says BootHash(j) = hash_of_mplayerrm
+
+    unsigned char buf[4000];
+
+    printf("Getting name for requesting ipd %d...\n", ipd_id);
+    int len = LabelStore_Get_IPD_Name(ipd_id, buf, sizeof(buf), NULL);
+    printf("done: got %d bytes\n", len);
+    if (len <= 0) { printf("error\n"); return -1; }
+    Form *requestor = form_from_der((Formula *)buf);
+    if (!requestor) { printf("error\n"); return -1; }
+    char *requestor_namestr = form_to_pretty(requestor, 0);
+    printf("requestor_name = %s\n", requestor_namestr);
+    Form *request = form_fmt("%{term} says ConnectToJukebox() = 1", requestor);
+
+    if (!nsk) {
+      printf("Getting name for own ipd ...\n");
+      int my_id = IPC_GetMyIPD_ID();
+      printf("%d\n", my_id);
+      int len = LabelStore_Get_IPD_Name(my_id, buf, sizeof(buf), NULL);
+      printf("done: got %d bytes\n", len);
+      if (len <= 0) { printf("error\n"); return -1; }
+      Form *self = form_from_der((Formula *)buf);
+      if (!self) { printf("error\n"); return -1; }
+      char *self_namestr = form_to_pretty(self, 0);
+      printf("self_name = %s\n", self_namestr);
+
+      assert(self->tag == F_TERM_CSUB);
+      assert(self->left->tag == F_TERM_DER);
+      nsk = form_dup(self->left);
+    }
+
+    Form *gf = form_fmt("($i says ConnectToJukebox()  = 1) "
+			"and ((%{term} says $j says IAmWrapping($i) = 1) "
+			"and (%{term} says BootHash($j) = %{bytes}))",
+			nsk, nsk, mplayerrm_hash, sizeof(mplayerrm_hash));
+
+    _Policy *policy = (_Policy *)form_to_der(gf);
+
+    Guard *g = guard_create();
+    guard_setdebug(g, GUARD_DEBUG_ALL);
+    guard_setgoal(g, &policy->gf);
+    if (guard_check(g, request, pg)) {
+      printf("denied\n");
+      return -JCTL_DENIED;
+    }
+    // todo: free stuff from above, error paths
+
+    P(&ipdTable_mutex);
+    // XXX this will be inserted into the rendezvous callback
+    if(findIPD(ipd_id)) {
+      V_nexus(&ipdTable_mutex);
+      printf("IPD already registered\n");
+      return -1;
+    }
+
+    hash_insert(ipdTable, (char *)&ipd_id, (void *)1);
+    V_nexus(&ipdTable_mutex);
+    printf("acceptable credentials, ipd allowed to play movies\n");
+    return 0;
+  }
+
+  interface lf_generate { OID_NONE; } lf_check { 1; }
+  int GetName(int ignored) {
+    return IPC_GetMyIPD_ID();
+  }
+}
+

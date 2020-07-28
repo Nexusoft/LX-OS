@@ -1,0 +1,52 @@
+want to prove
+  generic.compliance says generic_okay(doc)
+we know
+  generic speaksfor generic.compliance 
+  generic says pol speaksfor generic.compliance
+do we know generic.compliance? no
+do we know someone who speaks for generic.compliance? implicitly, generic and pol
+will pol say anything related to doc? no
+will generic say anything related to doc? yes
+  generic says docbook_okay(doc') imp generic_okay(doc)
+crunch 
+  generic.compliance says docbook_okay(doc') imp generic_okay(doc)
+new goal: try to get generic.compliance says docbook_okay(doc')
+will generic say anything related to doc'? no
+will pol say anything related to doc'? yes
+
+seek P says X
+strategy 1: find P, ask and learn X
+strategy 2: find P, ask and learn Y imp X; seek P says Y
+strategy 3: seek Q s.t. Q sfor P; seek Q says X
+
+seek Q s.t. Q sfor P.S
+strategy 1: seek P says Q sfor P.S 
+
+seek vector sv, evidence vector ev
+sv = { target }
+ev = { }
+
+learn stuff:
+ find all reps for every spkr for which we seek a statement
+ ask all they know (; for each f in f1...fn
+  ev += f;
+  while change: change = update_sv && update_ev
+
+ev_changed
+  for each new elt f in ev:
+    if (f is of the form (P says Y imp X) and we are seeking (P says X) then
+      sv += P says Y
+    if (f is of the form (P says Q sfor P.S) and we are seeking (P.S says X) then
+      sv += Q says X
+
+sv_changed:
+  for each new elt s in sv:
+    if s is of the form (P says X) and we have (P says Y imp X) then
+      sv += P says Y
+    if s is of the form (P.S says X) and we have (P says Q sfor P.S) then
+      sv += Q says X
+  
+if ever (ev intersect sv is non zero) then done
+
+
+

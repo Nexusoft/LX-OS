@@ -1,0 +1,72 @@
+include apps/netquery/Makefile.common
+
+CFLAGS_$(TARGET) := -DNO_GC_MALLOC
+
+EXCLUSIONS := client/queue.o
+
+QUAGGA_BASE := quagga-0.99.8
+QUAGGA_HOME := $(d)/$(QUAGGA_BASE)
+
+$(QUAGGA_HOME):
+	@echo "Unpacking and patching quagga"
+	(cd $(d); tar xjf $(QUAGGA_BASE).tar.bz2)
+	(cd $(QUAGGA_HOME); patch -p1 < $(d)/$(QUAGGA_BASE).nexus.patch)
+
+$(d)/router: $(QUAGGA_HOME)
+
+TARGET := $(d)/router
+OBJS := $(patsubst %,$(d)/%,$(filter-out $(EXCLUSIONS), $(ROUTER_OBJ)) )
+
+LIBS_$(TARGET) := lib/libstdc++.a lib/libm.a
+
+include Makefile.app
+
+TARGET := $(d)/site-crawl
+OBJS := $(patsubst %,$(d)/%,$(filter-out $(EXCLUSIONS),  $(SITE_CRAWL_OBJ) $(NQ_CLIENTLIB_OBJ)) )
+
+LIBS_$(TARGET) := lib/libstdc++.a lib/libm.a
+include Makefile.app
+
+TARGET := $(d)/site-init
+OBJS := $(patsubst %,$(d)/%,$(filter-out $(EXCLUSIONS),  $(SITE_INIT_OBJ) $(NQ_CLIENTLIB_OBJ)) )
+
+LIBS_$(TARGET) := lib/libstdc++.a lib/libm.a
+include Makefile.app
+
+TARGET := $(d)/nq-exporter
+OBJS := $(patsubst %,$(d)/%,$(filter-out $(EXCLUSIONS),  apps/nq-exporter.o $(NQ_CLIENTLIB_OBJ)) )
+LIBS_$(TARGET) := lib/libstdc++.a lib/libm.a lib/libssl.a
+include Makefile.app
+
+
+#TARGET := $(d)/netqueryd
+#OBJS :=  apps/netquery/client/nq_ip.o apps/netquery/client/nq_net_elements.o apps/netquery/client/nq_tuple.o apps/netquery/client/nq_exceptions.o apps/netquery/client/nq_util.o apps/netquery/client/nq_transaction.o apps/netquery/client/marshall.o apps/netquery/client/ip.o apps/netquery/client/util.o apps/netquery/client/optionlist.o apps/netquery/client/netquery-cc.o apps/netquery/client/netquery.o apps/netquery/client/transaction.o apps/netquery/client/uuid.o apps/netquery/client/attribute.o apps/netquery/client/util-c.o apps/netquery/client/net.o apps/netquery/client/socket.o apps/netquery/client/remote_trigger.o apps/netquery/apps/router.o apps/netquery/apps/netqueryd.o apps/netquery/client/scripting.o
+
+#LIBS_$(TARGET) := lib/libstdc++.a lib/libm.a
+#include Makefile.app
+
+TARGET := $(d)/l2secd
+OBJS := $(d)/apps/l2secd.o $(d)/apps/ipc.o $(d)/apps/ssl.o $(patsubst %,$(d)/%,$(filter-out $(EXCLUSIONS),  $(NQ_CLIENTLIB_OBJ)) )
+
+LIBS_$(TARGET) := lib/libstdc++.a lib/libevent.a lib/libssl.a lib/libm.a
+
+include Makefile.app
+
+TARGET := $(d)/check-path
+OBJS := $(d)/apps/check-path.o $(d)/apps/router.o $(patsubst %,$(d)/%,$(filter-out $(EXCLUSIONS),  $(NQ_CLIENTLIB_OBJ)) )
+
+LIBS_$(TARGET) := lib/libstdc++.a lib/libevent.a lib/libssl.a lib/libm.a
+
+include Makefile.app
+
+TARGET := $(d)/exn-test
+OBJS := $(d)/exn-test.o
+
+LIBS_$(TARGET) := lib/libstdc++.a
+
+include Makefile.app
+
+TARGET := $(d)/virus-check
+OBJS := $(d)/virus-check.o
+include Makefile.app
+

@@ -1,0 +1,126 @@
+service FuncInterposeDriver {
+  decls {
+    includefiles { "<op_types.h>" }
+    includefiles { "<nexus/ipc.h>" }
+    includefiles { "<nexus/transfer.h>" }
+    includefiles { "<nexus/interpose.h>" }
+    includefiles { "<nexus/IPC.interface.h>" }
+    includefiles { "<stdio.h>" }
+    includefiles { "<string.h>" }
+  }
+
+  decls __callee__ {
+    includefiles { "<nexus/IPC.interface.h>" }
+    includefiles { "<stdlib.h>" }
+    Port_Handle *interpose_port_handle_p = &FuncInterposeDriver_port_handle;
+
+    static int talked_to_jukebox = 0;
+
+    enum ChannelType {
+      SYSCALL_CHANNEL,
+      WRAPSTREAM_CHANNEL,
+      UNKNOWN_CHANNEL,
+    };
+    extern int wrap_target;
+    extern int wrapstream_ipd;
+
+    int filter_calls(enum ChannelType type, Call_Handle call_handle, 
+		     struct IEvent_Call_Info *call_info, 
+		     struct IEvent_Info *event_info, int channel_number){
+      int dbg = 0;
+      int ret = -1;
+      int resultCode = INTERFACE_INTERPOSEDROP;
+
+      //talked_to_jukebox = 0;
+      switch(type){
+      case WRAPSTREAM_CHANNEL:
+	//if(dbg)printf("(JUKEBOX)");
+	talked_to_jukebox = 1;
+	if(call_info != NULL) {
+	  ret = IPC_Interposition_CallPassThrough(call_handle, call_info);
+	} else {
+	  ret = IPC_Interposition_TransferPassThrough(call_handle);
+	}
+	break;
+      case SYSCALL_CHANNEL:
+	if(call_info != NULL) {
+	  ret = IPC_Interposition_CallPassThrough(call_handle, call_info);
+	} else {
+	  ret = IPC_Interposition_TransferPassThrough(call_handle);
+	}
+	break;
+      case UNKNOWN_CHANNEL:
+	if(dbg)printf("(UNKNOWN)");
+	int my_ipd_id = IPC_GetMyIPD_ID();
+
+	printf("blocked (%d=>%d[%d])!", event_info->src, event_info->dst, channel_number);
+	ret = IPC_Interposition_CallReturnValue(call_handle, (char *)&resultCode, sizeof(resultCode));
+	break;
+      default:
+	printf("Unknown channel type %d!\n", type);
+	assert(0);
+	break;
+      }
+      return ret;
+    }
+
+    enum ChannelType lookupChannelType(int channel_num, IPD_ID src, IPD_ID dst) {
+      if(IS_SYSCALL_IPCPORT(channel_num)) {
+	return SYSCALL_CHANNEL;
+      }
+      if(wrapstream_ipd == dst || wrapstream_ipd == src) {
+	return WRAPSTREAM_CHANNEL;
+      }
+
+      int dbg = 1;
+      if(dbg)printf("getting type of channel %d (src=%d,dst=%d)\n", channel_num, src, dst);
+      char *result = Reflection_GetPortType(dst == wrap_target ? src : dst, channel_num);
+      if (!result) return UNKNOWN_CHANNEL;
+      // No other channel types needed
+      return UNKNOWN_CHANNEL;
+    }
+  }
+
+  __callee__ {
+  }
+
+  interface __NoGenReturn__ lf_generate { OID_NONE; } lf_check { 1; }
+  int IEvent_Call(struct IEvent_Info event_info, 
+		  struct IEvent_Call_Info call_info, 
+		__input__ struct VarLen message) {
+    int ret;
+    int dbg = 0;
+
+    if(dbg)printf("call from (%d) ipd_id:%d to ipd_id:%d ",
+		  call_info.port_num, event_info.src, event_info.dst);
+
+    enum ChannelType type = 
+      lookupChannelType(call_info.port_num, event_info.src, event_info.dst);
+    ret = filter_calls(type, call_handle, &call_info, &event_info, call_info.port_num);
+    if(dbg)printf("call ret = %d\n", ret);
+    return ret;
+  }
+
+  interface __NoGenReturn__ lf_generate { OID_NONE; } lf_check { 1; }
+  int IEvent_Transfer(struct IEvent_Info event_info, 
+		      struct IEvent_Transfer_Info transfer_info, 
+		      __input__ struct VarLen data) {
+    int dbg = 0;
+    IPD_ID origsrc, origdst;
+    int ret = -1;
+
+    origsrc = event_info.dst;
+    origdst = event_info.src;
+
+    if(dbg)printf("transfers %s from (%d) ipd_id:%d to ipd_id:%d (orig %d to %d) ", 
+		  (transfer_info.direction == ToCaller)?"ToCaller":"FromCaller",
+		  transfer_info.port_num, event_info.src, event_info.dst, 
+		  origsrc, origdst);
+    enum ChannelType type = 
+      lookupChannelType(transfer_info.port_num, origsrc, origdst);
+    ret = filter_calls(type, call_handle, NULL, &event_info, transfer_info.port_num);
+    if(dbg)printf("transfer ret = %d\n", ret);
+    return ret;
+  }
+
+}

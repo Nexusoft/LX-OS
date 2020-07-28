@@ -1,0 +1,35 @@
+#RWPSS_TIMINGFLAGS := #-DRWPSSTEST_TIMING -DDO_TIMING
+
+#CFLAGS_$(d)/hashtree.o := $(TIMINGFLAGS) 
+#CFLAGS_$(d)/httest.o := $(TIMINGFLAGS) 
+#CFLAGS_$(d)/rwpsslib2.o := $(TIMINGFLAGS) 
+#CFLAGS_$(d)/aesfuncs.o := $(TIMINGFLAGS) 
+#CFLAGS_$(d)/rwpss_handler.o := $(TIMINGFLAGS) 
+#CFLAGS_$(d)/rwpsstest.o := $(TIMINGFLAGS) 
+
+
+#-DMALLOCCHECK 
+# The MALLOCCHECK definition needs to show up both here and in the COMPAT makefile
+# does the new tree have malloc_checker.o
+
+# what about -lm?
+
+TARGET := $(d)/abfinder
+OBJS := $(d)/abfinder.o 
+CFLAGS_$(d)/abfinder.o := -Werror
+include Makefile.app
+
+
+TARGET := $(d)/dirtyfinder
+OBJS := $(d)/dirtyfinder.o 
+CFLAGS_$(d)/dirtyfinder.o := -Werror
+include Makefile.app
+
+TARGET := $(d)/libwpss.o
+OBJS := $(d)/rwpsslib2.o $(d)/hashtree.o $(d)/blocksize.o $(d)/encblocks.o 
+CFLAGS_$(d)/rwpsslib2.o := -Werror
+CFLAGS_$(d)/hashtree.o := -Werror
+CFLAGS_$(d)/blocksize.o := 
+CFLAGS_$(d)/encblocks.o := -Werror
+include Makefile.lib
+

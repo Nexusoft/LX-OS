@@ -1,0 +1,7 @@
+node=bgp-conf/regtest
+NAME="regtest"
+
+. bgp-conf/start-common
+
+tail /tmp/zebra.log
+

@@ -1,0 +1,807 @@
+#ifndef _EVENTXX_HPP_
+#define _EVENTXX_HPP_
+
+#include <sys/types.h> // timeval
+#include <stdexcept>   // std::exception, std::invalid_argument,
+                       // std::runtime_error, std::bad_alloc
+
+/**
+ * Namespace for all symbols libevent C++ wrapper defines.
+ */
+namespace eventxx
+{
+
+
+// All libevent C API symbols and other internal stuff goes here.
+namespace internal
+{
+#include <event.h>
+}
+
+
+/** @defgroup exceptions Exceptions
+ *
+ * eventxx makes a heavy use of exceptions. Each function has it's exceptions
+ * specified, so it's very easy to find out what exceptions to expect.
+ *
+ * Exceptions are mostly thrown when there is a programming error. So if you get
+ * an exception check your code.
+ */
+//@{
+
+
+/**
+ * Base class for all libevent exceptions.
+ */
+struct exception: public std::exception
+{
+};
+
+
+/**
+ * Invalid event exception.
+ *
+ * This exception is thrown when passing an invalid event to a function, the
+ * reason is given in the what() description but it usually means that the you
+ * are making some restricted operation with an active event.
+ *
+ * If you hit this exception, you probably got a programming error.
+ */
+struct invalid_event: public std::invalid_argument, public exception
+{
+
+	/**
+	 * Creates an invalid event exception with a reason.
+	 *
+	 * @param what Reason why the event is invalid).
+	 */
+	explicit invalid_event(const std::string& what) throw():
+		std::invalid_argument(what)
+	{
+	}
+
+}; // struct invalid_event
+
+
+/**
+ * Invalid priority exception.
+ *
+ * This exception is thrown when passing an invalid priority to a function. This
+ * usually means you don't have enough priority queues in your dispatcher, so
+ * you should have allocated more in the constructor.
+ *
+ * If you hit this exception, you probably got a programming error.
+ *
+ * @see dispatcher::dispatcher(int) to allocate more priority queues.
+ */
+struct invalid_priority: public std::invalid_argument, public exception
+{
+
+	/**
+	 * Creates an invalid priority exception with a reason.
+	 *
+	 * @param what Reason why the priority is invalid).
+	 */
+	explicit invalid_priority(const std::string& what
+			= "invalid priority value") throw():
+		std::invalid_argument(what)
+	{
+	}
+
+}; // struct invalid_priority
+
+//@}
+
+
+/// Miscellaneous constants
+enum
+{
+	DEFAULT_PRIORITY = -1,      ///< Default priority (the middle value).
+	ONCE = EVLOOP_ONCE,         ///< Loop just once.
+	NONBLOCK = EVLOOP_NONBLOCK  ///< Don't block the event loop.
+};
+
+
+/**
+ * Time used for timeout values.
+ *
+ * This timeout is compose of seconds and microseconds.
+ */
+struct time: ::timeval
+{
+
+	/**
+	 * Creates a new time with @p sec seconds and @p usec microseconds.
+	 *
+	 * @param sec Number of seconds.
+	 * @param usec Number of microseconds.
+	 */
+	time(long sec = 0l, long usec = 0l) throw()
+		{ tv_sec = sec; tv_usec = usec; }
+
+	/**
+	 * Gets the number of seconds.
+	 *
+	 * @return Number of seconds.
+	 */
+	long sec() const throw() { return tv_sec; };
+
+	/**
+	 * Gets the number of microseconds.
+	 *
+	 * @return Number of microseconds.
+	 */
+	long usec() const throw() { return tv_usec; };
+
+	/**
+	 * Sets the number of seconds.
+	 *
+	 * @param s Number of seconds.
+	 */
+	void sec(long s) throw() { tv_sec = s; };
+
+	/**
+	 * Sets the number of microseconds.
+	 *
+	 * @param u Number of microseconds.
+	 */
+	void usec(long u) throw() { tv_usec = u; };
+
+}; // struct time
+
+
+/** @defgroup events Events
+ *
+ * There are many ways to specify how to handle an event. You can use use the
+ * same plain functions callbacks (see eventxx::cevent, eventxx::ctimer and
+ * eventxx::csignal) like in C or the other kind of more advanced, stateful
+ * function objects (see eventxx::event, eventxx::timer and eventxx::signal
+ * templates). The former are just typedef'ed specialization of the later.
+ *
+ * A member function wrapper functor (eventxx::mem_cb) is also included,
+ * so you can use any member function (method) as an event handler.
+ *
+ * Please note that C-like function callback take a short as the type of event,
+ * while functors (or member functions) use eventxx::type.
+ *
+ * All events derive from a plain class (not template) eventxx::basic_event, one
+ * of the main utilities of it (besides containing common code ;) is to be used
+ * in STL containers.
+ *
+ * Please see each class documentation for details and examples.
+ */
+//@{
+
+
+/// C function used as callback in the C API.
+typedef void (*ccallback_type)(int, short, void*);
+
+
+/**
+ * Type of events.
+ *
+ * There are 4 kind of events: eventxx::TIMEOUT, eventxx::READ, eventxx::WRITE
+ * or eventxx::SIGNAL. eventxx::PERSIST is not an event, is an event modifier
+ * flag, that tells eventxx that this event should live until dispatcher::del()
+ * is called. You can use, for example:
+ * @code
+ * eventxx::event(fd, eventxx::READ | eventxx::PERSIST, ...);
+ * @endcode
+ */
+enum type
+{
+	TIMEOUT = EV_TIMEOUT, ///< Timeout event.
+	READ = EV_READ,       ///< Read event.
+	WRITE = EV_WRITE,     ///< Write event.
+	SIGNAL = EV_SIGNAL,   ///< Signal event.
+	PERSIST = EV_PERSIST  ///< Not really an event, is an event modifier.
+};
+
+inline
+type operator| (const type& t1, const type& t2)
+{
+	int r = static_cast< int >(t1) | static_cast< int >(t2);
+	return static_cast< type >(r);
+}
+
+
+/**
+ * Basic event from which all events derive.
+ *
+ * All events derive from this class, so it's useful for use in containers,
+ * like:
+ * @code
+ * std::list< eventxx::basic_event* > events;
+ * @endcode
+ */
+struct basic_event: internal::event
+{
+
+	/**
+	 * Checks if there is an event pending.
+	 *
+	 * @param ev Type of event to check.
+	 *
+	 * @return true if there is a pending event, false if not.
+	 */
+	bool pending(type ev) const throw()
+	{
+		// HACK libevent don't use const
+		return event_pending(const_cast< basic_event* >(this), ev, 0);
+	}
+
+	/**
+	 * Timeout of the event.
+	 *
+	 * @return Timeout of the event.
+	 */
+	time timeout() const throw()
+	{
+		time tv;
+		// HACK libevent don't use const
+		event_pending(const_cast< basic_event* >(this), EV_TIMEOUT, &tv);
+		return tv;
+	}
+
+	/**
+	 * Sets the event's priority.
+	 *
+	 * @param priority New event priority.
+	 *
+	 * @pre The event must be added to some dispatcher.
+	 *
+	 * @see dispatcher::dispatcher(int)
+	 */
+	void priority(int priority) const throw(invalid_event, invalid_priority)
+	{
+		if (ev_flags & EVLIST_ACTIVE)
+			throw invalid_event("can't change the priority of an "
+					"active event");
+		// HACK libevent don't use const
+		if (event_priority_set(const_cast< basic_event* >(this),
+					priority))
+			throw invalid_priority();
+	}
+
+	/**
+	 * Event's file descriptor.
+	 *
+	 * @return Event's file descriptor.
+	 */
+	int fd() const throw()
+	{
+		return EVENT_FD(this);
+	}
+
+	/// @note This is an abstract class, you can't instantiate it.
+	protected:
+		basic_event() throw() {}
+		basic_event(const basic_event&);
+		basic_event& operator= (const basic_event&);
+
+}; // struct basic_event
+
+
+/**
+ * Generic event object.
+ *
+ * This object stores all the information about an event, including a callback
+ * functor, which is called when the event is fired. The template parameter
+ * must be a functor (callable object or function) that can take 2 parameters:
+ * an integer (the file descriptor of the fired event) and an event::type (the
+ * type of event being fired).
+ * There is a specialized version of this class which takes as the template
+ * parameter a C function with the eventxx::ccallback_type signature, just like
+ * C @libevent API does.
+ *
+ * @see eventxx::event< ccallback_type >
+ */
+template < typename F >
+struct event: basic_event
+{
+
+	/**
+	 * Creates a new event.
+	 *
+	 * @param fd File descriptor to monitor for events.
+	 * @param ev Type of events to monitor (see eventxx::type).
+	 * @param handler Callback functor.
+	 */
+	event(int fd, type ev, F& handler) throw()
+	{
+		event_set(this, fd, static_cast< short >(ev), &wrapper,
+				reinterpret_cast< void* >(&handler));
+	}
+
+	protected:
+		event() {}
+		static void wrapper(int fd, short ev, void* h)
+		{
+			F& handler = *reinterpret_cast< F* >(h);
+			// Hackish, but this way the handler can get a clean
+			// event type
+			handler(fd, static_cast< type >(ev));
+		}
+
+}; // struct event< F >
+
+
+/**
+ * This is the specialization of eventxx::event for C-style callbacks.
+ *
+ * @see eventxx::event
+ */
+template <>
+struct event< ccallback_type >: basic_event
+{
+
+	/**
+	 * Creates a new event.
+	 *
+	 * @param fd File descriptor to monitor for events.
+	 * @param ev Type of events to monitor (see eventxx::type).
+	 * @param handler C-style callback function.
+	 * @param arg Arbitrary pointer to pass to the handler as argument.
+	 */
+	event(int fd, type ev, ccallback_type handler, void* arg = 0) throw()
+	{
+		event_set(this, fd, static_cast< short >(ev), handler, arg);
+	}
+
+	protected:
+		event() {}
+
+}; // struct event< ccallback_type >
+
+
+/**
+ * Timer event object.
+ *
+ * This is just a special case of event that is fired only when a timeout is
+ * reached. It's just a shortcut to:
+ * @code
+ * event(-1, 0, handler);
+ * @endcode
+ *
+ * @note This event can't eventxx::PERSIST.
+ * @see timer< ccallback_type >
+ */
+template < typename F >
+struct timer: event< F >
+{
+
+	/**
+	 * Creates a new timer event.
+	 *
+	 * @param handler Callback functor.
+	 */
+	timer(F& handler) throw()
+	{
+		evtimer_set(this, &event< F >::wrapper,
+			reinterpret_cast< void* >(&handler));
+	}
+
+}; // struct timer< F >
+
+
+/**
+ * This is the specialization of eventxx::timer for C-style callbacks.
+ *
+ * @note This event can't eventxx::PERSIST.
+ * @see timer
+ */
+template <>
+struct timer< ccallback_type >: event< ccallback_type >
+{
+
+	/**
+	 * Creates a new timer event.
+	 *
+	 * @param handler C-style callback function.
+	 * @param arg Arbitrary pointer to pass to the handler as argument.
+	 */
+	timer(ccallback_type handler, void* arg = 0) throw()
+	{
+		evtimer_set(this, handler, arg);
+	}
+
+}; // struct timer< ccallback_type >
+
+
+/**
+ * Signal event object.
+ *
+ * This is just a special case of event that is fired when a signal is raised
+ * (instead of a file descriptor being active). It's just a shortcut to:
+ * @code
+ * event(signum, eventxx::SIGNAL, handler);
+ * @endcode
+ *
+ * @note This event always eventxx::PERSIST.
+ * @see signal< ccallback_type >
+ */
+template < typename F >
+struct signal: event< F >
+{
+
+	/**
+	 * Creates a new signal event.
+	 *
+	 * @param signum Signal number to monitor.
+	 * @param handler Callback functor.
+	 */
+	signal(int signum, F& handler) throw()
+	{
+		signal_set(this, signum, &event< F >::wrapper,
+			reinterpret_cast< void* >(&handler));
+	}
+
+	/**
+	 * Event's signal number.
+	 *
+	 * @return Event's signal number.
+	 */
+	int signum() const
+	{
+		return EVENT_SIGNAL(this);
+	}
+
+}; // struct signal<F>
+
+
+/**
+ * This is the specialization of eventxx::signal for C-style callbacks.
+ *
+ * @note This event always eventxx::PERSIST.
+ * @see signal
+ */
+template <>
+struct signal< ccallback_type >: event< ccallback_type >
+{
+
+	/**
+	 * Creates a new signal event.
+	 *
+	 * @param signum Signal number to monitor.
+	 * @param handler C-style callback function.
+	 * @param arg Arbitrary pointer to pass to the handler as argument.
+	 */
+	signal(int signum, ccallback_type handler, void* arg = 0) throw()
+	{
+		signal_set(this, signum, handler, arg);
+	}
+
+	/**
+	 * Event's signal number.
+	 *
+	 * @return Event's signal number.
+	 */
+	int signum() const
+	{
+		return EVENT_SIGNAL(this);
+	}
+
+}; // struct signal< ccallback_type >
+
+
+/// Shortcut to C-style event.
+typedef eventxx::event< ccallback_type > cevent;
+
+/// Shortcut to C-style timer.
+typedef eventxx::timer< ccallback_type > ctimer;
+
+/// Shortcut to C-style signal handler.
+typedef eventxx::signal< ccallback_type > csignal;
+
+/**
+ * Helper functor to use an arbitrary member function as an event handler.
+ *
+ * With this wrapper, you can use any object method, which accepts the right
+ * parameters (int, short) and returns void, as an event handler. This way you
+ * don't have to overload the operator() which can be confusing depending on the
+ * context.
+ *
+ * You can see an usage example in the Examples Section.
+ */
+template < typename O, typename M >
+struct mem_cb
+{
+
+	/**
+	 * Member function callback constructor.
+	 *
+	 * It expects to receive a class as the first parameter (O), and a
+	 * member function (of that class O) as the second parameter.
+	 *
+	 * When this instance is called with fd and ev as function arguments,
+	 * object.method(fd, ev) will be called.
+	 *
+	 * @param object Object to be used.
+	 * @param method Method to be called.
+	 */
+	mem_cb(O& object, M method) throw():
+		_object(object), _method(method) {}
+
+	void operator() (int fd, type ev) { (_object.*_method)(fd, ev); }
+	protected:
+		O& _object;
+		M _method;
+
+}; // struct mem_cb
+
+//@}
+
+
+/**
+ * Event dispatcher.
+ *
+ * This class is the responsible for looping and dispatching events. Every time
+ * you need an event loop you should create an instance of this class.
+ *
+ * You can @link dispatcher::add add @endlink events to the dispatcher, and you
+ * can @link dispatcher::del remove @endlink them later or you can @link
+ * dispatcher::add_once add events to be processed just once @endlink. You can
+ * @link dispatcher::dispatch loop once or forever @endlink (well, of course you
+ * can break that forever removing all the events or by @link dispatcher::exit
+ * exiting the loop @endlink).
+ */
+struct dispatcher
+{
+
+	/**
+	 * Creates a default dispatcher (with just 1 priority).
+	 *
+	 * @see dispatcher(int) if you want to create a dispatcher with more
+	 *      priorities.
+	 */
+	dispatcher() throw()
+	{
+		_event_base = static_cast< internal::event_base* >(
+				internal::event_init());
+	}
+
+	/**
+	 * Creates a dispatcher with npriorities priorities.
+	 *
+	 * @param npriorities Number of priority queues to use.
+	 */
+	dispatcher(int npriorities) throw(std::bad_alloc)
+	{
+		_event_base = static_cast< internal::event_base* >(
+				internal::event_init());
+		if (!_event_base) throw std::bad_alloc();
+		// Can't fail because there is no way that it has active events
+		internal::event_base_priority_init(_event_base, npriorities);
+	}
+
+#ifndef EVENTXX_NO_EVENT_BASE_FREE
+	/// Free dispatcher resources, see @ref Status section for details.
+	~dispatcher() throw() { event_base_free(_event_base); }
+#endif
+
+	/**
+	 * Adds an event to the dispatcher.
+	 *
+	 * @param e Event to add.
+	 * @param priority Priority of the event.
+	 */
+	void add(basic_event& e, int priority = DEFAULT_PRIORITY)
+		throw(invalid_priority)
+	{
+		internal::event_base_set(_event_base, &e);
+		if (priority != DEFAULT_PRIORITY
+				&& internal::event_priority_set(&e, priority))
+			throw invalid_priority();
+		internal::event_add(&e, 0);
+	}
+
+	/**
+	 * Adds an event to the dispatcher with a timeout.
+	 *
+	 * The event is fired when there is activity on e or when to has elapsed,
+	 * whatever come first.
+	 *
+	 * @param e Event to add.
+	 * @param to Timeout.
+	 * @param priority Priority of the event.
+	 */
+	void add(basic_event& e, const time& to,
+			int priority = DEFAULT_PRIORITY)
+		throw(invalid_priority)
+	{
+		internal::event_base_set(_event_base, &e);
+		if (priority != DEFAULT_PRIORITY
+				&& internal::event_priority_set(&e, priority))
+			throw invalid_priority();
+		// XXX HACK libevent don't use const
+		internal::event_add(&e, const_cast< time* >(&to));
+	}
+
+	/**
+	 * Adds a temporary event.
+	 *
+	 * Adds a temporary event, without the need of instantiating a new event
+	 * object. Events added this way can't eventxx::PERSIST.
+	 *
+	 * @param fd File descriptor to monitor for events.
+	 * @param ev Type of events to monitor.
+	 * @param handler Callback function.
+	 */
+	template < typename F >
+	void add_once(int fd, type ev, F& handler)
+	{
+		internal::event_once(fd, static_cast< short>(ev),
+			&dispatcher::wrapper< F >,
+			reinterpret_cast< void* >(&handler), 0);
+	}
+
+	/**
+	 * Adds a temporary event to with a C-style callback.
+	 *
+	 * Adds a temporary event, without the need of instantiating a new event
+	 * object. Events added this way can't eventxx::PERSIST.
+	 *
+	 * @param fd File descriptor to monitor for events.
+	 * @param ev Type of events to monitor.
+	 * @param handler Callback function.
+	 * @param arg Arbitrary pointer to pass to the handler as argument.
+	 */
+	void add_once(int fd, type ev, ccallback_type handler, void* arg)
+	{
+		internal::event_once(fd, static_cast< short >(ev), handler,
+			arg, 0);
+	}
+
+	/**
+	 * Adds a temporary event.
+	 *
+	 * Adds a temporary event, without the need of instantiating a new event
+	 * object. Events added this way can't eventxx::PERSIST.
+	 *
+	 * @param fd File descriptor to monitor for events.
+	 * @param ev Type of events to monitor.
+	 * @param handler Callback function.
+	 * @param to Timeout.
+	 */
+	template < typename F >
+	void add_once(int fd, type ev, F& handler, const time& to)
+	{
+		internal::event_once(fd, static_cast< short >(ev),
+			&dispatcher::wrapper< F >,
+			reinterpret_cast< void* >(&handler),
+			// XXX HACK libevent don't use const
+			const_cast< time* >(&to));
+	}
+
+	/**
+	 * Adds a temporary event with a C-style callback.
+	 *
+	 * Adds a temporary event, without the need of instantiating a new event
+	 * object. Events added this way can't eventxx::PERSIST.
+	 *
+	 * @param fd File descriptor to monitor for events.
+	 * @param ev Type of events to monitor.
+	 * @param handler Callback function.
+	 * @param arg Arbitrary pointer to pass to the handler as argument.
+	 * @param to Timeout.
+	 */
+	void add_once(int fd, type ev, ccallback_type handler, void* arg,
+			const time& to)
+	{
+		internal::event_once(fd, static_cast< short >(ev), handler, arg,
+				// XXX HACK libevent don't use const
+				const_cast< time* >(&to));
+	}
+
+	/**
+	 * Adds a temporary timer.
+	 *
+	 * Adds a temporary timer, without the need of instantiating a new timer
+	 * object.
+	 *
+	 * @param handler Callback function.
+	 * @param to Timer's timeout.
+	 */
+	template < typename F >
+	void add_once_timer(F& handler, const time& to)
+	{
+		internal::event_once(-1, EV_TIMEOUT, &dispatcher::wrapper< F >,
+				reinterpret_cast< void* >(&handler),
+				// XXX HACK libevent don't use const
+				const_cast< time* >(&to));
+	}
+
+	/**
+	 * Adds a temporary timer with a C-style callback.
+	 *
+	 * Adds a temporary timer, without the need of instantiating a new timer
+	 * object.
+	 *
+	 * @param handler Callback function.
+	 * @param arg Arbitrary pointer to pass to the handler as argument.
+	 * @param to Timer's timeout.
+	 */
+	void add_once_timer(ccallback_type handler, void* arg, const time& to)
+	{
+		// XXX HACK libevent don't use const
+		internal::event_once(-1, EV_TIMEOUT, handler, arg,
+				const_cast< time* >(&to));
+	}
+
+	/**
+	 * Removes an event.
+	 *
+	 * The event e will be no longer monitored by this dispatcher.
+	 *
+	 * @param e Event to remove.
+	 */
+	void del(basic_event& e) throw()
+	{
+		internal::event_del(&e);
+	}
+
+	/**
+	 * Main dispatcher loop.
+	 *
+	 * This function takes the control of the program, waiting for an event
+	 * and calling its callbacks when it's fired. It only returns under
+	 * this conditions:
+	 * - exit() was called.
+	 * - All events were del()eted.
+	 * - Another internal error.
+	 * - eventxx::ONCE flag was set.
+	 * - eventxx::NONBLOCK flag was set.
+	 *
+	 * @param flags If eventxx::ONCE is specified, then just one event is
+	 *              processed, if eventxx::NONBLOCK is specified, then this
+	 *              function returns even if there are no pending events.
+	 *
+	 * @return 0 if eventxx::NONBLOCK or eventxx::ONCE is set, 1 if there
+	 *         are no more events registered and EINTR if you use the
+	 *         @libevent's  @c event_gotsig and return -1 in your
+	 *         @c event_sigcb callback.
+	 */
+	int dispatch(int flags = 0) throw()
+	{
+		return internal::event_base_loop(_event_base, flags);
+	}
+
+	/**
+	 * Exit the dispatch() loop.
+	 *
+	 * @param to If a timeout is given, the loop exits after the specified
+	 *           time is elapsed.
+	 *
+	 * @return Not very well specified by @libevent :-/ that's why it
+	 *         doesn't throw an exception either.
+	 */
+	int exit(const time& to = time()) throw() // TODO  throw(exception)
+	{
+		// XXX HACK libevent don't use const
+		return internal::event_base_loopexit(_event_base,
+			const_cast< time* >(&to));
+	}
+
+	protected:
+		internal::event_base* _event_base;
+		template < typename F >
+		static void wrapper(int fd, short ev, void* h)
+		{
+			F& handler = *reinterpret_cast< F* >(h);
+			short *ev_p = &ev;
+			type *t_p = (type *)ev_p;
+			handler(fd, *t_p);
+		}
+
+	private:
+		// Hide nonsense copy-constructor and operator=
+		dispatcher(const dispatcher&);
+		dispatcher& operator=(const dispatcher&);
+
+}; // struct dispatcher
+
+} // namespace eventxx
+
+#endif // _EVENTXX_HPP_
+
+// vim: set filetype=cpp :

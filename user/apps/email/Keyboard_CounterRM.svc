@@ -1,0 +1,130 @@
+service Keyboard_CounterRM {
+  decls {
+    includefiles { "<nexus/ipc.h>" }
+    includefiles { "<string.h>" }
+    includefiles { "<nexus/formula.h>" }
+    includefiles { "\"../nameserver/NS.interface.h\"" }
+
+    static void Keyboard_CounterRM_computeName(char *dest, IPD_ID ipd_id) {
+      sprintf(dest, "KeyboardCounterRM-%d", ipd_id);
+    }
+
+    void Keyboard_CounterRM_SelectTarget(IPD_ID target_ipd_id);
+  }
+
+  decls __callee__ {
+    includefiles { "<nexus/IPC.interface.h>" }
+    includefiles { "<stdlib.h>" }
+    includefiles { "\"keyboardrm.h\"" }
+    extern int call_counter;
+    struct NS_SimpleRegisterCtx *registerCtx;
+    extern int wrap_target;
+  }
+
+  __callee__ {
+    int err;
+
+    char rm_name[128];
+    Keyboard_CounterRM_computeName(rm_name, wrap_target);
+    // can't use IDL_REGISTER(), since this name is computed
+    registerCtx = NS_SimpleRegister(rm_name, Keyboard_CounterRM_server_port_num);
+
+    if(registerCtx == NULL) {
+      printf("Could not register '%s'!\n", rm_name);
+      return /* -1 */;
+    }
+    printf("Keyboard_CounterRM - Registered %s=>%d (%d)\n", 
+	   rm_name, Keyboard_CounterRM_server_port_num,
+	   Keyboard_CounterRM_port_handle);
+  }
+  ~__callee__ {
+    NS_SimpleUnregister(registerCtx);
+  }
+
+  decls __caller__ {
+    int g_Keyboard_CounterRM_conn_handle;
+    void Keyboard_CounterRM_SelectTarget(IPD_ID target_ipd_id) {
+      char rm_name[128];
+      Keyboard_CounterRM_computeName(rm_name, target_ipd_id);
+      Port_Num channel = NS_SimpleLookup(rm_name);
+      printf("lookup name = %s, result = %d\n", rm_name, channel);
+      g_Keyboard_CounterRM_conn_handle = Keyboard_CounterRM_conn_handle = 
+	IPC_DoBind(channel);
+      printf("KeyboardCounterRM Client Bind of %d => %d\n", 
+	     channel, Keyboard_CounterRM_conn_handle);
+    }
+  }
+
+  interface lf_generate { OID_NONE; } lf_check { 1; }
+  int GetWrapperHashCredential(__output__ struct VarLen cred, int exported) {
+    if (exported) {
+      if (!hashcred) {
+	printf("Reading signed hashcred back out... ");
+	hashcred = malloc(4096);
+	int len = LabelStore_Label_Externalize(hashcred_id, (char *)hashcred, 4096, NULL);
+	if (len <= 0) { printf("error (%d)\n", len); return -1; }
+	printf("done: got %d bytes\n", len);
+	assert (len <= 4096);
+      }
+      int len = der_msglen((unsigned char *) hashcred->body);
+      if (len > cred.len)
+	return -2;
+      int err = IPC_TransferTo(call_handle, cred.desc_num, (unsigned int)cred.data,
+	  hashcred->body, len); 
+      return err;
+    } else {
+      int err = IPC_TransferTo(call_handle, cred.desc_num, (unsigned int)cred.data,
+	  &hashcred_id, sizeof(hashcred_id)); 
+      return err;
+    }
+  }
+
+  interface lf_generate { OID_NONE; } lf_check { 1; }
+  int GetNumTypedCredential(int nonce, __output__ struct VarLen cred, int exported) {
+    int i, num_lines = 0;
+    P(&all_input_mutex);
+    int len = strlen(all_input->data);
+    for (i=0; i < len; i++) { if(all_input->data[i] == '\n') num_lines++; }
+    // all_input->data[0] = 0;
+    V_nexus(&all_input_mutex);
+    printf("num lines = %d, len = %d\n", num_lines, len);
+
+    Form *f = form_fmt("NumLinesTyped(%{term/der}, %{int}) = %{int}", target_name, nonce, num_lines);
+    if (!f) return -1;
+    form_printf("Creating a statement (%s)... ", form_s(f));
+
+    printf("Serializing it... ");
+    Formula *der = form_to_der(f);
+    form_free(f);
+    if (!der) return -1;
+    printf("%d bytes... done\n", der_msglen((unsigned char *)der->body));
+
+    printf("Adding it to labelstore... ");
+    static int count = 1;
+    char labelname[40];
+    sprintf(labelname, "numtyped-%d", count++);
+    FSID label = LabelStore_Label_Create(store, labelname, der, NULL);
+    free(der);
+    if (!FSID_isValid(label)) return -1;
+    printf("done\n");
+
+    if (exported) {
+      printf("Exporting it... ");
+      char buf[4000];
+      len = LabelStore_Label_Externalize(label, buf, sizeof(buf), NULL);
+      if (len <= 0) return -1;
+      printf("%d bytes... done\n", len);
+
+      if (len > cred.len)
+	return -2;
+      int err = IPC_TransferTo(call_handle, cred.desc_num, (unsigned int)cred.data,
+	  buf, len); 
+      return err;
+    } else {
+      int err = IPC_TransferTo(call_handle, cred.desc_num, (unsigned int)cred.data,
+	  &label, sizeof(label)); 
+      return err;
+    } 
+  }
+}
+

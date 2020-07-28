@@ -1,0 +1,44 @@
+#!/bin/bash
+
+host=`hostname -f`
+ip=`host $host | grep "has address" | cut -d' ' -f4`
+
+if [ ! -e ca.cfg ]; then
+cat <<END >|ca.cfg
+[req]
+prompt = no
+distinguished_name = req_distinguished_name
+x509_extensions = extend
+
+[ req_distinguished_name ]
+C                      = US
+ST                     = New York
+L                      = Ithaca
+O                      = Cornell University Nexus
+OU                     = NONE
+CN                     = TPM Privacy CA
+
+[extend] # openssl extensions
+basicConstraints = critical,CA:true
+subjectAltName = IP:$ip,DNS:$host,URI:http://$host:5893
+END
+fi
+
+cat <<END >|nexusca.cfg
+[req]
+prompt = no
+distinguished_name = req_distinguished_name
+x509_extensions = extend
+
+        [ req_distinguished_name ]
+        C                      = US
+        ST                     = New York
+        L                      = Ithaca
+        O                      = Cornell University Nexus
+        OU                     = NONE
+        CN                     = Nexus Vetting CA
+
+[extend] # openssl extensions
+basicConstraints = critical,CA:true
+subjectAltName = IP:$ip,DNS:$host,URI:http://$host:5892
+END

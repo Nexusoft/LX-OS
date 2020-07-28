@@ -1,0 +1,104 @@
+Nexus Networking
+  last update: November 30th, 2009
+
+## Overview
+
+The Nexus network stack combines micro- and exokernel design elements. 
+The TCP/IP stack is pushed to userspace. Each process has its own TCP/IP
+stack that receives ethernet frames from the kernel. Below the stack,
+Nexus supports both userspace device drivers (similar to microkernels) and
+in-kernel drivers. Or, to put it old skool:
+
+	 -----------	 -----------		 --------------
+	| process 1 | 	| process 2 |		| e1000 driver |
+	|	    |	|	    |		|	       |
+	|  -------  |	|           |		|	       |
+	|  sockets  |   |  -------  |		|  ----------  |
+	|     -     |	|           |		|              |
+	| lwip raw  |   | lwip raw  |           |    compat    |
+	|     -     |	|     -     |		|      -       |
+	| nexus IPC |   | nexus IPC |		|   nexus IPC  |
+	 ----- -----	 ----- -----		 ------ -------
+	     | |             | |                      | |
+ 	 ----- --------------- ------------------------ -------
+	|   kernel packet filter  |			       |
+	|   (kernel/net/filter.c) |			       |
+	|----------- -------------			       |
+	| 	   | |_ 			       	       |
+	| 	   |  _			ethernet switch	       |
+	| 	   | |			(kernel/net/switch.c)  |
+	|----------- ------------			       |
+	|       nexus  IPC       |		       	       |
+	|  (common/net/device.c) |			       |
+	 ----------- ------------------------------------------
+	 	   | |
+	 ----------- -------------
+	|  kernel device driver  |
+	|  (kernel/drivers/net)	 |
+	 -------------------------
+
+# TCP/IP Stack
+Each process can have its own TCP/IP stack, for which we rely on
+the external lwIP package. By default, processes all use the
+same MAC and IP address even though they have separate stacks.
+The kernel keeps the default_mac and default_ip variables that
+it communicates when a process starts. 
+
+# low-level IPC
+Not all processes have a stack. Userspace device drivers, such
+as the 'e1000 driver' communicate at the raw IPC level, sending
+Ethernet frames to the kernel and receiving them. This low-level
+functionality is implemented in common/net/device.c
+
+Like device drivers, Xen guest operating systems have no use
+for the shared MAC and IP. They communicate directly with the
+switch as if they implement their own NIC (not shown).
+
+The kernel interconnect implementation is discussed below..
+
+## Application Interfaces
+
+# sockets (recommended)
+Processes generally talk to the socket interface exported by libc.
+This, in turn, talks to the lwip socket interface through some glue
+code. 
+
+# lwIP raw and netconn APIs
+Below the sockets, lwIP exports 'raw' and 'netconn' interfaces. 
+The Nexus performs some network stack initialization (opening an
+IPC channel to the kernel, for instance) within the socket
+library implementation. Unless you know what you are doing, do not
+use the lower layer interfaces directly
+
+# raw Ethernet
+lwIP communicates with the kernel at the level of Ethernet packets
+through an IPC channel. It listens on an IPC port that it registers
+with the in-kernel switch.
+
+# device drivers
+Device drivers communicate through the same IPC mechanism with the
+in-kernel switch. Besides the userspace 1000 driver, Nexus has the tg3
+and 3com 3c59x drivers in the kernel. They communicate with the main
+kernel code through the same device driver interface as user drivers
+(in common/net/device.c)
+
+## Interconnect
+All stacks and drivers are connected through 'standard' Nexus IPC 
+channels over which they send raw Ethernet frames. All IPC endpoints
+register a port and connect this to an in kernel switch.
+
+# Switch
+The kernel switch listens for packets on a well known port. It forwards
+incoming packets to other IPC endpoints solely by inspecting the packet's
+Ethernet fields.
+
+# Filter
+Userlevel TCP/IP stacks that share a MAC and IP address should not see
+each other's data. For this purpose, all data with default MAC destination
+is not sent directly to all stacks. In between is an in-kernel packet filter
+that only selects packets that the stack has registered an interest in.
+By default, socket applications register interest in all packets going to
+their ports and in ARP reply packets. 
+
+
+

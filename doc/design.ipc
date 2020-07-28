@@ -1,0 +1,24 @@
+
+
+services
+
+in kernel and userspace
+
+if in kernel: nexusthread_impersonate_push
+
+clients
+
+in userspace: IPC.sc 
+in kernel? IPC-Callee-code duplicates the IPC.sc calls for calls originating from the kernel
+
+## Kernel Services
+
+One peculiarity stems from the support for running services in the kernel (something that
+should go, btw). Because services expect to have a private process, the in-kernel services
+also acquire their own (fake) IPD structure and id. When control passes between such
+kernel services and the main kernel code (ipd 0), we do not perform a real context switch.
+Instead, the calls
+	nexusthread_impersonate_push(ipd) and
+	nexusthread_impersonate_pop()
+Modify the currently reported ipd. 
+

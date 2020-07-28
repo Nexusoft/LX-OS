@@ -1,0 +1,19 @@
+NexusOS build environment
+
+## Various
+
+# Build location
+Nexus does not build object code in the main source directories. Instead
+it creates hardcopies from all sources into a subdirectory 'build' and 
+builds from there. Some advantages of this approach are that 
+- the main sourcetree is easy to grep, changes to the repository are clear
+- a dirty/unstable build is easily cleaned with a `rm -rf build/`
+
+On the other hand, you should be aware that when you replace a file in
+the sourcetree, the file in the build tree is NOT automatically updated.
+
+# Q&A 
+
+Q: My build fails with No rule to make target ... `/NAL.yy.c'. What do I do?
+A: This is an artifact of automated build dependency tracking. Remove 
+   NAL.yy.* and continue.

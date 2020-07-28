@@ -1,0 +1,47 @@
+#!/usr/bin/perl
+
+while (<>) {
+	chomp;
+	next if substr($_, 0, 1) ne "*";
+	next if substr($_, 1, 1) ne ">" && substr($_, 3, 1) eq " ";
+	my $tag = substr($_, 1, 2);       $tag =~ s/\s+//g;
+	my $network = substr($_, 3, 17);  $network =~ s/\s+//g;
+	my $nexthop = substr($_, 20, 15); $nexthop =~ s/\s+//g;
+	my $metric = substr($_, 36, 10);  $metric =~ s/\s+//g;
+	my $locprf = substr($_, 47, 6);   $locprf =~ s/\s+//g;
+	my $weight = substr($_, 54, 6);   $weight =~ s/\s+//g;
+	my $path_origin = substr($_, 61);
+	my ($path, $origin) = $path_origin =~ /([0-9 ]+) ([ie?])/;
+	#print "tag=\"$tag\"\n";
+	#print "  network=\"$network\" (", join",",netparse($network), ")\n";
+	#print "  nexthop=\"$nexthop\"\n";
+	#print "  metric=\"$metric\"\n";
+	#print "  locprf=\"$locprf\"\n";
+	#print "  weight=\"$weight\"\n";
+	#print "  path=\"$path\"\n";
+	#print "  origin=\"$origin\"\n";
+
+	if ($network =~ /^\d/) { $curnet = $network; }
+	if ($tag eq ">") {
+		#print "  network=\"$curnet\" (", join",",netparse($curnet), ")\n";
+		#print "best path to $curnet: $nexthop\n";
+		my @path = split/ /, $path;
+		# <prefix length>[1], <prefix>[4], <nexthop>[4], <path origin>[1]
+		# <path len>[1], <path>[*]
+		print pack "C9aCv*",
+			netparse($curnet), (split/\./, $nexthop),
+			$origin, (scalar @path), @path;
+	}
+}
+
+sub netparse {
+	my $network = shift;
+	my @bytes = split/[.\/]/, $network;
+	if ($bytes[4] == 0) {    # implicit classed routing
+		if ($bytes[0] <= 127) { $bytes[4] = 8; }
+		elsif ($bytes[0] <= 191) { $bytes[4] = 16; }
+		else { $bytes[4] = 24; }
+	}
+	unshift @bytes, (pop @bytes);    # move the prefix to the beginning
+	@bytes;
+}

@@ -1,0 +1,11 @@
+ME: 216.24.191.226
+IPBGP_FILE: nlr/denv-bgptable.txt
+USERWAIT: Waiting to start trace
+TEXT_FILE: nlr/denv25.src
+TEXT_FILE: nlr/denv26.src
+USERWAIT: Waiting to take over www.nytimes.com
+COM: Attempting to take over www.nytimes.com
+SENT_TO: 192.43.217.137
+AS_PATH: 19401
+STATUS: 0
+ANNOUNCE: 199.239.136.0/21

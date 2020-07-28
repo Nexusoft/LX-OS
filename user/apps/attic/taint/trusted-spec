@@ -1,0 +1,8 @@
+!NS (4)
+!NAMESPACE namespace
+!TAINT taint
+!NFS nfs
+!TCP tcp
+EMAIL email
+JUKEBOX jukebox
+

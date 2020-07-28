@@ -1,0 +1,72 @@
+#!/usr/bin/vmplayer
+config.version = "8"
+virtualHW.version = "4"
+ide0:0.present = "TRUE"
+ide0:0.filename = "/redhat/fc8/Fedora-8-x86_64-DVD.iso"
+#ide0:0.present = "TRUE"
+#ide0:0.filename = "dev.vmdk"
+
+memsize = "512"
+MemAllowAutoScaleDown = "FALSE"
+ide1:0.present = "FALSE"
+ide1:0.autodetect = "TRUE"
+ide1:0.fileName = "/root/trickles.iso"
+ide1:0.deviceType = "cdrom-image"
+floppy0.present = "FALSE"
+ethernet0.present = "TRUE"
+#ethernet0.virtualDev = "e1000"
+ethernet0.virtualDev = "vlance"
+
+ethernet1.present = "FALSE"
+#ethernet1.virtualDev = "e1000"
+#ethernet1.virtualDev = "e1000"
+ethernet1.virtualDev = "vlance"
+
+usb.present = "FALSE"
+sound.present = "FALSE"
+displayName = "NQ-router Master"
+guestOS = "other26xlinux"
+nvram = "fc4.nvram"
+MemTrimRate = "-1"
+ide0:0.redo = ""
+#ethernet0.addressType = "generated"
+uuid.location = "56 4d 90 21 24 ec a6 9e-d0 ec 00 2c fb a7 e7 8f"
+uuid.bios = "56 4d 90 21 24 ec a6 9e-d0 ec 00 2c fb a7 e7 8f"
+uuid.action = "create"
+#ethernet0.generatedAddress = "00:0c:29:d1:fd:ef"
+#ethernet0.generatedAddressOffset = "0"
+tools.syncTime = "TRUE"
+ide1:0.startConnected = "FALSE"
+checkpoint.vmState = ""
+
+sound.virtualDev = "es1371"
+
+tools.remindInstall = "TRUE"
+
+ide0:1.redo = ""
+
+#ethernet1.addressType = "generated"
+#ethernet1.generatedAddress = "00:0c:29:d1:fd:f9"
+#ethernet1.generatedAddressOffset = "10"
+
+priority.grabbed = "normal"
+priority.ungrabbed = "normal"
+
+Ethernet0.connectionType = "bridged"
+Ethernet0.vnet = "/dev/vmnet0"
+
+ethernet0.addressType = "generated"
+ethernet0.generatedAddress = "00:0c:29:a7:e7:8f"
+ethernet0.generatedAddressOffset = "0"
+
+scsi0.present = "TRUE"
+scsi0:0.present = "TRUE"
+scsi0:0.fileName = "/root/router-0/tnode.vmdk"
+
+scsi0:0.redo = ""
+
+ide0:0.deviceType = "cdrom-image"
+
+ide0:0.startConnected = "FALSE"
+
+

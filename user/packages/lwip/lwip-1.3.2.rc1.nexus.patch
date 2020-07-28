@@ -1,0 +1,720 @@
+diff -Nur lwip-1.3.2.rc1-unix/Makefile lwip-1.3.2.rc1/Makefile
+--- lwip-1.3.2.rc1-unix/Makefile	1969-12-31 19:00:00.000000000 -0500
++++ lwip-1.3.2.rc1/Makefile	2009-12-07 16:06:00.000000000 -0500
+@@ -0,0 +1,69 @@
++# lwip Makefile for Nexus
++#
++# this is mainly a unix port, but we replace system headers with 
++# our crosscompiled uclibc
++
++.PHONY: all clean distclean
++
++CC		:= gcc
++GCC_MAJOR       := $(shell gcc -dumpversion | cut -d'.' -f1)
++GCC_MINOR       := $(shell gcc -dumpversion | cut -d'.' -f2)
++GCC_HOME	:= /usr/lib/gcc/$(shell gcc -dumpmachine)/$(shell gcc -dumpversion)
++USER_HOME	:= ../../..
++CFLAGS		:= -O2 -Wall -fno-stack-protector
++LDFLAGS		:= -r -static -nostdlib
++
++INCS		:= -nostdinc -I ./src/include \
++		   -I $(USER_HOME)/../common/include \
++		   -I $(USER_HOME)/include \
++		   -isystem $(GCC_HOME)/include \
++		   -isystem $(GCC_HOME)/include-fixed
++
++OBJS := src/api/api_lib.o \
++		src/api/api_msg.o \
++		src/api/err.o \
++		src/api/netbuf.o \
++		src/api/netifapi.o \
++		src/api/sockets.o \
++		src/api/tcpip.o \
++		src/arch/sys_arch.o \
++		src/core/dhcp.o \
++		src/core/dns.o \
++		src/core/init.o \
++		src/core/mem.o \
++		src/core/memp.o \
++		src/core/netif.o \
++		src/core/pbuf.o \
++		src/core/raw.o \
++		src/core/sys.o \
++		src/core/stats.o \
++		src/core/udp.o \
++		src/core/tcp.o \
++		src/core/tcp_in.o \
++		src/core/tcp_out.o \
++		src/core/ipv4/autoip.o \
++		src/core/ipv4/icmp.o \
++		src/core/ipv4/igmp.o \
++		src/core/ipv4/inet.o \
++		src/core/ipv4/inet_chksum.o \
++		src/core/ipv4/ip.o \
++		src/core/ipv4/ip_addr.o \
++		src/core/ipv4/ip_frag.o \
++		src/netif/nexusif.o \
++		src/netif/etharp.o \
++		src/netif/loopif.o
++
++%.o: %.c 
++	$(CC) -c -o $@ $(CFLAGS) $(INCS) $+ 
++
++all: liblwip.a
++
++liblwip.a: $(OBJS)
++	$(LD) $(LDFLAGS) -o $@ $+
++
++clean:
++	@-rm -f `find . -name *.o`
++
++distclean: clean
++	@-rm liblwip.a
++
+diff -Nur lwip-1.3.2.rc1-unix/src/api/netdb.c lwip-1.3.2.rc1/src/api/netdb.c
+--- lwip-1.3.2.rc1-unix/src/api/netdb.c	2009-10-28 11:17:23.000000000 -0400
++++ lwip-1.3.2.rc1/src/api/netdb.c	2009-12-07 16:06:00.000000000 -0500
+@@ -314,7 +314,6 @@
+   /* set up sockaddr */
+   sa->sin_addr.s_addr = addr.addr;
+   sa->sin_family = AF_INET;
+-  sa->sin_len = sizeof(struct sockaddr_in);
+   sa->sin_port = htons(port_nr);
+ 
+   /* set up addrinfo */
+diff -Nur lwip-1.3.2.rc1-unix/src/api/sockets.c lwip-1.3.2.rc1/src/api/sockets.c
+--- lwip-1.3.2.rc1-unix/src/api/sockets.c	2009-10-28 11:17:23.000000000 -0400
++++ lwip-1.3.2.rc1/src/api/sockets.c	2009-12-07 16:06:00.000000000 -0500
+@@ -170,12 +170,17 @@
+ /**
+  * Initialize this module. This function has to be called before any other
+  * functions in this module!
++ *
++ * Update in nexus patch: made it safe to call this function multiple times.
++ * Useful to be able to stuff it behind the libc:socket() call
+  */
+ void
+ lwip_socket_init(void)
+ {
+-  socksem   = sys_sem_new(1);
+-  selectsem = sys_sem_new(1);
++  if (!socksem)
++    socksem   = sys_sem_new(1);
++  if (!selectsem)
++    selectsem = sys_sem_new(1);
+ }
+ 
+ /**
+@@ -287,7 +292,6 @@
+   if (NULL != addr) {
+     LWIP_ASSERT("addr valid but addrlen NULL", addrlen != NULL);
+     memset(&sin, 0, sizeof(sin));
+-    sin.sin_len = sizeof(sin);
+     sin.sin_family = AF_INET;
+     sin.sin_port = htons(port);
+     sin.sin_addr.s_addr = naddr.addr;
+@@ -570,7 +574,6 @@
+         }
+ 
+         memset(&sin, 0, sizeof(sin));
+-        sin.sin_len = sizeof(sin);
+         sin.sin_family = AF_INET;
+         sin.sin_port = htons(port);
+         sin.sin_addr.s_addr = addr->addr;
+@@ -1146,7 +1149,6 @@
+     return -1;
+ 
+   memset(&sin, 0, sizeof(sin));
+-  sin.sin_len = sizeof(sin);
+   sin.sin_family = AF_INET;
+ 
+   /* get the IP address and port */
+diff -Nur lwip-1.3.2.rc1-unix/src/core/dns.c lwip-1.3.2.rc1/src/core/dns.c
+--- lwip-1.3.2.rc1-unix/src/core/dns.c	2009-10-28 11:17:23.000000000 -0400
++++ lwip-1.3.2.rc1/src/core/dns.c	2009-12-07 16:06:00.000000000 -0500
+@@ -84,7 +84,7 @@
+ 
+ /** DNS server IP address */
+ #ifndef DNS_SERVER_ADDRESS
+-#define DNS_SERVER_ADDRESS        inet_addr("208.67.222.222") /* resolver1.opendns.com */
++#define DNS_SERVER_ADDRESS        lwip_inet_addr("208.67.222.222") /* resolver1.opendns.com */
+ #endif
+ 
+ /** DNS server port address */
+diff -Nur lwip-1.3.2.rc1-unix/src/core/ipv4/inet.c lwip-1.3.2.rc1/src/core/ipv4/inet.c
+--- lwip-1.3.2.rc1-unix/src/core/ipv4/inet.c	2009-10-28 11:17:23.000000000 -0400
++++ lwip-1.3.2.rc1/src/core/ipv4/inet.c	2009-12-07 16:06:00.000000000 -0500
+@@ -58,11 +58,11 @@
+  * @return ip address in network order
+  */
+ u32_t
+-inet_addr(const char *cp)
++lwip_inet_addr(const char *cp)
+ {
+   struct in_addr val;
+ 
+-  if (inet_aton(cp, &val)) {
++  if (lwip_inet_aton(cp, &val)) {
+     return (val.s_addr);
+   }
+   return (INADDR_NONE);
+@@ -72,7 +72,7 @@
+  * Check whether "cp" is a valid ascii representation
+  * of an Internet address and convert to a binary address.
+  * Returns 1 if the address is valid, 0 if not.
+- * This replaces inet_addr, the return value from which
++ * This replaces lwip_inet_addr, the return value from which
+  * cannot distinguish between failure and a local broadcast address.
+  *
+  * @param cp IP address in ascii represenation (e.g. "127.0.0.1")
+@@ -80,7 +80,7 @@
+  * @return 1 if cp could be converted to addr, 0 on failure
+  */
+ int
+-inet_aton(const char *cp, struct in_addr *addr)
++lwip_inet_aton(const char *cp, struct in_addr *addr)
+ {
+   u32_t val;
+   u8_t base;
+diff -Nur lwip-1.3.2.rc1-unix/src/core/tcp.c lwip-1.3.2.rc1/src/core/tcp.c
+--- lwip-1.3.2.rc1-unix/src/core/tcp.c	2009-10-28 11:17:23.000000000 -0400
++++ lwip-1.3.2.rc1/src/core/tcp.c	2009-12-07 16:07:01.000000000 -0500
+@@ -330,6 +330,7 @@
+   pcb->local_port = port;
+   TCP_REG(&tcp_bound_pcbs, pcb);
+   LWIP_DEBUGF(TCP_DEBUG, ("tcp_bind: bind to port %"U16_F"\n", port));
++  Net_filter_ipport(1, port, nexusif_port); 
+   return ERR_OK;
+ }
+ #if LWIP_CALLBACK_API
+diff -Nur lwip-1.3.2.rc1-unix/src/core/udp.c lwip-1.3.2.rc1/src/core/udp.c
+--- lwip-1.3.2.rc1-unix/src/core/udp.c	2009-10-28 11:17:23.000000000 -0400
++++ lwip-1.3.2.rc1/src/core/udp.c	2009-12-07 16:07:28.000000000 -0500
+@@ -655,6 +655,9 @@
+                (u16_t)((ntohl(pcb->local_ip.addr) >> 16) & 0xff),
+                (u16_t)((ntohl(pcb->local_ip.addr) >> 8) & 0xff),
+                (u16_t)(ntohl(pcb->local_ip.addr) & 0xff), pcb->local_port));
++
++  // ask the kernel for all packets destined to our port
++  Net_filter_ipport(0, port, nexusif_port); 
+   return ERR_OK;
+ }
+ /**
+diff -Nur lwip-1.3.2.rc1-unix/src/include/ipv4/lwip/inet.h lwip-1.3.2.rc1/src/include/ipv4/lwip/inet.h
+--- lwip-1.3.2.rc1-unix/src/include/ipv4/lwip/inet.h	2009-10-28 11:17:24.000000000 -0400
++++ lwip-1.3.2.rc1/src/include/ipv4/lwip/inet.h	2009-12-07 16:06:00.000000000 -0500
+@@ -48,8 +48,8 @@
+ #define INADDR_ANY          ((u32_t)0x00000000UL)  /* 0.0.0.0 */
+ #define INADDR_BROADCAST    ((u32_t)0xffffffffUL)  /* 255.255.255.255 */
+ 
+-u32_t inet_addr(const char *cp);
+-int inet_aton(const char *cp, struct in_addr *addr);
++u32_t lwip_inet_addr(const char *cp);
++int lwip_inet_aton(const char *cp, struct in_addr *addr);
+ char *inet_ntoa(struct in_addr addr); /* returns ptr to static buffer; not reentrant! */
+ 
+ #ifdef htons
+diff -Nur lwip-1.3.2.rc1-unix/src/include/lwip/arch.h lwip-1.3.2.rc1/src/include/lwip/arch.h
+--- lwip-1.3.2.rc1-unix/src/include/lwip/arch.h	2009-12-07 16:05:35.000000000 -0500
++++ lwip-1.3.2.rc1/src/include/lwip/arch.h	2009-12-07 16:06:00.000000000 -0500
+@@ -42,7 +42,7 @@
+ #define BIG_ENDIAN 4321
+ #endif
+ 
+-#include "arch/cc.h"
++#include "lwip/arch/cc.h"
+ 
+ /** Temporary: define format string for size_t if not defined in cc.h */
+ #ifndef SZT_F
+diff -Nur lwip-1.3.2.rc1-unix/src/include/lwip/def.h lwip-1.3.2.rc1/src/include/lwip/def.h
+--- lwip-1.3.2.rc1-unix/src/include/lwip/def.h	2009-10-28 11:17:24.000000000 -0400
++++ lwip-1.3.2.rc1/src/include/lwip/def.h	2009-12-07 16:06:29.000000000 -0500
+@@ -32,6 +32,10 @@
+ #ifndef __LWIP_DEF_H__
+ #define __LWIP_DEF_H__
+ 
++/** Nexus: should not be declared here */
++int Net_filter_ipport(int istcp, unsigned short ipport, int ipcport); 
++extern int nexusif_port; 
++
+ /* this might define NULL already */
+ #include "lwip/arch.h"
+ 
+diff -Nur lwip-1.3.2.rc1-unix/src/include/lwip/lwipopts.h lwip-1.3.2.rc1/src/include/lwip/lwipopts.h
+--- lwip-1.3.2.rc1-unix/src/include/lwip/lwipopts.h	2009-12-07 16:05:35.000000000 -0500
++++ lwip-1.3.2.rc1/src/include/lwip/lwipopts.h	2009-12-07 16:06:00.000000000 -0500
+@@ -38,6 +38,9 @@
+ #ifndef __LWIPOPTS_H__
+ #define __LWIPOPTS_H__
+ 
++#define LWIP_NETIF_LOOPBACK			1
++#define LWIP_NETIF_API				1
++
+ /*
+  * Include user defined options first. Anything not defined in these files
+  * will be set to standard values. Override anything you dont like!
+@@ -55,7 +58,7 @@
+  * critical regions during buffer allocation, deallocation and memory
+  * allocation and deallocation.
+  */
+-#define SYS_LIGHTWEIGHT_PROT            0
++#define SYS_LIGHTWEIGHT_PROT            1
+ 
+ /** 
+  * NO_SYS==1: Provides VERY minimal functionality. Otherwise,
+@@ -80,7 +83,7 @@
+  * MEM_SIZE: the size of the heap memory. If the application will send
+  * a lot of data that needs to be copied, this should be set high.
+  */
+-#define MEM_SIZE                        8192
++#define MEM_SIZE                        (1 << 16)
+ 
+ /*
+    ------------------------------------------------
+@@ -98,20 +101,20 @@
+  * MEMP_NUM_RAW_PCB: Number of raw connection PCBs
+  * (requires the LWIP_RAW option)
+  */
+-#define MEMP_NUM_RAW_PCB                4
++#define MEMP_NUM_RAW_PCB                8
+ 
+ /**
+  * MEMP_NUM_UDP_PCB: the number of UDP protocol control blocks. One
+  * per active UDP "connection".
+  * (requires the LWIP_UDP option)
+  */
+-#define MEMP_NUM_UDP_PCB                4
++#define MEMP_NUM_UDP_PCB                8
+ 
+ /**
+  * MEMP_NUM_TCP_PCB: the number of simulatenously active TCP connections.
+  * (requires the LWIP_TCP option)
+  */
+-#define MEMP_NUM_TCP_PCB                4
++#define MEMP_NUM_TCP_PCB                8
+ 
+ /**
+  * MEMP_NUM_TCP_PCB_LISTEN: the number of listening TCP connections.
+@@ -129,7 +132,7 @@
+  * MEMP_NUM_REASSDATA: the number of simultaneously IP packets queued for
+  * reassembly (whole packets, not fragments!)
+  */
+-#define MEMP_NUM_REASSDATA              1
++#define MEMP_NUM_REASSDATA              4
+ 
+ /**
+  * MEMP_NUM_ARP_QUEUE: the number of simulateously queued outgoing
+@@ -149,13 +152,13 @@
+  * MEMP_NUM_NETBUF: the number of struct netbufs.
+  * (only needed if you use the sequential API, like api_lib.c)
+  */
+-#define MEMP_NUM_NETBUF                 2
++#define MEMP_NUM_NETBUF                 8
+ 
+ /**
+  * MEMP_NUM_NETCONN: the number of struct netconns.
+  * (only needed if you use the sequential API, like api_lib.c)
+  */
+-#define MEMP_NUM_NETCONN                4
++#define MEMP_NUM_NETCONN                16
+ 
+ /**
+  * MEMP_NUM_TCPIP_MSG_API: the number of struct tcpip_msg, which are used
+@@ -169,12 +172,12 @@
+  * for incoming packets. 
+  * (only needed if you use tcpip.c)
+  */
+-#define MEMP_NUM_TCPIP_MSG_INPKT        8
++#define MEMP_NUM_TCPIP_MSG_INPKT        32
+ 
+ /**
+  * PBUF_POOL_SIZE: the number of buffers in the pbuf pool. 
+  */
+-#define PBUF_POOL_SIZE                  8
++#define PBUF_POOL_SIZE                  32
+ 
+ /*
+    ---------------------------------
+@@ -239,7 +242,7 @@
+  * fragmentation. Otherwise pbufs are allocated and reference the original
+     * packet data to be fragmented.
+ */
+-#define IP_FRAG_USES_STATIC_BUF         0
++#define IP_FRAG_USES_STATIC_BUF         1
+ 
+ /**
+  * IP_DEFAULT_TTL: Default value for Time-To-Live used by transport layers.
+@@ -352,7 +355,7 @@
+  * link level header. The default is 14, the standard value for
+  * Ethernet.
+  */
+-#define PBUF_LINK_HLEN                  16
++#define PBUF_LINK_HLEN                  14
+ 
+ /**
+  * PBUF_POOL_BUFSIZE: the size of each pbuf in the pbuf pool. The default is
+@@ -393,6 +396,8 @@
+  */
+ #define LWIP_SOCKET                     1
+ 
++#define LWIP_COMPAT_SOCKETS             0
++
+ /*
+    ----------------------------------------
+    ---------- Statistics options ----------
+diff -Nur lwip-1.3.2.rc1-unix/src/include/lwip/sockets.h lwip-1.3.2.rc1/src/include/lwip/sockets.h
+--- lwip-1.3.2.rc1-unix/src/include/lwip/sockets.h	2009-10-28 11:17:24.000000000 -0400
++++ lwip-1.3.2.rc1/src/include/lwip/sockets.h	2009-12-07 16:06:00.000000000 -0500
+@@ -49,7 +49,6 @@
+ 
+ /* members are in network byte order */
+ struct sockaddr_in {
+-  u8_t sin_len;
+   u8_t sin_family;
+   u16_t sin_port;
+   struct in_addr sin_addr;
+@@ -57,7 +56,6 @@
+ };
+ 
+ struct sockaddr {
+-  u8_t sa_len;
+   u8_t sa_family;
+   char sa_data[14];
+ };
+diff -Nur lwip-1.3.2.rc1-unix/src/include/lwip/sys.h lwip-1.3.2.rc1/src/include/lwip/sys.h
+--- lwip-1.3.2.rc1-unix/src/include/lwip/sys.h	2009-10-28 11:17:23.000000000 -0400
++++ lwip-1.3.2.rc1/src/include/lwip/sys.h	2009-12-07 16:06:00.000000000 -0500
+@@ -75,7 +75,7 @@
+ #define SYS_MBOX_EMPTY SYS_ARCH_TIMEOUT 
+ 
+ #include "lwip/err.h"
+-#include "arch/sys_arch.h"
++#include "lwip/arch/sys_arch.h"
+ 
+ typedef void (* sys_timeout_handler)(void *arg);
+ 
+diff -Nur lwip-1.3.2.rc1-unix/src/netif/nexusif.c lwip-1.3.2.rc1/src/netif/nexusif.c
+--- lwip-1.3.2.rc1-unix/src/netif/nexusif.c	1969-12-31 19:00:00.000000000 -0500
++++ lwip-1.3.2.rc1/src/netif/nexusif.c	2009-12-07 16:06:00.000000000 -0500
+@@ -0,0 +1,309 @@
++/**
++ * @file
++ * Nexus Interface 
++ * Communicates with the Nexus kernel over IPC
++ * 
++ */
++
++#include <pthread.h>
++
++#include "lwip/opt.h"
++
++#include "lwip/def.h"
++#include "lwip/mem.h"
++#include "lwip/pbuf.h"
++#include "lwip/sys.h"
++#include "lwip/stats.h"
++#include "lwip/snmp.h"
++#include "netif/etharp.h"
++
++#include <nexus/IPC.interface.h>
++#include <nexus/Net.interface.h>
++
++/* Define those to better describe your network interface. */
++#define IFNAME0 'n'
++#define IFNAME1 'x'
++
++/**
++ * Helper struct to hold private data used to operate your nexus interface.
++ * Keeping the nexus address of the MAC in this struct is not necessary
++ * as it is already kept in the struct netif.
++ * But this is only an example, anyway...
++ */
++struct nexusif {
++  int port_num;		///< nexus IPC port on which we wait for packets
++  pthread_t rx_thread;
++
++  const char *ll_buf;	///< packet, forwarded from rxthread to low_level_input
++  int ll_len;
++};
++
++/* Forward declarations. */
++static void  nexusif_input(struct netif *netif);
++
++/** after initialization, IPC portnum of listening thread 
++    of first nexusif device in this process space. */
++int nexusif_port; 
++
++static void *
++low_level_rxthread(void *_netif)
++{
++#define BUFLEN 2000
++  struct netif *netif = _netif;
++  struct nexusif *nexusif = netif->state;
++  char buf[BUFLEN];
++  int ret;
++
++  while (1) {
++
++    /* get a packet from the kernel */
++    ret = IPC_Recv(nexusif->port_num, buf, BUFLEN);
++    if (ret < 0)
++      LWIP_DEBUGF(NETIF_DEBUG, ("nexusif: ipc rx failed\n"));
++
++    /* send up to lwIP */
++    nexusif->ll_buf = buf;
++    nexusif->ll_len = ret;
++    nexusif_input(netif);
++  
++  }
++
++  /* not reached */
++  return NULL;
++}
++
++/**
++ * In this function, the hardware should be initialized.
++ * Called from nexusif_init().
++ *
++ * @param netif the already initialized lwip network interface structure
++ *        for this nexusif
++ */
++static void
++low_level_init(struct netif *netif)
++{
++  struct nexusif *nexusif = netif->state;
++  char mac[6];
++ 
++  /* nexus: acquire MAC */
++  memset(mac, 0, 6);
++  Net_get_mac(mac);
++  LWIP_DEBUGF(NETIF_DEBUG, ("nexusif: got MAC %hx.%hx.%hx.%hx.%hx.%hx\n",
++			    mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]));
++
++  /* set MAC hardware address length */
++  netif->hwaddr_len = ETHARP_HWADDR_LEN;
++
++  /* set MAC hardware address */
++  memcpy(netif->hwaddr, mac, 6);
++
++  /* maximum transfer unit */
++  netif->mtu = 1500;
++  
++  /* device capabilities */
++  netif->flags = NETIF_FLAG_BROADCAST | NETIF_FLAG_ETHARP | NETIF_FLAG_LINK_UP;
++ 
++  /* start nexus IPC reception thread */
++  pthread_create(&nexusif->rx_thread, NULL, low_level_rxthread, netif);
++
++}
++
++/**
++ * This function should do the actual transmission of the packet. The packet is
++ * contained in the pbuf that is passed to the function. This pbuf
++ * might be chained.
++ *
++ * @param netif the lwip network interface structure for this nexusif
++ * @param p the MAC packet to send (e.g. IP packet including MAC addresses and type)
++ * @return ERR_OK if the packet could be sent
++ *         an err_t value if the packet couldn't be sent
++ *
++ * @note Returning ERR_MEM here if a DMA queue of your MAC is full can lead to
++ *       strange results. You might consider waiting for space in the DMA queue
++ *       to become availale since the stack doesn't retry to send a packet
++ *       dropped because of memory failure (except for the TCP timers).
++ */
++
++static err_t
++low_level_output(struct netif *netif, struct pbuf *p)
++{
++  struct pbuf *q;
++  char *buf;
++  uint16_t tot_len, off;
++  err_t ret = ERR_OK;
++
++#if ETH_PAD_SIZE
++  pbuf_header(p, -ETH_PAD_SIZE); /* drop the padding word */
++#endif
++
++  /* IPC_send takes control of the packet, so we have to make a copy. 
++     XXX: speed this up. */
++  tot_len = 0;
++  for(q = p; q != NULL; q = q->next)
++    tot_len += q->len;
++  buf = malloc(tot_len);
++
++  off = 0;
++  for(q = p; q != NULL; q = q->next) {
++    memcpy(buf + off, q->payload, q->len);
++    off += q->len;
++  }
++  
++  if (IPC_Send(default_switch_port, buf, tot_len)) {
++    LWIP_DEBUGF(NETIF_DEBUG, ("nexusif: ipc tx failed\n"));
++    ret = ERR_IF;
++  }
++
++#if ETH_PAD_SIZE
++  pbuf_header(p, ETH_PAD_SIZE); /* reclaim the padding word */
++#endif
++  
++  LINK_STATS_INC(link.xmit);
++
++  return ret;
++}
++
++/**
++ * Should allocate a pbuf and transfer the bytes of the incoming
++ * packet from the interface into the pbuf.
++ *
++ * @param netif the lwip network interface structure for this nexusif
++ * @return a pbuf filled with the received packet (including MAC header)
++ *         NULL on memory error
++ */
++static struct pbuf *
++low_level_input(struct netif *netif)
++{
++  struct nexusif *nexusif = netif->state;
++  struct pbuf *p;
++  u16_t len, off;
++
++  /* Obtain the size of the packet and put it into the "len"
++     variable. */
++  len = nexusif->ll_len;
++  off = 0;
++
++  /* We allocate a pbuf chain of pbufs from the pool. */
++  p = pbuf_alloc(PBUF_RAW, len, PBUF_RAM);
++  
++  if (p && p->len >= len) {
++    memcpy(p->payload, nexusif->ll_buf, len);
++    LINK_STATS_INC(link.recv);
++  } else {
++    LWIP_DEBUGF(NETIF_DEBUG, ("nexusif: OOM: dropped packet on rx.\n"));
++    LINK_STATS_INC(link.memerr);
++    LINK_STATS_INC(link.drop);
++  }
++
++  return p;  
++}
++
++/**
++ * This function should be called when a packet is ready to be read
++ * from the interface. It uses the function low_level_input() that
++ * should handle the actual reception of bytes from the network
++ * interface. Then the type of the received packet is determined and
++ * the appropriate input function is called.
++ *
++ * @param netif the lwip network interface structure for this nexusif
++ */
++static void
++nexusif_input(struct netif *netif)
++{
++  struct nexusif *nexusif;
++  struct eth_hdr *ethhdr;
++  struct pbuf *p;
++
++  nexusif = netif->state;
++
++  /* move received packet into a new pbuf */
++  p = low_level_input(netif);
++  /* no packet could be read, silently ignore this */
++  if (p == NULL) return;
++  /* points to packet payload, which starts with an Ethernet header */
++  ethhdr = p->payload;
++
++  switch (htons(ethhdr->type)) {
++  /* IP or ARP packet? */
++  case ETHTYPE_IP:
++  case ETHTYPE_ARP:
++#if PPPOE_SUPPORT
++  /* PPPoE packet? */
++  case ETHTYPE_PPPOEDISC:
++  case ETHTYPE_PPPOE:
++#endif /* PPPOE_SUPPORT */
++    /* full packet send to tcpip_thread to process */
++    if (netif->input(p, netif)!=ERR_OK)
++     { LWIP_DEBUGF(NETIF_DEBUG, ("nexusif_input: IP input error\n"));
++       pbuf_free(p);
++       p = NULL;
++     }
++    break;
++
++  default:
++    pbuf_free(p);
++    p = NULL;
++    break;
++  }
++}
++
++/**
++ * Should be called at the beginning of the program to set up the
++ * network interface. It calls the function low_level_init() to do the
++ * actual setup of the hardware.
++ *
++ * This function should be passed as a parameter to netif_add().
++ *
++ * @param netif the lwip network interface structure for this nexusif
++ * @return ERR_OK if the loopif is initialized
++ *         ERR_MEM if private data couldn't be allocated
++ *         any other err_t on error
++ */
++err_t
++nexusif_init(struct netif *netif)
++{
++  struct nexusif *nexusif;
++
++  LWIP_ASSERT("netif != NULL", (netif != NULL));
++    
++  nexusif = mem_malloc(sizeof(struct nexusif));
++  if (nexusif == NULL) {
++    LWIP_DEBUGF(NETIF_DEBUG, ("nexusif_init: out of memory\n"));
++    return ERR_MEM;
++  }
++
++  nexusif->port_num = IPC_CreatePort(NULL);
++  if (nexusif->port_num < 0) {
++    LWIP_DEBUGF(NETIF_DEBUG, ("nexusif_init: could not connect to kernel\n"));
++    return ERR_IF;
++  }
++  nexusif_port = nexusif->port_num;
++
++#if LWIP_NETIF_HOSTNAME
++  /* Initialize interface hostname */
++  netif->hostname = "nexus";
++#endif /* LWIP_NETIF_HOSTNAME */
++
++  /*
++   * Initialize the snmp variables and counters inside the struct netif.
++   * The last argument should be replaced with your link speed, in units
++   * of bits per second.
++   */
++  NETIF_INIT_SNMP(netif, snmp_ifType_nexus_csmacd, 1000 * 1000 * 1000);
++
++  netif->state = nexusif;
++  netif->name[0] = IFNAME0;
++  netif->name[1] = IFNAME1;
++  /* We directly use etharp_output() here to save a function call.
++   * You can instead declare your own function an call etharp_output()
++   * from it if you have to do some checks before sending (e.g. if link
++   * is available...) */
++  netif->output = etharp_output;
++  netif->linkoutput = low_level_output;
++  
++  /* initialize the hardware */
++  low_level_init(netif);
++
++  return ERR_OK;
++}
++
+diff -Nur lwip-1.3.2.rc1-unix/src/netif/ppp/auth.c lwip-1.3.2.rc1/src/netif/ppp/auth.c
+--- lwip-1.3.2.rc1-unix/src/netif/ppp/auth.c	2009-10-28 11:17:24.000000000 -0400
++++ lwip-1.3.2.rc1/src/netif/ppp/auth.c	2009-12-07 16:06:00.000000000 -0500
+@@ -943,7 +943,7 @@
+       if (hp != NULL && hp->h_addrtype == AF_INET) {
+         a = *(u32_t *)hp->h_addr;
+       } else {
+-        a = inet_addr(p);
++        a = lwip_inet_addr(p);
+       }
+       if (a != (u32_t) -1) {
+         wo->hisaddr = a;

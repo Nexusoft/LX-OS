@@ -1,0 +1,77 @@
+#!/usr/bin/perl -w
+
+use File::Temp qw/ :mktemp /;
+
+# Save PR
+$nq_server_opts = ""; #"-r";
+
+# disable triggers
+$nq_server_opts = "-t";
+
+my $analyze = "";
+if(0) {
+  # Settings for flow test w/ analysis
+  $analyze .= "-a ";
+#  $NUM_THREADS=30;
+#  $NUM_FLOWS=500;
+
+  $NUM_THREADS=20;
+  #$NUM_FLOWS=200;
+  $NUM_FLOWS=150;
+} else {
+  # Settings for flow test w/o analysis
+  $NUM_THREADS=50;
+  $NUM_FLOWS=1000;
+}
+
+$analyze .= "-s ";
+my $do_capture = ""; # = "DO_CAPTURE=1 ";
+
+push @post_setup, sub {
+  my $DATA_DIR = "data/flow-latency/";
+
+  system("mkdir -p $DATA_DIR/tmp");
+
+  print "Sleeping\n";
+  sleep(10);
+
+  print "Crawl\n";
+  print "Args: " . "$first_nq_server_ip_external, ../site-crawl $first_nq_server_ip $FIRST_NQ_SERVER_PORT 0" . "\n";
+  start_one($first_nq_server_ip_external, "../site-crawl $first_nq_server_ip $FIRST_NQ_SERVER_PORT 0");
+
+  print "Starting client process\n";
+  my $env_opts ="";
+  $env_opts ="ANALYZE=\\\"$analyze\\\" $do_capture NUM_THREADS=$NUM_THREADS FLOWS_EACH=$NUM_FLOWS";
+
+  my @clients = grep { is_nqclientid($_->[0])  } @machines;
+  if (@clients > 1) {
+    print "Warning: Too many clients specified\n";
+  }
+  my $client_ip = $clients[0]->[1];
+
+  my $pid = fork();
+  if( !$pid ) {
+    start_one($client_ip, "$env_opts ./start-clients.sh");
+    exit(0);
+  }
+  sleep(20);
+  print "perl back from script, will kill\n";
+  kill(1,$pid);
+  print "after kill\n";
+  waitpid($pid, 0);
+  print "after wait\n";
+
+  my $tempdir = mkdtemp("$DATA_DIR/tmp/data-XXXX");
+  # Collect the data
+  print "trying to scp\n";
+  system("scp -r root\@$client_ip:/tmp/flow-last $tempdir");
+  open(OF, ">$tempdir/flow-last/envopts");
+  print OF "Environment options: $env_opts\n";
+  close(OF);
+  my $test_time = `cat $tempdir/flow-last/timestamp`;
+  chomp($test_time);
+  print "Got test time $test_time\n";
+  system("mv $tempdir/flow-last $DATA_DIR/$test_time");
+  system("rm $DATA_DIR/last ; ln -s $test_time $DATA_DIR/last");
+};
+1;

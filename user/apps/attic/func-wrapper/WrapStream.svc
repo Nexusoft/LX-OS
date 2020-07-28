@@ -1,0 +1,268 @@
+service WrapStream {
+  decls {
+    includefiles { "<string.h>" }
+    includefiles { "<fcntl.h>" }
+    includefiles { "<unistd.h>" }
+    includefiles { "<nexus/LabelStore.interface.h>" }
+    includefiles { "<nexus/sema.h>" }
+
+    IDL_EXTERNS(WrapStream);
+
+    // server-side only
+    extern int (*recv_fn)(char *target, int maxlen);
+    extern int (*send_fn)(const unsigned char *target, int maxlen);
+    extern int (*close_fn)(void);
+
+    extern SignedFormula *nsk_label;
+    extern SignedFormula *child_label;
+    extern SignedFormula *hashcred;
+    extern SignedFormula *sslkey_binding;
+  }
+
+  decls __callee__ {
+    includefiles { "<nexus/ipc.h>"}
+    includefiles { "<nexus/formula.h>"}
+    includefiles { "<nexus/guard.h>" }
+    includefiles { "<nexus/debug.h>" }
+    includefiles { "<errno.h>" }
+    includefiles { "FuncInterposeDriver.interface.h" }
+    includefiles { "exec-func.h" }
+
+    includefiles { "<openssl/ssl.h>" }
+    includefiles { "<openssl/err.h>" }
+
+    IDL_SERVER_VARDEFS(WrapStream);
+
+    enum WrapStreamState {
+      INITIALIZING,
+      PASSING_DATA,
+      DONE,
+    } WrapStream_state = INITIALIZING;
+
+    extern int dbg;
+    struct _ign {
+#define printf_dbg(x...) if(dbg)printf(x)
+    };
+
+    int (*recv_fn)(char *target, int maxlen);
+    int (*send_fn)(const unsigned char *target, int maxlen);
+    int (*close_fn)(void);
+
+    int wrap_target;
+    int wrapstream_ipd;
+
+    extern Port_Handle *interpose_port_handle_p;
+    extern int g_child_ipd;
+
+    SignedFormula *child_label;
+
+    static int send_all(unsigned char *data, int len) {
+      int result = 0;
+      int pos = 0;
+      // printf("send in %d\n", len);
+      while(pos < len) {
+	result = send_fn(data + pos, len - pos);
+	// printf("sent out %d\n", result);
+	if(result < 0) break;
+	assert(result != 0);
+	pos += result;
+      }
+      assert(pos == len);
+      return (pos > 0) ? pos : result;
+    }
+    static void send_der(unsigned char *der) {
+      int len = der_msglen(der);
+      send_all((unsigned char *)&len, sizeof(len));
+      send_all(der, len);
+    }
+  }
+
+  decls __caller__ {
+    includefiles { "\"../nameserver/NS.interface.h\""}
+    includefiles { "<nexus/formula.h>" }
+    includefiles { "<nexus/guard.h>" }
+    includefiles { "<nexus/debug.h>" }
+  }
+
+  __callee__ {
+    int err;
+    if((err = NS_clientInit()) != 0) {
+      printf("WrapStream server could not connect to name server (%d)\n", err);
+      return;
+    }
+    IDL_REGISTER(WrapStream);
+
+    Reflection_SetPortType(WrapStream_server_port_num, WrapStream_svc_name);
+
+    wrapstream_ipd = IPC_GetMyIPD_ID();
+  }
+
+  ~__callee__ {
+    NS_SimpleUnregister(registerCtx);
+  }
+
+  __caller__ {
+    extern int g_wrap_stream_port_num;
+    WrapStream_client_port_num = g_wrap_stream_port_num;
+    IDL_BINDREQUEST(WrapStream);
+    return 0;
+  }
+
+  interface lf_generate { OID_NONE; } lf_check { 1; }
+  int Make_Functional(__input__ struct VarLen ext_label) {
+    if(ipd_id != g_child_ipd) {
+      printf("Invalid source ipd (%d,%d)!\n", ipd_id, g_child_ipd);
+      return -1;
+    }
+    if(WrapStream_state != INITIALIZING) {
+      printf("Go functional called in invalid state (%d)!\n", WrapStream_state);
+      return -1;
+    }
+    wrap_target = ipd_id;
+    printf_dbg("Wrapping %d\n", wrap_target);
+
+    int wrap_channel = IPC_Wrap(wrap_target);
+    if(wrap_channel <= 0) {
+      printf("invalid wrap channel %d!\n", wrap_channel);
+      return -1;
+    }
+    printf_dbg("wrap channel = %d\n", wrap_channel);
+
+    *interpose_port_handle_p = wrap_channel;
+    start_wrapper_threads();
+
+    // get the name of the wrapped ipd
+    printf_dbg("Getting name for ipd %d...\n", wrap_target);
+
+#if 0
+    // XXX Poll
+    char buf[4000];
+    int i;
+    for(i=0 ;; i++) {
+      sleep(2);
+      int len = LabelStore_Get_IPD_Name(wrap_target, buf, sizeof(buf), NULL);
+      if(len > 0) {
+	// printf("done: got %d bytes\n", len);
+	break;
+      }
+      if (i > 5) {
+	printf("error %d\n", len);
+	exit(-1);
+      } else {
+	printf("trying again\n");
+      }
+    }
+
+    Form *target = form_from_der((Formula *)buf);
+    if (!target) { printf("error\n"); exit(1); }
+    char *target_namestr = form_to_pretty(target, 0);
+    char *target_name;
+    // printf("target_name = %s\n", target_namestr);
+    target_name = malloc(der_msglen(buf));
+    memcpy(target_name, buf, der_msglen(buf));
+#endif
+
+    child_label = malloc(ext_label.len);
+    int err = IPC_TransferFrom(call_handle, ext_label.desc_num, child_label, 
+			       (unsigned int)ext_label.data, ext_label.len);
+    if(err < 0) {
+      printf("Could not get label from subprocess!\n");
+      return -1;
+    }
+
+    // send the following labels: hashcred_id, child_label
+    assert(child_label != NULL);
+    printf("Should send ; nsk label (%d), ssl key label (%d), hash_cred (len = %d) ; child label (len = %d)\n",
+	   der_msglen(nsk_label->body),
+	   der_msglen(sslkey_binding->body), 
+	   der_msglen(hashcred->body), 
+	   der_msglen(child_label->body));
+    int len;
+    send_der(nsk_label->body);
+    send_der(sslkey_binding->body);
+    send_der(hashcred->body);
+    send_der(child_label->body);
+
+    {
+      Formula *extracted = signedform_get_formula(child_label);
+      write_file("/nfs/child.extracted", 
+		 extracted->body, der_msglen(extracted->body));
+    }
+
+    WrapStream_state = PASSING_DATA;
+    return 0;
+  }
+
+  interface lf_generate { OID_NONE; } lf_check { 1; }
+  int Recv(__output__ struct VarLen data) {
+    if(ipd_id != g_child_ipd) {
+      printf("Invalid source ipd!\n");
+      return -1;
+    }
+    if(WrapStream_state != PASSING_DATA) {
+      printf("Recv(): not in pass data state\n");
+      return -EINVAL;
+    }
+
+    // return value: length of info written to data
+    char *tmp = malloc(data.len);
+    int real_len = recv_fn(tmp, data.len);
+    if(real_len > 0) {
+      int err = IPC_TransferTo(call_handle, data.desc_num, (unsigned int)data.data,
+			       tmp, real_len);
+      if(err != 0) {
+	assert(err < 0);
+	real_len = err;
+      }
+    }
+    // printf("Got %d\n", real_len);
+    if(real_len < 0) {
+      printf("printing errs\n");
+      ERR_print_errors_fp(stdout);
+    }
+    free(tmp);
+    return real_len;
+  }
+
+  interface lf_generate { OID_NONE; } lf_check { 1; }
+  int Send(__input__ struct VarLen data) {
+    if(ipd_id != g_child_ipd) {
+      printf("Invalid source ipd!\n");
+      return -1;
+    }
+    if(WrapStream_state != PASSING_DATA) {
+      printf("Send(): not in pass data state\n");
+      return -1;
+    }
+
+
+    unsigned char *tmp = malloc(data.len);
+    int err = IPC_TransferFrom(call_handle, data.desc_num, tmp, 
+			       (unsigned int)data.data,
+			       data.len);
+    if(err < 0) {
+      printf("Send(): Could not transfer data\n");
+      goto out;
+    }
+    // Try to pass the full send
+    err = send_all(tmp, data.len);
+  out:
+    free(tmp);
+    return err;
+  }
+
+  interface lf_generate { OID_NONE; } lf_check { 1; }
+  int Done(void) {
+    if(ipd_id != g_child_ipd) {
+      printf("Invalid source ipd!\n");
+      return -1;
+    }
+    if(WrapStream_state != PASSING_DATA) {
+      printf("Done: not in passing data state (state = %d)!\n", WrapStream_state);
+      return -1;
+    }
+    WrapStream_state = DONE;
+    return close_fn();
+  }
+}
+

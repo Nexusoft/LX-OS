@@ -1,0 +1,231 @@
+service SpamFreeAttestationService {
+  decls {
+    includefiles { "<pthread.h>" } /* for semaphores */
+    includefiles { "<nexus/util.h>" }
+
+    includefiles { "<string.h>" }
+    includefiles { "<fcntl.h>" }
+    includefiles { "<unistd.h>" }
+
+    includefiles { "<nexus/ipc.h>" }
+    includefiles { "<nexus/IPC.interface.h>" }
+    includefiles { "<nexus/LabelStore.interface.h>" }
+    includefiles { "<nexus/guard.h>" }
+    includefiles { "<nexus/debug.h>" }
+
+    struct stupid {
+#define SFAS_NOERROR (0)
+#define SFAS_DENIED (1)
+#define SFAS_SIGERROR (2)
+#define SFAS_ACCESSERROR (3)
+    };
+  }
+
+  decls __callee__ {
+    includefiles { "<openssl/bio.h>" }
+    includefiles { "<openssl/err.h>" }
+    includefiles { "<openssl/rsa.h>" }
+    includefiles { "<openssl/pem.h>" }
+    includefiles { "<nexus/util.h>" }
+    includefiles { "<nexus/IPC.interface.h>" }
+
+    includefiles { "\"../email/keyboardrm-hash.h\"" } /* todo: move */
+    includefiles { "sfaservice.h"}
+
+    static Form *self = NULL, *nsk = NULL;
+
+    int is_fresh_nonce_cred_check(struct opencred *oc) {
+      int nonce = (int)oc->cred->data;
+      printf("fresh nonce cred check: %d versus %d\n", nonce, next_nonce-1);
+      int ret = (nonce != next_nonce - 1);
+      return ret;
+    }
+
+    int is_fresh_nonce_cred_opener(struct opencred *oc) {
+      oc->start = is_fresh_nonce_cred_check;
+      oc->middle = NULL; // is_fresh_nonce_middler;
+      oc->stop = is_fresh_nonce_cred_check;
+      oc->close = NULL; // is_fresh_nonce_closer;
+      return 0;
+    }
+
+    struct cred *is_fresh_nonce_auth(struct term_auth *auth, Form *f) {
+      // handle formulas like "self says IsFreshNonce(...)"
+      Form *who;
+      int nonce;
+      if (form_scan(f, "%{term} says IsFreshNonce(%{int}) = 1", &who, &nonce) != 2)
+	return NULL;
+
+      struct cred *cred = malloc(sizeof(struct cred));
+      cred->tag = CRED_OTHER;
+      cred->data = (void *)nonce;
+      cred->open = is_fresh_nonce_cred_opener;
+      cred->free = NULL; // is_fresh_nonce_cred_freeer; // unused anyway
+      return cred;
+    }
+  }
+
+  decls __caller__ {
+    includefiles { "<nexus/IPC.interface.h>" }
+  }
+
+  __caller__ {
+    IPC_DoBind(SpamFree_reserved_port);
+    return 0;
+  }
+
+  interface lf_generate { OID_NONE; } lf_check { 1; }
+  int AttestToNonSpamness(__input__ struct VarLen email_body,
+	    __output__ struct VarLen signed_email, __input__ struct VarLen upgvl) {
+    int err;
+
+    ++next_nonce;
+
+    _Grounds *pg = NULL;
+    if (upgvl.len > 0) {
+      char *upg = malloc(upgvl.len);
+      if( (err = IPC_TransferFrom(call_handle, upgvl.desc_num, 
+			    upg, (unsigned int)upgvl.data, upgvl.len)) != 0) {
+	printf("can't pull upg\n");
+	return -SFAS_ACCESSERROR;
+      }
+      pg = grounds_deserialize(upg, upgvl.len);
+      printf("deserialized %d bytes into grounds %p\n", upgvl.len, pg);
+      free(upg);
+    }
+
+    if (!pg) {
+      printf("denied: missing grounds\n");
+      return -SFAS_DENIED;
+    }
+
+    // manually generated policy:
+    // i says AttestToNonSpamness()
+    // and
+    // j says NumLinesTyped(i, n) > 0
+    // and
+    // nsk says BootHash(j) = hash_of_keyboardrm
+    // and
+    // self says IsFreshNonce(n)
+
+    unsigned char buf[4000];
+
+    printf("Getting name for requesting ipd %d...\n", ipd_id);
+    int len = LabelStore_Get_IPD_Name(ipd_id, buf, sizeof(buf), NULL);
+    printf("done: got %d bytes\n", len);
+    if (len <= 0) { printf("error\n"); return -1; }
+    Form *requestor = form_from_der((Formula *)buf);
+    if (!requestor) { printf("error\n"); return -1; }
+    char *requestor_namestr = form_to_pretty(requestor, 0);
+    printf("requestor_name = %s\n", requestor_namestr);
+    Form *request = form_fmt("%{term} says AttestToNonSpamness() = 1", requestor);
+
+    if (!self) {
+      int my_id = IPC_GetMyIPD_ID();
+      printf("Getting name for own ipd %d...\n", my_id);
+      int len = LabelStore_Get_IPD_Name(my_id, buf, sizeof(buf), NULL);
+      printf("done: got %d bytes\n", len);
+      if (len <= 0) { printf("error\n"); return -1; }
+      self = form_from_der((Formula *)buf);
+      if (!self) { printf("error\n"); return -1; }
+      char *self_namestr = form_to_pretty(self, 0);
+      printf("self_name = %s\n", self_namestr);
+
+      assert(self->tag == F_TERM_CSUB);
+      assert(self->left->tag == F_TERM_DER);
+      nsk = form_dup(self->left);
+    }
+
+    Form *gf = form_fmt("(%i says AttestToNonSpamness() = 1)"
+			" and (%j says NumLinesTyped(%i, %n) > %{int})" 
+			" and (%{term} says BootHash(%j) = %{bytes})"
+			" and (%{term} says IsFreshNonce(%n) = 1)", 
+	require_numlines, nsk, keyboardrm_hash, sizeof(keyboardrm_hash), self);
+
+    _Policy *policy = (_Policy *)form_to_der(gf);
+
+    Guard *g = guard_create();
+    guard_setdebug(g, GUARD_DEBUG_ALL);
+    guard_setgoal(g, &policy->gf);
+    guard_addauth(g, new_auth_callback(is_fresh_nonce_auth));
+    if (guard_check(g, request, pg)) {
+      printf("denied\n");
+      return -SFAS_DENIED;
+    }
+    // todo: free stuff from above, error paths
+
+    if (!spamkey || !spamkey_cert || !spamkey_certstack) {
+      printf("not ready\n");
+      return -1;
+    }
+
+    char body[4096];
+    assert(email_body.len * 2 + 100 < sizeof(body));
+    if( (err = IPC_TransferFrom(call_handle, email_body.desc_num, 
+			    body, (unsigned int)email_body.data, email_body.len)) != 0) {
+      printf("%s: error copying email body (%d)\n", __FUNCTION__, err);
+      return -SFAS_ACCESSERROR;
+    }
+    body[email_body.len] = '\0';
+    sprintf(body + email_body.len, "(This message had nonce %d)\n", next_nonce - 2);
+
+    // convert newlines, put in bio
+    char bodybuf[4096*2+2];
+    bodybuf[0] = '\r';
+    bodybuf[1] = '\n';
+    int i, j;
+    for(i=0, j=2; i < strlen(body) + 1; i++, j++) {
+      if (body[i] != '\n') bodybuf[j] = body[i];
+      else {
+	bodybuf[j++] = '\r';
+	bodybuf[j] = '\n';
+      }
+    }
+
+    BIO *bio_body = BIO_new(BIO_s_mem());
+    BIO_puts(bio_body, bodybuf);
+    PKCS7 *sig_p7 = PKCS7_sign(spamkey_cert, spamkey, spamkey_certstack, bio_body, PKCS7_DETACHED);
+    if (!sig_p7) {
+      printf("PKCS7_sign failed\n");
+      return -SFAS_SIGERROR;
+    }
+    BIO_free(bio_body);
+    bio_body = BIO_new(BIO_s_mem());
+    BIO_puts(bio_body, bodybuf);
+    BIO *bio_signature = BIO_new(BIO_s_mem());
+    if(!SMIME_write_PKCS7(bio_signature, sig_p7, bio_body, PKCS7_DETACHED)) {
+      printf("smime_write failed\n");
+      return -SFAS_SIGERROR;
+    }
+    char *smime_text;
+    len = BIO_get_mem_data(bio_signature, &smime_text);
+
+    if( (err = IPC_TransferTo(call_handle, signed_email.desc_num, 
+			  (unsigned int) signed_email.data, smime_text, len+1)) != 0 ) {
+      printf("%s:%d could not transfer signed email result (%d)\n", __FUNCTION__, __LINE__, err);
+      return -SFAS_ACCESSERROR;
+    }
+
+    BIO_free(bio_body);
+    BIO_free(bio_signature);
+
+    printf("signed message of %d bytes\n", email_body.len);
+    return 0;
+  }
+
+  interface lf_generate { OID_NONE; } lf_check { 1; }
+  int GetNonce(int ignored) {
+    return ++next_nonce;
+  }
+
+  interface lf_generate { OID_NONE; } lf_check { 1; }
+  int GetNumLinesRequired(int ignored) {
+    return require_numlines;
+  }
+
+  interface lf_generate { OID_NONE; } lf_check { 1; }
+  int GetName(int ignored) {
+    return IPC_GetMyIPD_ID();
+  }
+
+}

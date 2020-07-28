@@ -1,0 +1,50 @@
+syscall KTCPMgr {
+	decls {
+		includefiles { "\"a.h\"" }
+	}
+
+	// constructors
+	callee {
+		a;
+	}
+	caller {
+		b;
+	}
+
+
+	// destructors
+	~callee {
+		c;
+	}
+	~caller {
+		d;
+	}
+
+  interface
+  	int *foo(int x, bool y, char z, int *px, int *py) {
+	char *str = "in foo";
+  }
+  interface
+  	int foo1(VarLen v, int *py, enum Etest ez, output struct Stest * ea, output Itest * ia) {
+	char *str = "in foo1";
+  }
+  interface
+  	struct blah foo2(VarLen v, int *py, enum Etest ez, output struct Stest * ea, output Itest * ia) {
+	char *str = "in foo1";
+  }
+  decls {
+	  includefiles { "<b.h>" }
+  }
+
+  decls callee {
+	  includefiles { "<callee.h>" }
+	  void Callee(void);
+	  void Callee(void);
+  }
+  decls caller {
+	  includefiles { "<caller.h>" }
+	  void Caller(void);
+	  void Caller(void);
+  }
+}
+

@@ -1,0 +1,44 @@
+
+odf_view(odf) --> will view an odf if a certain policy is met
+ guard: P(T) = dispatch says okay(T)
+ how:
+    OO calls to nexus, asks to evaluate P(T)
+ or:
+    OO looks for existing signature (hack proxy for evaluation from above)
+ or:
+  change policy:
+  P(T) = OO says okay(T)
+  call into OO itself, it will say okay if convinced that it is signed
+
+
+
+odf_sign(odf) --> will sign an odf document if a certain policy is met
+  guard: P(T) = dispatch says okay(T)
+  how:
+   calls into guard
+    guard checks statement from dispatch, returns 1
+   signs odf document
+   returns signature
+  problem: the odf signature no longer means anything in the logic
+
+
+better approach:
+
+partial_eval(P(T)) --> gather evidence for P(T) and return it
+  no guard
+
+odf_partial_eval(T) --> same, but hides results in ODF document
+  no guard
+  decide on P(T) = dispatch says F(T)
+  partial_eval(P(T))
+  if enough evidence, then say F(T)
+  hack: hidden evidence is not a signed formula, but an ODF signature
+
+odf_view(T) --> will view if a certain policy is met
+ guard: P(T) = OO says okay(T)
+ and we have OO says OPE speaksfor OO
+ so we just look for OPE saying something
+ hack: (we use an ODF signature to mean that OPE said a particular thing)
+
+
+

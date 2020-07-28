@@ -1,0 +1,46 @@
+service TCPMgr {
+	includefiles { "\"a.h\"" }
+
+	// constructors
+	callee {
+		a;
+	}
+	caller {
+		b;
+	}
+
+
+	// destructors
+	~callee {
+		c;
+	}
+	~caller {
+		d;
+	}
+
+  secure_channel bar {
+    int a(int x) {
+	    char *str = "in a";
+    }
+    interface lf_generate { } lf_check { /* pass in lf_oid, labelBuf, labelLen */ }
+    	int baz(int x) {
+	    char *str = "in baz";
+    }
+    secure_channel qux {
+      interface lf_generate { } lf_check { }
+      	int q1(int x) {
+	    char *str = "in q1";
+      }
+    }
+  }
+  interface lf_generate { } lf_check { }
+  	int foo(int x, bool y, char z, int *px, int *py) {
+	char *str = "in foo";
+  }
+  interface lf_generate { } lf_check { }
+  	int foo1(VarLen v, int *py, enum Etest ez, struct Stest * ea, Itest * ia) {
+	char *str = "in foo1";
+  }
+  includefiles { "<b.h>" }
+}
+

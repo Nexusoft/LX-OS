@@ -1,0 +1,225 @@
+diff -Nur netcat-openbsd_1.89.orig-orig/Makefile netcat-openbsd_1.89.orig/Makefile
+--- netcat-openbsd_1.89.orig-orig/Makefile	2001-09-02 18:45:41.000000000 +0000
++++ netcat-openbsd_1.89.orig/Makefile	2009-11-17 16:16:23.000000000 +0000
+@@ -1,6 +1,48 @@
+-#	$OpenBSD: Makefile,v 1.6 2001/09/02 18:45:41 jakob Exp $
++# netcat Makefile for Nexus
++#
++# this is mainly a posix port, but we replace system headers with 
++# our crosscompiled uclibc
+ 
+-PROG=	nc
+-SRCS=	netcat.c atomicio.c socks.c
++.PHONY: all clean distclean
++
++CC		:= gcc
++GCC_MAJOR       := $(shell gcc -dumpversion | cut -d'.' -f1)
++GCC_MINOR       := $(shell gcc -dumpversion | cut -d'.' -f2)
++GCC_HOME	:= /usr/lib/gcc/$(shell gcc -dumpmachine)/$(shell gcc -dumpversion)
++USER_HOME	:= ../../..
++CFLAGS		:= -O2 -Wall -fno-stack-protector
++LDFLAGS		:= -static -nostdlib -Bstatic -e compatmain
++
++LIBS		:= $(USER_HOME)/lib/libnexus.a \
++		   $(USER_HOME)/lib/libnexus-sys.a \
++		   $(USER_HOME)/lib/libnexus-sec.a \
++		   $(USER_HOME)/lib/libcrypto.a \
++		   $(USER_HOME)/lib/liblwip.a \
++		   $(USER_HOME)/lib/libc.a \
++		   $(USER_HOME)/lib/crti.o\
++		   $(USER_HOME)/lib/crt1.o \
++		   $(USER_HOME)/lib/crtn.o \
++	   	   $(GCC_HOME)/libgcc.a
++
++INCS		:= -nostdinc -I ./src/include \
++		   -I $(USER_HOME)/../common/include \
++		   -I $(USER_HOME)/include \
++		   -isystem $(GCC_HOME)/include \
++		   -isystem $(GCC_HOME)/include-fixed
++
++OBJS		:= netcat.o atomicio.o 
++
++%.o: %.c 
++	$(CC) -c -o $@ $(CFLAGS) $(INCS) $+ 
++
++all: nc
++
++nc: $(OBJS) $(LIBS)
++	$(LD) $(LDFLAGS) -o $@ $+
++
++clean:
++	@-rm -f *.o
++
++distclean: clean
++	@-rm nc
+ 
+-.include <bsd.prog.mk>
+Binary files netcat-openbsd_1.89.orig-orig/.Makefile.swp and netcat-openbsd_1.89.orig/.Makefile.swp differ
+diff -Nur netcat-openbsd_1.89.orig-orig/netcat.c netcat-openbsd_1.89.orig/netcat.c
+--- netcat-openbsd_1.89.orig-orig/netcat.c	2007-02-20 14:11:17.000000000 +0000
++++ netcat-openbsd_1.89.orig/netcat.c	2009-11-17 16:19:19.000000000 +0000
+@@ -42,7 +42,6 @@
+ #include <netinet/ip.h>
+ #include <arpa/telnet.h>
+ 
+-#include <err.h>
+ #include <errno.h>
+ #include <netdb.h>
+ #include <poll.h>
+@@ -63,6 +62,10 @@
+ #define PORT_MAX	65535
+ #define PORT_MAX_LEN	6
+ 
++#define err(exitcode, format, ...)	do { printf(format); exit(exitcode); } while (0)
++#define errx err
++#define warn(format, ...) printf(format)
++
+ /* Command Line Options */
+ int	dflag;					/* detached, no stdin */
+ unsigned int iflag;				/* Interval Flag */
+@@ -93,8 +96,11 @@
+ int	local_listen(char *, char *, struct addrinfo);
+ void	readwrite(int);
+ int	remote_connect(const char *, const char *, struct addrinfo);
++// Nexus: disable socks support
++#if 0
+ int	socks_connect(const char *, const char *, struct addrinfo,
+ 	    const char *, const char *, struct addrinfo, int, const char *);
++#endif
+ int	udptest(int);
+ int	unix_connect(char *);
+ int	unix_listen(char *);
+@@ -151,7 +157,7 @@
+ 			help();
+ 			break;
+ 		case 'i':
+-			iflag = strtonum(optarg, 0, UINT_MAX, &errstr);
++			iflag = strtol(optarg, NULL, 10);
+ 			if (errstr)
+ 				errx(1, "interval %s: %s", errstr, optarg);
+ 			break;
+@@ -189,7 +195,7 @@
+ 			vflag = 1;
+ 			break;
+ 		case 'w':
+-			timeout = strtonum(optarg, 0, INT_MAX / 1000, &errstr);
++			timeout = strtol(optarg, NULL, 10);
+ 			if (errstr)
+ 				errx(1, "timeout %s: %s", errstr, optarg);
+ 			timeout *= 1000;
+@@ -353,11 +359,14 @@
+ 			if (s)
+ 				close(s);
+ 
++// Nexus: disable socks support
++#if 0
+ 			if (xflag)
+ 				s = socks_connect(host, portlist[i], hints,
+ 				    proxyhost, proxyport, proxyhints, socksv,
+ 				    Pflag);
+ 			else
++#endif
+ 				s = remote_connect(host, portlist[i], hints);
+ 
+ 			if (s < 0)
+@@ -414,7 +423,7 @@
+ 	memset(&sun, 0, sizeof(struct sockaddr_un));
+ 	sun.sun_family = AF_UNIX;
+ 
+-	if (strlcpy(sun.sun_path, path, sizeof(sun.sun_path)) >=
++	if (strncpy(sun.sun_path, path, sizeof(sun.sun_path)) >=
+ 	    sizeof(sun.sun_path)) {
+ 		close(s);
+ 		errno = ENAMETOOLONG;
+@@ -445,7 +454,7 @@
+ 	memset(&sun, 0, sizeof(struct sockaddr_un));
+ 	sun.sun_family = AF_UNIX;
+ 
+-	if (strlcpy(sun.sun_path, path, sizeof(sun.sun_path)) >=
++	if (strncpy(sun.sun_path, path, sizeof(sun.sun_path)) >=
+ 	    sizeof(sun.sun_path)) {
+ 		close(s);
+ 		errno = ENAMETOOLONG;
+@@ -550,7 +559,7 @@
+ 		    res0->ai_protocol)) < 0)
+ 			continue;
+ 
+-		ret = setsockopt(s, SOL_SOCKET, SO_REUSEPORT, &x, sizeof(x));
++		ret = setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &x, sizeof(x));
+ 		if (ret == -1)
+ 			err(1, NULL);
+ 
+@@ -691,10 +700,10 @@
+ 		n++;
+ 
+ 		/* Make sure the ports are in order: lowest->highest. */
+-		hi = strtonum(n, 1, PORT_MAX, &errstr);
++		hi = strtol(n, NULL, 10);
+ 		if (errstr)
+ 			errx(1, "port number %s: %s", errstr, n);
+-		lo = strtonum(p, 1, PORT_MAX, &errstr);
++		lo = strtol(p, NULL, 10);
+ 		if (errstr)
+ 			errx(1, "port number %s: %s", errstr, p);
+ 
+@@ -718,15 +727,16 @@
+ 			int y;
+ 			char *c;
+ 
++			srand(lo);
+ 			for (x = 0; x <= (hi - lo); x++) {
+-				y = (arc4random() & 0xFFFF) % (hi - lo);
++				y = (rand() & 0xFFFF) % (hi - lo);
+ 				c = portlist[x];
+ 				portlist[x] = portlist[y];
+ 				portlist[y] = c;
+ 			}
+ 		}
+ 	} else {
+-		hi = strtonum(p, 1, PORT_MAX, &errstr);
++		hi = strtol(p, NULL, 10);
+ 		if (errstr)
+ 			errx(1, "port number %s: %s", errstr, p);
+ 		portlist[0] = calloc(1, PORT_MAX_LEN);
+@@ -772,8 +782,10 @@
+ 			err(1, NULL);
+ 	}
+ 	if (jflag) {
++#if 0
+ 		if (setsockopt(s, SOL_SOCKET, SO_JUMBO,
+ 			&x, sizeof(x)) == -1)
++#endif
+ 			err(1, NULL);
+ 	}
+ 	if (Tflag != -1) {
+diff -Nur netcat-openbsd_1.89.orig-orig/socks.c netcat-openbsd_1.89.orig/socks.c
+--- netcat-openbsd_1.89.orig-orig/socks.c	2006-09-25 04:51:20.000000000 +0000
++++ netcat-openbsd_1.89.orig/socks.c	2009-11-17 16:08:54.000000000 +0000
+@@ -38,7 +38,7 @@
+ #include <string.h>
+ #include <unistd.h>
+ #include <resolv.h>
+-#include <readpassphrase.h>
++//#include <readpassphrase.h>
+ #include "atomicio.h"
+ 
+ #define SOCKS_PORT	"1080"
+@@ -112,6 +112,7 @@
+ static const char *
+ getproxypass(const char *proxyuser, const char *proxyhost)
+ {
++#if 0
+ 	char prompt[512];
+ 	static char pw[256];
+ 
+@@ -120,6 +121,10 @@
+ 	if (readpassphrase(prompt, pw, sizeof(pw), RPP_REQUIRE_TTY) == NULL)
+ 		errx(1, "Unable to read proxy passphrase");
+ 	return (pw);
++#else
++	printf("%s unimplemented\n");
++	return NULL;
++#endif
+ }
+ 
+ int

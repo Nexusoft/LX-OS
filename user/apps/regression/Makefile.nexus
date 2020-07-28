@@ -1,0 +1,167 @@
+
+TARGET := $(d)/syscall-tests
+OBJS := $(d)/syscall-tests.o# compat/socketcompat.o
+include Makefile.app
+
+TARGET := $(d)/filewrite
+OBJS := $(d)/filewrite.o
+CFLAGS_$(d)/filewrite.o := -Werror
+include Makefile.app
+
+TARGET := $(d)/fileread
+OBJS := $(d)/fileread.o
+CFLAGS_$(d)/fileread.o := -Werror
+include Makefile.app
+
+TARGET := $(d)/wpssregression
+OBJS := $(d)/wpssregression.o $(p)/wpss/libwpss.o
+LIBS_$(d)/wpssregression := lib/libm.a
+CFLAGS_$(d)/wpssregression.o := -Werror
+CFLAGS_$(p)/wpss/libwpss.o := -Werror
+include Makefile.app
+#include Makefile.app_efence
+#include Makefile.app
+
+TARGET := $(d)/sleeptest
+OBJS := $(d)/sleeptest.o
+CFLAGS_$(d)/sleeptest.o := -Werror
+include Makefile.app
+
+TARGET := $(d)/tst-loop
+OBJS := $(d)/tst-loop.o
+CFLAGS_$(d)/tst-loop.o := -Werror
+include Makefile.app
+
+TARGET := $(d)/ls_enum_test
+OBJS := $(d)/ls_enum_test.o
+CFLAGS_$(d)/ls_enum_test.o := -Werror
+include Makefile.app
+
+TARGET := $(d)/labeltest
+OBJS := $(d)/labeltest.o
+include Makefile.app
+
+TARGET := $(d)/gpf_vs_pf
+OBJS := $(d)/gpf_vs_pf.o
+CFLAGS_$(d)/gpf_vs_pf.o := -Werror
+include Makefile.app
+
+TARGET := $(d)/efencetester
+OBJS := $(d)/efencetester.o
+CFLAGS_$(d)/efencetester.o := -Werror
+include Makefile.app_efence
+#include Makefile.app
+
+TARGET := $(d)/tst-malloc
+OBJS := $(d)/tst-malloc.o
+CFLAGS_$(d)/tst-malloc.o := -Werror
+include Makefile.app
+
+TARGET := $(d)/tst-mallocstate
+OBJS := $(d)/tst-mallocstate.o
+include Makefile.app
+
+TARGET := $(d)/encblockstest
+OBJS := $(d)/encblockstest.o $(p)/wpss/encblocks.o #compat/aes.o
+CFLAGS_$(d)/encblockstest.o := -Werror
+CFLAGS_$(p)/wpss/encblocks.o := -Werror
+include Makefile.app
+
+TARGET := $(d)/cryptotest
+OBJS := $(d)/cryptotest.o #compat/aes.o 
+CFLAGS_$(d)/cryptotest.o := -Werror
+include Makefile.app
+
+TARGET := $(d)/tpmstructtest
+OBJS := $(d)/tpmstructtest.o #compat/aes.o 
+CFLAGS_$(d)/tpmstructtest.o := -Werror
+include Makefile.app
+
+TARGET := $(d)/fputs
+OBJS := $(d)/fputs.o 
+CFLAGS_$(d)/fputs.o := -Werror
+include Makefile.app
+
+TARGET := $(d)/hashtree 
+OBJS := $(d)/httest.o $(p)/wpss/hashtree.o $(p)/wpss/blocksize.o 
+LIBS_$(d)/hashtree := lib/libm.a
+CFLAGS_$(d)/httest.o := -Werror
+CFLAGS_$(p)/wpss/hashtree.o := -Werror
+CFLAGS_$(p)/wpss/blocksize.o := -Werror
+include Makefile.app
+
+TARGET := $(d)/filerw
+OBJS := $(d)/filerw.o
+CFLAGS_$(d)/filerw.o := -Werror
+include Makefile.app
+
+TARGET := $(d)/framebuf
+OBJS := $(d)/framebuf.o
+include Makefile.app
+
+TARGET := $(d)/mouse
+OBJS := $(d)/mouse.o
+CFLAGS_$(d)/mouse.o := -Werror
+include Makefile.app
+
+TARGET := $(d)/tst-fpuswitch
+OBJS := $(d)/tst-fpuswitch.o
+include Makefile.app
+
+TARGET := $(d)/tst-peekpoke
+OBJS := $(d)/tst-peekpoke.o
+include Makefile.app
+
+TARGET := $(d)/vkeytest
+OBJS := $(d)/vkeytest.o
+#CFLAGS_$(d)/vkeytest.o := -Werror
+include Makefile.app
+
+TARGET := $(d)/tst-malloc_checker
+OBJS := $(d)/tst-malloc_checker.o
+include Makefile.app
+
+TARGET := $(d)/tst-async
+OBJS := $(d)/tst-async.o
+CFLAGS_$(d)/tst-async.o := -Werror
+include Makefile.app
+
+TARGET := $(d)/tst-sync
+OBJS := $(d)/tst-sync.o $(d)/Sync.server.o $(d)/Sync.client.o
+CFLAGS_$(d)/tst-sync.o := -Werror
+include Makefile.app
+
+TARGET := $(d)/tst-tap
+OBJS := $(d)/tst-tap.o $(d)/TapNotification_RejectAll.server.o
+CFLAGS_$(d)/tst-tap.o := -Werror
+include Makefile.app 
+
+TARGET := $(d)/tst-pnic
+$(TARGET): drivers/compat/skbuff.o  compat/netcomp-components.o 
+OBJS := $(d)/tst-pnic.o 
+include Makefile.app 
+
+TARGET := $(d)/tst-pipe
+OBJS := $(d)/tst-pipe.o 
+include Makefile.app 
+
+TARGET := $(d)/tst-condvar
+OBJS := $(d)/tst-condvar.o 
+include Makefile.app 
+
+TARGET := $(d)/tst-tcp
+OBJS := $(d)/tst-tcp.o 
+include Makefile.app 
+
+TARGET := $(d)/tst-sched
+OBJS := $(d)/tst-sched.o
+include Makefile.app 
+
+TARGET := $(d)/tst-labelstore
+OBJS := $(d)/tst-labelstore.o
+include Makefile.app 
+
+TARGET := $(d)/tst-env
+OBJS := $(d)/tst-env.o
+include Makefile.app 
+

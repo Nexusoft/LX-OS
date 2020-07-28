@@ -1,0 +1,6 @@
+node=/nq-linux/user/apps/netquery/bgp-conf/node1
+NAME="node1"
+
+. /local/ashieh/nq-linux/user/apps/netquery/bgp-conf/start-common
+
+tail /tmp/zebra.log

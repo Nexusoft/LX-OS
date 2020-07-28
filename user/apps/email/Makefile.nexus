@@ -1,0 +1,17 @@
+CFLAGS_$(d) := -Werror
+
+TARGET := $(d)/email
+OBJS := $(p)/spamfree/SpamFreeAttestationService.client.o $(d)/email.o compat/Profile.user.o \
+	$(d)/Keyboard_CounterRM.client.o 
+include Makefile.app
+
+TARGET := $(d)/keyboardrm
+OBJS := $(d)/keyboardrm.o $(d)/Keyboard_Counter.interpose.o \
+	$(d)/Keyboard_CounterRM.server.o $(d)/InterposeEventDriver.server.o
+HASHTARGET := $(d)/keyboardrm
+include Makefile.refmon
+
+TARGET := $(d)/signedformtest-linux
+OBJS := $(d)/test.o
+include Makefile.app_linux_tpm
+

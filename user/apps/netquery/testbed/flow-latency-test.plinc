@@ -1,0 +1,53 @@
+#!/usr/bin/perl -w
+
+use File::Temp qw/ :mktemp /;
+
+# Save PR
+$nq_server_opts = "-r";
+
+my $do_capture = "DO_CAPTURE=1 ";
+my $analyze = "";
+
+$do_capture = "";
+if(1) {
+  $analyze .= "-a ";
+}
+$analyze .= "-s ";
+
+push @post_setup, sub {
+  my $DATA_DIR = "data/flow-latency/";
+
+  system("mkdir -p $DATA_DIR/tmp");
+
+  print "Sleeping\n";
+  sleep(10);
+
+  print "Crawl\n";
+  print "Args: " . "$first_nq_server_ip_external, ../site-crawl $first_nq_server_ip $FIRST_NQ_SERVER_PORT 0" . "\n";
+  start_one($first_nq_server_ip_external, "../site-crawl $first_nq_server_ip $FIRST_NQ_SERVER_PORT 0");
+
+  print "Starting client process\n";
+  my $env_opts ="";
+  $env_opts ="ANALYZE=\\\"$analyze\\\" $do_capture NUM_THREADS=1 FLOWS_EACH=5000";
+
+  my @clients = grep { is_nqclientid($_->[0])  } @machines;
+  if (@clients > 1) {
+    print "Warning: Too many clients specified\n";
+  }
+  my $client_ip = $clients[0]->[1];
+
+  start_one($client_ip, "$env_opts ./start-clients.sh");
+
+  my $tempdir = mkdtemp("$DATA_DIR/tmp/data-XXXX");
+  # Collect the data
+  system("scp -r root\@$client_ip:/tmp/flow-last $tempdir");
+  open(OF, ">$tempdir/flow-last/envopts");
+  print OF "Environment options: $env_opts\n";
+  close(OF);
+  my $test_time = `cat $tempdir/flow-last/timestamp`;
+  chomp($test_time);
+  print "Got test time $test_time\n";
+  system("mv $tempdir/flow-last $DATA_DIR/$test_time");
+  system("rm $DATA_DIR/last ; ln -s $test_time $DATA_DIR/last");
+};
+1;

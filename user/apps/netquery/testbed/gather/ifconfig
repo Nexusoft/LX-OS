@@ -1,0 +1,3 @@
+pssh -l root -h hosts -o ifconfig-out hostname \; ifconfig
+cat ifconfig-out/*
+

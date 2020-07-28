@@ -1,0 +1,127 @@
+service Jukebox {
+  __implements__ { "../../../common/services/FS.svc" }
+
+  decls {
+    includefiles { "<stdio.h>" }
+    includefiles { "<stdlib.h>" }
+    includefiles { "<string.h>" }
+    includefiles { "<unistd.h>" }
+    includefiles { "<nexus/IPC.interface.h>" }
+    includefiles { "<nexus/fs.h>" }
+    includefiles { "<nexus/NS.interface.h>" }
+    includefiles { "<nexus/FS.interface.h>" }
+
+    struct NS_SimpleRegisterCtx *registerCtx;
+    extern char *Custom_Jukebox_svc_name;
+  }
+
+  decls __callee__ {
+    includefiles { "jukebox.h" }
+    struct silly {
+#define LOCAL_DEBUG_LEVEL DEBUG_LEVEL_INFO
+    };
+    includefiles { "<nexus/debug.h>" }
+    char *Custom_Jukebox_svc_name;
+  }
+
+  __callee__ {
+    if (Custom_Jukebox_svc_name) {
+      printf("Jukebox: about to register port %d as %s\n", Jukebox_server_port_num, Custom_Jukebox_svc_name);
+      IDL_REGISTER_STR(Jukebox, Custom_Jukebox_svc_name);
+      printf("Jukebox: registered port %d as %s\n", Jukebox_server_port_num, Custom_Jukebox_svc_name);
+    }
+  }
+
+  interface lf_generate { OID_NONE; } lf_check { 1; }
+  int Read(FSID target_node, int file_position, 
+	    __output__ struct VarLen dest, int count) {
+    printf("Read... "); 
+    int len = jukebox_read(ipd_id, call_handle, target_node, file_position, dest, count);
+    printf("done (ret = %d)\n", len);
+    return len;
+  }
+
+  // todo: call ReadDir on underlying file
+
+  interface lf_generate { OID_NONE; } lf_check { 1; }
+  FSID Lookup(FSID parent_node, __input__ struct VarLen node_name, int resolve_mounts) {
+    printf("Lookup...");
+    char name[MAX_FNAME_LEN];
+    if(node_name.len > MAX_FNAME_LEN || node_name.len <= 1) {
+      printf("name too long or too short (%d chars)... ", node_name.len);
+      printf("invalid\n");
+      return FSID_ERROR(FS_INVALID);
+    }
+    if(IPC_TransferFrom(call_handle, node_name.desc_num,
+			name, (unsigned) node_name.data, node_name.len) != 0) {
+      printf("access error\n");
+      return FSID_ERROR(FS_ACCESSERROR);
+    }
+    name[node_name.len - 1] = '\0';
+    printf(" (name = %s) ", name);
+    FSID ret = jukebox_lookup(parent_node, name, resolve_mounts);
+    if (!FSID_isValid(ret)) printf(" lookup error\n");
+    else printf(" lookup done\n");
+    return ret;
+  }
+
+  interface lf_generate { OID_NONE; } lf_check { 1; }
+  int Pin(FSID target_node) {
+    return 0;
+  }
+
+  interface lf_generate { OID_NONE; } lf_check { 1; }
+  int Unpin(FSID target_node) {
+    return 0;
+  }
+
+  interface lf_generate { OID_NONE; } lf_check { 1; }
+  FSID Create(FSID parent_node, 
+	    __input__ struct VarLen node_name, int nodeType) {
+    return FSID_ERROR(FS_UNSUPPORTED);
+  }
+
+  interface lf_generate { OID_NONE; } lf_check { 1; }
+  struct ReadDirCont_and_Rcode ReadDir(FSID target_node,
+	    __output__ struct VarLen dest, struct ReadDirCont readdir_cont) {
+    return ReadDirCont_and_Rcode_ERROR(FS_UNSUPPORTED);
+  }
+
+  interface lf_generate { OID_NONE; } lf_check { 1; }
+  int Write(FSID target_node, int file_position,
+	     __input__ struct VarLen source, int count) {
+    return -FS_UNSUPPORTED;
+  }
+
+  interface lf_generate { OID_NONE; } lf_check { 1; }
+  int Truncate(FSID target_node, int target_len) {
+    return -FS_UNSUPPORTED;
+  }
+
+  interface lf_generate { OID_NONE; } lf_check { 1; }
+  int Sync(FSID target_node) {
+    return -FS_UNSUPPORTED;
+  }
+
+  // should be generalized to stat() eventually
+  interface lf_generate { OID_NONE; } lf_check { 1; }
+  int Size(FSID target_node) {
+    return -FS_UNSUPPORTED;
+  }
+
+  interface lf_generate { OID_NONE; } lf_check { 1; }
+  int Unlink(FSID parent_node, FSID child_node) {
+    return -FS_UNSUPPORTED;
+  }
+
+  interface lf_generate { OID_NONE; } lf_check { 1; }
+  FSID Mount(FSID target_node, FSID mount_node) {
+    return FSID_ERROR(FS_UNSUPPORTED);
+  }
+
+  interface lf_generate { OID_NONE; } lf_check { 1; }
+  int Unmount(FSID target_node) {
+    return -FS_UNSUPPORTED;
+  }
+
+}

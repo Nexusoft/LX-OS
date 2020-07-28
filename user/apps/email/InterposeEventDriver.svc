@@ -1,0 +1,88 @@
+service InterposeEventDriver {
+  decls {
+    includefiles { "<op_types.h>" }
+    includefiles { "<nexus/ipc.h>" }
+    includefiles { "<nexus/transfer.h>" }
+    includefiles { "<nexus/interpose.h>" }
+
+    struct CallInfo {
+      struct IEvent_Info event_info;
+      struct IEvent_Call_Info call_info;
+    };
+  }
+
+  decls __callee__ {
+    includefiles { "<stdlib.h>" }
+    includefiles { "<string.h>" }
+    includefiles { "\"keyboardrm.h\"" }
+    includefiles { "Keyboard_Counter.interpose.h" }
+
+    struct HashTable *call_table; // EventID => CallInfo (copy)
+    Sema call_table_mutex = SEMA_MUTEX_INIT;
+    
+    StringBuffer *all_input;
+    Sema all_input_mutex = SEMA_MUTEX_INIT;
+
+    int isKeyboardChannel(Port_Num port_num) {
+      return (port_num == SYSCALL_IPCPORT_Console);
+    }
+  }
+
+  __callee__ {
+    call_table = hash_new(16, sizeof(IEventID));
+    all_input = StringBuffer_new(1024);
+  }
+
+  interface __NoGenReturn__ lf_generate { OID_NONE; } lf_check { 1; }
+  int IEvent_Call(struct IEvent_Info event_info, struct IEvent_Call_Info call_info, 
+		__input__ struct VarLen message) {
+    printf("got a call");
+    printf(", port = %d\n", call_info.port_num);
+    if (isKeyboardChannel(call_info.port_num))
+      Keyboard_Counter_processCall(ipd_id, call_handle, SERVERPROCESSOR_SYNC,
+				   &event_info, &call_info, message);
+    else
+      IPC_Interposition_CallPassThrough(call_handle, &call_info);
+    return 0;
+  }
+
+  interface __NoGenReturn__ lf_generate { OID_NONE; } lf_check { 1; }
+  int IEvent_Transfer(struct IEvent_Info event_info, struct IEvent_Transfer_Info transfer_info, __input__ struct VarLen data) {
+    printf("got a transfer");
+    printf(", len = %d\n", transfer_info.len);
+
+    P(&call_table_mutex);
+    // printf("lookup parent = %llu\n", event_info.parent_id);
+    struct CallInfo *call_info = hash_findItem(call_table, &event_info.parent_id);
+    if(call_info == NULL) {
+      // printf("could not find %d in call table\n", event_info.parent_id);
+      V_nexus(&call_table_mutex);
+    } else {
+      /* printf("found existing call (id=%d, port_num=%d)!\n", 
+	 event_info.parent_id, call_info->call_info.port_num); */
+      hash_delete(call_table, &event_info.parent_id);
+      V_nexus(&call_table_mutex);
+
+      if (isKeyboardChannel(call_info->call_info.port_num)) {
+	// printf("keyboard channel transfer, copy some of the info!\n");
+	if(transfer_info.direction == ToCaller) {
+	  int len = transfer_info.len;
+	  char *rbuf = malloc(len + 1);
+	  IPC_TransferFrom(call_handle, data.desc_num, rbuf,
+			   (unsigned int)data.data, data.len);
+	  rbuf[len] = '\0';
+	  P(&all_input_mutex);
+	  SB_cat(all_input, rbuf);
+	  V_nexus(&all_input_mutex);
+	  free(rbuf);
+	} else {
+	  printf("unexpected transfer direction: %d\n", transfer_info.direction);
+	}
+      }
+    }
+
+    IPC_Interposition_TransferPassThrough(call_handle);
+    if(call_info != NULL) free(call_info);
+    return 0;
+  }
+}

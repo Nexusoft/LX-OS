@@ -1,0 +1,111 @@
+Code Organization
+
+Support Code
+
+* NexusSync - C++ wrapper around Nexus' semaphore implementation.
+
+* OptionList - A set of utilities meant to assist in the generation of configuration file parsers.  Authors specify a set of commands by declaring them and their parameters in a setup phase.  When the parser is run, it breaks each line of the config file down and feeds all the specified parameters to the caller.  See core/nbgp-commands.o for examples of how this is used.
+
+* debug - Performance measurement utilities.  Scattered throughout the code are calls to debug_get_stateptr() and debug_start_timing()/_stop_timing().  Every start/stop pair takes two arguments: A measurement name and an event counter.  Every name is assigned a counter when it's first used.  After leaving a start/stop block, the counter will be updated with the time spent in the block and the number of events encountered (in several instances, a block handles a variable number of events per invocation).
+
+* FileBuffer - IO buffer capable of reading from a file or a socket
+
+* OpenSSL_Compat - Utility functions for managing OpenSSL certificates and keys.
+
+* Reassemble - Patrick's sniffed TCP stream reassembler.
+
+* Runtime - An event library.  Though the implementation presents an event-driven interface, much of the underlying code is thread-based.  This is the unfortunate consequence of much missing functionality in the Nexus at the time the code was written.  The recent addition of poll should make this work, but this code works as is, so the effort involved in transitioning to poll is arguable.
+
+NBGP
+
+NBGP is composed of 3 layers: Protocol, Database, and Management.  The protocol layer is contained within bgp.c/bgp.h.  This layer is just about decoding bgp packets off the wire.  It's nothing too fancy, but it works.  You give it a stream, buffer, or vbuffer (encoded in the PIPE_TYPE datastructure), and the function bgp_read_packet() reads into the bgp_packet datastructure.  The one bit of wierdness here is that bgp_read_packet might need to allocate memory.  Malloc is slow, so the code is smart enough to re-use memory allocated by previous calls on the same bgp_packet (or realloc it if necessary).
+
+The database layer is a little more interesting.  Most of the logic described in the paper lives here, in the file bgpcheck.c/bgpcheck.h.  The structure of the class is a giant binary trie that catalogues advertisements received at each node.  A lot of work went into optimizing the hell out of this thing with respect to storage, so some of the code may be a little nonsensical at first glance.  Every node (BC_Database_Entry) represents a prefix and contains a list of advertisements that included the prefix.  Every advertisement (BC_Advertisement) represents the PATH_ATTRIBUTES field of a BGP message.  The two big things here are the AS_PATH and COMMUNITIES fields.  The former is the crux of the project, while the latter is probably the most interesting part of the policy management code.  Communities are an extension to BGP that detail AS-based routing preferences.  The presence of a community attribute implies that a policy exists on advertisements in this message.  The exact policy is determined by out of band agreement between peered ASes and is where our policy code comes in. 
+
+Advertisements are registered in the trie at all nodes that might have use for them.  Every node stores advertisements indexed by 2-keys: the source AS and the IP address of the router that sent the ad.  An advertisement is registered at a particular prefix if: 
+1) A BGP UPDATE message was received with the prefix in its NLRI (advertised route) field, and has not been subsequently explicitly or implicitly withdrawn (ie: by another advertisement from the same peer implicitly overriding it).
+2) A BGP UPDATE message was received with a more specific prefix in its Withdrawn Routes field, thus explicitly withdrawing *part of* the route in question.  In this case, all prefixes on the tree branches NOT taken by the withdrawn route will have the advertisement registered.  Note that this is ONLY the case if the advertisement is explicitly withdrawn.  Advertisements of subsets of an advertised prefix range may actually be re-advertised (behavior we've seen in the field, despite it being a no-no in the spec).  This doesn't harm anything, since shorter paths are implicitly preferred by the BGP decision process.  Also note that due to this behavior, the withdraw message only applies to the deepest prefix in the tree.
+
+The function lookup() serves to find all advertisements received that might be used to "back" an advertisement sent.  A backing advertisement is defined as an incoming ad that has an AS_PATH that is a strict subset of the outgoing advertisement's AS_PATH.  An advertisement is added to the ad set for an outgoing prefix in one of three cases: 
+1) A backing ad is registered at the prefix's node in the trie.
+2) A proof can be constructed out of sub-advertisements: ie: one or more underlying advertisements back every portion of the advertised prefix-space. (ie, the ad is a proper aggregation of sub-prefixes)
+3) Code exists that can be used to permit deaggregation as well; adding any ads that "back" a prefix range anywhere above the prefix's node in the trie.  This behavior is controlled by the DISALLLOW_DEAGGREGATION flag.  That said, this flag should probably be removed, along with all code that allows deaggregation.  Deaggregation is invariably evil, and should be disallowed (see YouTube+Pakistan).  It's there mainly for debugging purposes.
+
+The BC_Checker class contains most of the static analysis code.  There are three basic functions here: parse_incoming() inserts the contents of a bgp_packet into the checker's database.  load_packet() sets up an iterator for outgoing packets.  check_next_ad() iterates over every prefix in the outgoing packet's NLRI field, returning a nonzero error code if an error occurs (positive for policy violations, negative for spec violations).  There's also some policy code here.  Most of that's delegated to the file policy_specification.c, but this code integrates with the checker.  In short, a Policy_Specification is handed to bgpcheck.  If at a later point in time, a new policy is provided, the policy will not immediately switch over; there's no coordination between the router and the monitor.  Instead, the switchover happens as a result of one of two events: 1) a timeout passes, or 2) the router sends a message that does not obey the old policy.  In case 2, the router rechecks the message with the new policy before sending out a bwarning.  Note that old messages are not verified against policy.  Policy changes are only applied to new advertisements and withdrawals.
+
+The one other bit of functionality at the database layer is grassroots.c.  This guy's another trie, though it's meant to operate completely separately from the BC_DB code.  This is where most of the grassroots logic lives.  The key functionality here is validate_advertisers().  Given a routing 
+
+Finally, we have the Management layer.  Most of the code lives here, but it's almost all glue code.  
+* nbgp-dispatcher is sort the of meta-glue code.  It links all the components I'm describing in this paragraph together.  
+* nbgp-process includes several runtime handlers: Source_Handler, NBGP_Peer, and BGP_Interposition_Agent; 
+- The former reads from a stream generated by reassemble (or by something pretending to be reassemble) and distributes it to the BGP_Peers.  
+- BGP_Interposition_Agent interposes on a stream and feeds the the captured packets to a BGP_Peer.  
+- Each BGP_Peer represents one of the router's peers.  It instantiates a BC_Checker (which links itself to the main BGP Database), and maintains 2 stream buffers: one for ingoing and outgoing communications.  It decodes packets with the bgp parser, feeds them to the bgp checker, and alerts the dispatcher that a packet has been sent/received.  The dispatcher can react accordingly.  The grassroots check is done at this stage by the dispatcher.  
+* nbgp-overlay is fairly self explanatory.  Mostly just code for reading messages off the wire, and maintaining a global table of AS->IP/Socket mappings.  Everything not related to the overlay is sent to the dispatcher.  
+* nbgp-commands is the code that implements an optionlist config file parser for NBGP.  It initializes all the global variables, and sets them up according to the config file.
+* nbgp-policy is the code that implements a BGP checker policy specification.  It's a bit hairy at the moment.  There's code for a parser around somewhere, but I never got a chance to actually link it in.  Most of the test cases have had a policy generated entirely in code.
+* nbgp just calls into nbgp-commands to initialize everything, and feeds it the config script.
+
+Test code
+There are two general approaches to test cases: Self-test, and External Simulation.  Most of the real testing is done with the former, the latter is just proof of concept.  It's simpler to reset things if they run in a single process on the nexus box than if you're running 20 apps between the nexus box, the router, and any number of linux boxes.  It also allows for more automated testing.
+
+Most of the self-test code is contained in testsuite.cc  Most of that code is coordinated by the Test_Handler class and its subclass MRTStream.  It's basically a simulator that reads in a stream of BGP packets in MRT format, parses them out, and feeds them to the monitor (via simulated routers; see Fake_Router).  Just about any test should be runnable by creating the correct config file.
+
+The config file has a series of commands with parameters.  In general, it looks like
+monitor ip [monitored router's ip] as [monitored router's as]
+grassroots db /path/to/grassrootsdb save_every [interval]
+overlay ip [monitor's IP]
+peer ip [router peer ip] as [peer as] ol_ip [overlay IP] ol_port [overlay connected port]
+....
+peer ip [router peer ip] as [peer as] ol_ip [overlay IP] ol_port [overlay connected port]
+capture [capture parameters]
+
+Order matters, but it'll complain if you don't get them in the right order.  The field [capture parameters] varies depending on what sort of setup you want.  
+* sniffer
+Starts using pcap.  The ethernet driver must be put into promiscuous mode for this to work.
+* interpose
+Sets up interposition mode... this isn't quite fully implemented due to the lack of IP spoofing in the kernel.  It works with a single peer atm.
+* remote
+Prepares for "remote sniffer" mode.  In this mode, the monitor connects to a socket that pretends to generate the same messages that reassemble would.  See the apps below.
+* peer
+Testing mode where the monitor connects to a BGP stream and pretends to be the router it's monitoring.
+* file
+Like remote sniffer mode, except the data is read from a file
+* mrt
+Like file, except the file is assumed to be in MRT format rather than reassemble format
+* mrt_socket
+Like mrt, except the file is read from a server socket instead.
+
+Most of the routeviews traces are exported from zebra daemons.  The default export format is a BGP-like format called MRT.  It's sorta ugly, so I've implemented only enough of it to support the routeviews traces.  In addition, I've also got a handful of linux tools that can be used to assist in testing.  These may be built using `make linux`
+
+virtual_overlay
+A virtual "peer" for the nbgp overlay.  If one of the peers is given an ol_ip of the linux box running this, it will connect and feed it information.  This app is mainly here for debugging purposes.
+
+bgpdump
+The nbgp testing swiss army knife:
+bgpdump -d [dumpfile] [options] : Runs bgpdump with an MRT dump as an input file.  
+bgpdump -t [textfile] [options] : Runs bgpdump with a plaintext output file as an input file.  Most of the testing simulation generators use this format for output.
+bgpdump -b [showipbgpfile] [options] : Runs bgpdump on the output of "show ip bgp"  This mode is a little flaky, as it relies on tab widths that may vary across different BGP implementations.
+After selecting an input format, you need to select an output format
+bgpdump [input] -o [outputfile] : Split the input into a series of plaintext files and write them to the file [ip].src
+bgpdump [input] -u [outputfile] : Split the input into a series of plaintext files and write them to the file updates/[ip].src
+bgpdump [input] -n [IP] : Start serving a remote sniffer trace (ie, for use with NBGP's capture remote mode)
+bgpdump [input] -s [IP] : Pretend to be a BGP speaker operating with the specified IP address.  If no input file is specified, it defaults to '-t updates/[ip].src'
+Several output formats simply output statistics
+bgpdump [input] -v IP/n : Show all advertisements for the specified prefix.
+bgpdump [input] -i AS : Detect all peers with the following AS.
+
+burst
+Effectively bgpdump with the -d and -s options
+
+plutofilter
+Planetlab pluto feeds are effectively raw BGP, but they have extra header data mushed in there.  This connects to a planetlab feed, then starts up a BGP server.  Once a bgp speaker connects, this app will act as a relay, stripping off the headers first.
+
+grassroots
+A set of tools for manipulating grassroots data.  Specifically, grassroots -l [file] builds a grassroots database based on an input file of the format: [as] [prefix].  It builds a set of legitimate ownership delegations for all advertised prefixes.  Following that up with a -e [file] exports the grassroots database to a file that nbgp can read.
+
+mrt_optimize
+MRT is a metaformat containing a list of objects.  Of concern are two object types: router dump and bgp.  Of these two, the router dump format is rather stupid and inefficient.  BGP maps a set of attributes to a set of prefixes.  This is generally a one to many mapping, so it's most efficient for each message to contain a (large) attribute, and a number of (small) prefixes.  MRT router dump objects on the other hand, map each (large) attribute to a single (small) prefix.  This is horribly inefficient and very dissimilar from the behavior of a real BGP router.  This little app reads in an MRT file full of router dumps and outputs a second MRT file with bgp objects that conform to the more efficient bgp coding.
+
+Other notes:
+The NLR traces have been checked in at svn://glubglub/experiments/nbgptracedata

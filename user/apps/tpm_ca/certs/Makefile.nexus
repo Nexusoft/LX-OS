@@ -1,0 +1,4 @@
+
+TARGET := $(d)/certmaker
+OBJS := $(d)/certmaker.o # $(d)/tpmcerts.o # tpmcerts.o winds up in compat
+include Makefile.app

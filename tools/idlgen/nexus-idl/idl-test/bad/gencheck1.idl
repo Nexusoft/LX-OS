@@ -1,0 +1,27 @@
+syscall TCPMgr {
+	includefiles { "\"a.h\"" }
+
+	// constructors
+	callee {
+		a;
+	}
+	caller {
+		b;
+	}
+
+
+	// destructors
+	~callee {
+		c;
+	}
+	~caller {
+		d;
+	}
+
+  interface lf_generate { } lf_check { }
+  	int foo(int x, bool y, char z, int *px, int *py) {
+	char *str = "in foo";
+  }
+  includefiles { "<b.h>" }
+}
+

@@ -1,0 +1,164 @@
+BINARIES=switchd site-init site-crawl switch-enforcer netqueryd l2secd trigger-test  garbage-test flow-test netquery-lib.o trie-test obj-test nqsh nq-exporter net-take-ownership check-path microbench #fib-updater rocket-router2  
+
+INSTALLDIR=/nfs/linux
+
+all: tags $(BINARIES)
+
+install: $(BINARIES)
+	mkdir -p $(INSTALLDIR) 
+	cp $(BINARIES) $(INSTALLDIR)
+
+# update-test microbench
+
+oliver: netqueryd generic-bench distributed-trigger-test
+# netquery obj-test router rocket-router net-test trie-test 
+
+linux: all
+
+.PHONY: tags
+
+#PROFILE=-pg
+#OPT=-O1 -fno-strict-aliasing
+#OPT=-O2
+OPT=-O0
+#OPT=-O1 # valgrind -O level
+#OPT=-O3 -fno-inline # profiler level
+
+#GC_MALLOC=1
+ifdef GC_MALLOC
+GCLIBS =  -lgc -lgccpp
+GC_FLAGS=-DGC_PTHREADS
+else
+GC_FLAGS=-DNO_GC_MALLOC
+endif
+
+LDLIBS_SIMPLE = $(LDLIBRARYPATH) -lssl -lcrypto  $(PROFILE) $(GCLIBS)  # -lpthread
+LDLIBS = $(LDLIBS_SIMPLE) -lboost_regex -lboost_iostreams
+FLAGS += -Werror -ggdb3 $(OPT) -I./include $(INCLUDEPATH) $(GC_FLAGS) $(PROFILE) -I../../../common/include -D__LINUX__ -DEVENTXX_NO_EVENT_BASE_FREE -pthread -D_XOPEN_SOURCE=600 -D_BSD_SOURCE -D_GNU_SOURCE  $(PROFILE)  -Wall
+CFLAGS = $(FLAGS)
+CXXFLAGS = $(FLAGS)
+
+#OVERRIDE=-build
+
+include Makefile.common
+
+lib: $(NQ_CLIENTLIB_OBJ) # no output; this target is intended for use during development to force just the library to build, thus cleaning up output
+
+router: $(NQ_CLIENTLIB_OBJ) $(ROUTER_OBJ)
+	g++ $(LDLIBS) $(CFLAGS) $^ -o $@ 
+
+flow-test: $(NQ_CLIENTLIB_OBJ) $(FLOW_OBJ)
+	g++ $(LDLIBS) $(CFLAGS) $^ -o $@ 
+
+obj-test: $(NQ_CLIENTLIB_OBJ) $(OBJTEST_CC:.cc=.o)
+	g++ $(LDLIBS) $(CFLAGS) $^ -o $@  #-lefence
+
+update-test: $(NQ_CLIENTLIB_OBJ) $(UPDATE_TEST_OBJ)
+	g++ $(LDLIBS_SIMPLE) $(CFLAGS) $^ -o $@
+
+microbench$(OVERRIDE): $(NQ_CLIENTLIB_OBJ) $(MICROBENCH_OBJ)
+	g++ $(LDLIBS_SIMPLE) $(CFLAGS) $^ -o $@
+
+netquery: $(NQ_TEST_OBJ)
+	g++ $(LDLIBS) $(CFLAGS) $^ -o $@
+
+netqueryd$(OVERRIDE): $(NQ_DAEMON_OBJ)
+	g++ $(LDLIBS) $(CFLAGS) $^ -o $@
+
+rocket-router: $(ROCKET_OBJ)
+	g++ $(LDLIBS) $(CFLAGS) $^ -o $@ 
+
+rocket-router2: $(ROCKET_OBJ2)
+	g++ $(LDLIBS) $(CFLAGS) $^ -o $@ 
+
+fib-updater: $(FIB_UPDATE_OBJ)
+	g++ $(LDLIBS) $(CFLAGS) $^ -o $@ 
+
+net-test: $(NETTEST_OBJ)
+	g++ $(LDLIBS) $(CFLAGS) $^ -o $@ 
+
+switchd: $(SWITCHD_OBJ) $(SWITCH_COMMON_OBJ) $(NQ_CLIENTLIB_OBJ)
+	g++ $(LDLIBS) -levent $(CFLAGS) $^ -o $@  #-lefence
+
+switch-enforcer: $(SWITCH_ENFORCER_OBJ) $(SWITCH_COMMON_OBJ) $(NQ_CLIENTLIB_OBJ)
+	g++ $(LDLIBS) -levent $(CFLAGS) $^ -o $@ 
+
+#old-trie-test: client/trie.c include/nq/trie.h
+#	gcc $(LDLIBS) $(CFLAGS) -DUSE_TRIE_TEST_MAIN client/trie.c -o $@ 
+
+trie-test: client/fib_trie.c
+	gcc $(CFLAGS) -DUSE_TRIE_TEST_MAIN client/fib_trie.c -o $@ #-lefence
+
+l2secd: $(L2SECD_OBJ) $(NQ_CLIENTLIB_OBJ)
+	g++ $(LDLIBS) -levent $(CFLAGS) $^ -o $@ 
+
+site-init: $(SITE_INIT_OBJ) $(NQ_CLIENTLIB_OBJ)
+	g++ $(LDLIBS) $(CFLAGS) $^ -o $@ 
+
+site-crawl: $(SITE_CRAWL_OBJ) $(NQ_CLIENTLIB_OBJ)
+	g++ $(LDLIBS) $(CFLAGS) $^ -o $@ 
+
+trigger-test: $(TRIGGER_TEST_OBJ) $(NQ_CLIENTLIB_OBJ)
+	g++ $(LDLIBS) $(CFLAGS) $^ -o $@ 
+
+garbage-test: $(GARBAGE_TEST_OBJ) $(NQ_CLIENTLIB_OBJ)
+	g++ $(LDLIBS) $(CFLAGS) $^ -o $@ 
+
+distributed-trigger-test: apps-linux/distributed_trigger_test.o $(NQ_CLIENTLIB_OBJ)
+	g++ $(LDLIBS) $(CFLAGS) $^ -o $@ 
+
+generic-bench: apps-linux/generic-bench.o $(NQ_CLIENTLIB_OBJ)
+	g++ $(LDLIBS) $(CFLAGS) $^ -o $@
+	
+nq-stats: $(STATS_OBJ) $(NQ_CLIENTLIB_OBJ)
+	g++ $(LDLIBS) $(CFLAGS) $^ -o $@ 
+
+netquery-lib.o: $(NQ_CLIENTLIB_OBJ) $(NETQUERY_LIB_OBJ)
+	ld -r  -o $@ $^
+
+nqsh: $(NQ_CLIENTLIB_OBJ) $(NQSHELL_OBJ)
+	g++ $(LDLIBS) $(CFLAGS) $^ -o $@ 
+
+nq-exporter: $(NQ_CLIENTLIB_OBJ) $(EXPORTER_OBJ)
+	g++ $(LDLIBS) $(CFLAGS) $^ -o $@ 
+
+net-take-ownership: $(NQ_CLIENTLIB_OBJ) $(OPERATOR_OBJ)
+	g++ $(LDLIBS) $(CFLAGS) $^ -o $@ 
+
+check-path:  $(NQ_CLIENTLIB_OBJ) $(CHECK_PATH_OBJ)
+	g++ $(LDLIBS) $(CFLAGS) $^ -o $@ 
+
+linuxclean: clean
+
+clean:
+	rm -f apps-linux/*.o client/*.o netquery obj-test rocket-router router l2secd switchd switch-enforcer update-test microbench
+
+test: obj-test
+test: obj-test router trie-test
+	./obj-test
+	#./trie-test
+	./router 0 ignored
+	./router 1 ignored
+
+tags: $(SRC_FILES)
+	etags `find . -name '*.cc' -or -name '*.c'  -or -name '*.h' -or -name '*.hh'`
+
+# Dependency generation, based on make man page
+
+%.d: %.c
+	@echo "DEP($*)"
+	@$(CC) -MM -MT 'DEP_TARGET' $(CFLAGS) $< > $@.$$$$; \
+	sed 's,\(DEP_TARGET\)[ :]*,$*.o $@ : ,g' < $@.$$$$ > $@; \
+	rm -f $@.$$$$
+
+%.d: %.cc
+	@echo "DEP($*)"
+	@$(CXX) -MM -MT 'DEP_TARGET' $(CXXFLAGS) $< > $@.$$$$; \
+	sed 's,\(DEP_TARGET\)[ :]*,$*.o $@ : ,g' < $@.$$$$ > $@; \
+	rm -f $@.$$$$
+
+include $(patsubst %.c,%.d, $(patsubst %.cc,%.d, $(SRC_FILES)))
+
+.PHONY: linux  microbench-build netqueryd-build
+
+linux:

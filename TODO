@@ -1,0 +1,30 @@
+
+## MUSTHAVE
+
+Hi	20091023 -		NAL-based access control
+Med 	20091027 - 		Xen support
+Med	20091016 - 		verify TPM functionality and add selftest
+Low	20091016 - 		userlevel audio driver 
+
+## WOULDLIKE
+
+Med	20091208 -		disk filesystem support (through FUSE)
+Med	20091021 - 		port busybox shell (ash). requires somewhat working posix signals
+Med	20091021 - 		port busybox vi. requires somewhat working posix signals
+Med	20091021 - 		fix busybox ls. requires stat that discerns directories from files
+Low	20090929 - 		make completes without second invocation
+Low	20090929 - 		understand why cpu_in_interrupt does not seem a valid indicator
+Low	20090929 - 		single pair of queue and map structures with internal interrupt/concurrency protection
+
+## COMPLETED
+
+Hi	20090929 - 20091130 	userlevel network driver 
+Med 	20090929 - 20091130	nfs support
+Hi	20090929 - 20091022	mplayer
+Med	20090929 - 20091016	regression tests (+ framework) in userspace
+Med	20090929 - 20091007 	regression tests (+ framework) in kernel 
+Med	20091016 - 20091020	port busybox (selected functionality)
+Low	20091016 - 20091020 	FS client can support multiple filesystems (see FS.svc)
+
+## WONTFIX
+

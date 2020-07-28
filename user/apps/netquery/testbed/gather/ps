@@ -1,0 +1,4 @@
+rm ifconfig-out/*
+pssh -l root -h ../vm-ips.txt -o ifconfig-out ps -A
+cat ifconfig-out/*
+

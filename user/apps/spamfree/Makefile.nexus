@@ -1,0 +1,5 @@
+CFLAGS_$(d) := -Werror
+
+TARGET := $(d)/sfaservice
+OBJS := $(d)/SpamFreeAttestationService.server.o $(d)/sfaservice.o
+include Makefile.app

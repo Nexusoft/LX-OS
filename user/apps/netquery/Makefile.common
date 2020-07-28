@@ -1,0 +1,94 @@
+ASHIEH_CLIENTLIB_CC=nq_ip.cc nq_net_elements.cc nq_tuple.cc nq_exceptions.cc nq_util.cc nq_transaction.cc marshall.cc ip.cc util.cc site.cc nq_output.cc policy.cc
+NQ_CLIENTLIB_CC=$(patsubst %,client/%, 	\
+	$(ASHIEH_CLIENTLIB_CC) optionlist.cc netquery-cc.cc \
+	)
+NQ_CLIENTLIB_CC_OBJ=$(NQ_CLIENTLIB_CC:.cc=.o)
+
+client/net.o: client/net.c client/pickle.c # net.c #includes pickle.c
+
+NQ_CLIENTLIB_C=$(patsubst %,client/%,		\
+	 netquery.c queue.c transaction.c uuid.c attribute.c util-c.c net.c socket.c remote_trigger.c hashtable.c workqueue.c garbage.c fib_trie.c \
+	)
+client/attribute.c: client/attribute_trie.c
+
+#trie.c attribute_trie.c
+NQ_CLIENTLIB_C_OBJ=$(NQ_CLIENTLIB_C:.c=.o)
+
+NQ_CLIENTLIB_OBJ=$(NQ_CLIENTLIB_CC_OBJ) $(NQ_CLIENTLIB_C_OBJ)
+
+ROUTER_CC=apps/router.cc apps/router-test.cc
+ROUTER_OBJ=$(NQ_CLIENTLIB_OBJ) $(ROUTER_CC:.cc=.o)
+
+FLOW_CC=apps/router.cc apps/flow-test.cc
+FLOW_OBJ=$(NQ_CLIENTLIB_OBJ) $(FLOW_CC:.cc=.o)
+
+OBJTEST_CC=apps/obj-test.cc
+NQ_TEST_CC=apps/nq_test.cc
+NQ_TEST_OBJ = $(NQ_CLIENTLIB_C_OBJ) $(NQ_TEST_CC:.cc=.o) client/optionlist.o client/scripting.o client/netquery-cc.o client/util.o client/marshall.o 
+NQ_DAEMON_CC=apps-linux/netqueryd.cc
+NQ_DAEMON_OBJ = $(NQ_CLIENTLIB_C_OBJ) $(NQ_DAEMON_CC:.cc=.o) client/optionlist.o client/scripting.o client/netquery-cc.o client/util.o client/marshall.o 
+
+ROCKET_CC=apps/rocket-router.cc 
+ROCKET_OBJ=$(ROCKET_CC:.cc=.o) apps/router.o $(NQ_CLIENTLIB_OBJ)
+
+#ROCKET2_CC=apps/rocket-parser.cc
+ROCKET2_CC=apps/rocket-router2.cc apps/fib-update-protocol.cc
+ROCKET_OBJ2=$(ROCKET2_CC:.cc=.o) apps/router.o $(NQ_CLIENTLIB_OBJ)
+
+FIB_UPDATE_CC=apps/fib-update-protocol.cc apps/fib-update-main.cc
+FIB_UPDATE_OBJ=$(FIB_UPDATE_CC:.cc=.o) apps/router.o  $(NQ_CLIENTLIB_OBJ)
+
+NETTEST_CC=apps/net-test.cc
+NETTEST_OBJ=$(NETTEST_CC:.cc=.o) $(NQ_CLIENTLIB_OBJ) apps/router.o
+
+SWITCHD_CC = apps/switch-control.cc apps/switch-forwarding.cc
+SWITCHD_OBJ = $(SWITCHD_CC:.cc=.o)
+
+L2SECD_CC = apps/l2secd.cc apps/ipc.cc apps/ssl.cc
+L2SECD_OBJ = $(L2SECD_CC:.cc=.o)
+
+SWITCHD_CC = apps-linux/switch-control.cc apps-linux/switch-forwarding.cc  apps-linux/ipc.cc apps-linux/ssl.cc
+SWITCHD_OBJ = $(SWITCHD_CC:.cc=.o)
+
+SWITCH_COMMON_CC = apps-linux/switch-nq.cc
+SWITCH_COMMON_OBJ = $(SWITCH_COMMON_CC:.cc=.o)
+
+SWITCH_ENFORCER_CC = apps-linux/switch-enforcer.cc apps-linux/ssl.cc
+SWITCH_ENFORCER_OBJ = $(SWITCH_ENFORCER_CC:.cc=.o)
+NETQUERY_LIB_CC = apps/nq-zebra.cc
+NETQUERY_LIB_OBJ = $(NETQUERY_LIB_CC:.cc=.o)
+
+SITE_INIT_CC=apps-linux/site-init.cc
+SITE_INIT_OBJ=$(SITE_INIT_CC:.cc=.o)
+SITE_CRAWL_CC=apps/site-crawl.cc
+SITE_CRAWL_OBJ=$(SITE_CRAWL_CC:.cc=.o)
+
+TRIGGER_TEST_CC=apps-linux/trigger-test.cc
+TRIGGER_TEST_OBJ=$(TRIGGER_TEST_CC:.cc=.o)
+
+GARBAGE_TEST_CC=apps-linux/garbage-test.cc
+GARBAGE_TEST_OBJ=$(GARBAGE_TEST_CC:.cc=.o)
+
+UPDATE_TEST_CC=apps-linux/update-test.cc
+UPDATE_TEST_OBJ=$(UPDATE_TEST_CC:.cc=.o)
+
+MICROBENCH_CC=apps-linux/microbench.cc
+MICROBENCH_OBJ=$(MICROBENCH_CC:.cc=.o)
+
+STATS_CC=apps/nq-stats.cc
+STATS_OBJ=$(STATS_CC:.cc=.o)
+
+NQSHELL_CC=apps/nq_shell.cc 
+NQSHELL_OBJ=$(NQSHELL_CC:.cc=.o)
+
+EXPORTER_CC=apps/nq-exporter.cc
+EXPORTER_OBJ=$(EXPORTER_CC:.cc=.o)
+
+OPERATOR_CC=apps/operator.cc
+OPERATOR_OBJ=$(OPERATOR_CC:.cc=.o)
+
+CHECK_PATH_CC=apps/router.cc apps/check-path.cc
+CHECK_PATH_OBJ=$(CHECK_PATH_CC:.cc=.o)
+
+SRC_FILES=$(NQ_CLIENTLIB_C) $(NQ_CLIENTLIB_CC) $(ROUTER_CC) $(NQ_TEST_CC) $(OBJTEST_CC) $(ROCKET_CC) $(NETTEST_CC) $(SWITCHD_CC) $(L2SECD_CC) $(SWITCHD_CC) $(SWITCH_COMMON_CC) $(SWITCH_ENFORCER_CC) $(NETQUERY_LIB_CC) $(FLOW_CC) $(SITE_CRAWL_CC) $(SITE_INIT_CC) $(TRIGGER_TEST_CC) $(GARBAGE_TEST_CC) $(STATS_CC) $(NQSHELL_CC) $(EXPORTER_CC) $(OPERATOR_CC) $(CHECK_PATH_CC)
+

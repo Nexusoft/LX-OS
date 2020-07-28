@@ -1,0 +1,11 @@
+CFLAGS_$(d) := -Werror
+
+TARGET := $(d)/jukebox_install
+OBJS :=  $(TARGET).o $(p)/wpss/libwpss.o compat/Profile.user.o
+LIBS_$(TARGET) := lib/libm.a
+include Makefile.app
+
+TARGET := $(d)/jukebox
+OBJS :=  $(TARGET).o $(d)/Jukebox.server.o $(p)/wpss/libwpss.o $(d)/Jukeboxctl.server.o
+LIBS_$(TARGET) := lib/libm.a
+include Makefile.app

@@ -1,0 +1,92 @@
+service PcapInterposeEventDriver {
+  decls {
+    includefiles { "<op_types.h>" }
+    includefiles { "<nexus/ipc.h>" }
+    includefiles { "<nexus/transfer.h>" }
+    includefiles { "<nexus/interpose.h>" }
+
+    struct CallInfo {
+      struct IEvent_Info event_info;
+      struct IEvent_Call_Info call_info;
+    };
+
+    extern int call_count, transfer_count;
+  }
+
+  decls __callee__ {
+    // includefiles { "\"PingPong_Interpose.interpose.h\"" }
+    includefiles { "<pthread.h>" }
+    includefiles { "<nexus/util.h>" }
+    includefiles { "<stdio.h>" }
+    includefiles { "<nexus/IPC.interface.h>" }
+    includefiles { "<assert.h>" }
+    includefiles { "<string.h>" }
+    includefiles { "\"all-null.h\"" }
+    includefiles { "<nexus/netcomp.h>" }
+
+    IDL_SERVER_VARDEFS(PcapInterposeEventDriver);
+
+    int call_count = 0, transfer_count = 0;
+  }
+
+  __callee__ {
+  }
+
+  interface __NoGenReturn__
+    lf_generate { OID_NONE; }
+  lf_check { 1; }
+  int IEvent_Call(struct IEvent_Info event_info, struct IEvent_Call_Info call_info, 
+		__input__ struct VarLen message) {
+    call_count++;
+    static int last_src_ipd;
+    if(last_src_ipd != event_info.src) {
+      printf("src=%d ", event_info.src);
+    }
+    if(__is_async) {
+      // printf("async call %d\n", call_handle);
+      printf("Need to change netcomp constructor to account for interposition case\n");
+      assert(0);
+      NetComp_Packet *pkt = NetComp_Packet_new(call_handle);
+      int rv;
+      Ethernet_Header eth;
+      IP_Header iph;
+      rv = NetComp_Packet_extract(pkt, 0, &eth, sizeof(eth));
+      if(rv != 0) {
+	printf("error %d extracting eth header\n", rv);
+	goto done_printing;
+      }
+      printf("Ethernet: len = %d ", NetComp_Packet_get_len(pkt));
+      printf("Src "); MAC_Address_print_from_char(eth.src); printf(" "); // printf("\n");
+      printf("Dest "); MAC_Address_print_from_char(eth.dst); printf(" "); // printf("\n");
+      printf("Proto %04x", ntohs(eth.protocol)); printf("\n");
+      if(ntohs(eth.protocol) == ETH_P_IP) {
+	rv = NetComp_Packet_extract(pkt, sizeof(eth), &iph, sizeof(iph));
+	if(rv != 0) {
+	  printf("error extracting ip header\n");
+	  goto done_printing;
+	}
+	printf("\t"); printf("IP: len = %d ", ntohs(iph.tot_len));
+		IP_Address_print(iph.saddr);
+		printf(" => ");
+		IP_Address_print(iph.daddr); 
+	printf("\n");
+	printf("Proto %02x\n", iph.protocol);
+	
+      }
+    done_printing:
+      NetComp_Packet_destroy(pkt, 0);
+    }
+    last_src_ipd = event_info.src;
+    IPC_Interposition_CallPassThrough(call_handle, &call_info);
+    return 0;
+  }
+
+  interface __NoGenReturn__
+    lf_generate { OID_NONE; }
+  lf_check { 1; }
+  int IEvent_Transfer(struct IEvent_Info event_info, struct IEvent_Transfer_Info transfer_info, __input__ struct VarLen data) {
+    transfer_count++;
+    IPC_Interposition_TransferPassThrough(call_handle);
+    return 0;
+  }
+}

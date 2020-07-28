@@ -1,0 +1,25 @@
+service Sync {
+  decls {
+    includefiles { "<nexus/IPC.interface.h>" }
+    includefiles { "<string.h>" }
+    IDL_EXTERNS(Sync);
+  }
+  decls __callee__ {
+    IDL_SERVER_VARDEFS(Sync);
+  }
+  decls __caller__ {
+    includefiles { "../nameserver/NS.interface.h" }
+  }
+  __callee__ {
+    IDL_REGISTER(Sync);
+  }
+  __caller__ {
+    IDL_LOOKUP(Sync);
+    IDL_BINDREQUEST(Sync);
+  }
+
+  interface lf_generate { OID_NONE; } lf_check { 1; }
+  int Call(void) {
+    return 0;
+  }
+}

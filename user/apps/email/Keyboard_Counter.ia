@@ -1,0 +1,91 @@
+service Keyboard_Counter {
+  __interpose_on__ { "../../compat/Console.sc" }
+
+  decls __callee__ {
+    int call_counter = 0;
+    includefiles { "\"InterposeEventDriver.interface.h\"" }
+    includefiles { "\"Keyboard_Counter.interpose.h\"" }
+    includefiles { "\"keyboardrm.h\"" }
+  }
+
+  __callee__ {
+    Reflection_PutInt("/keyboard/input_counter", &call_counter);
+    Reflection_PutData("/keyboard/input_data", all_input->data, -1);
+  }
+
+  __interpose__ Console_GetData __Call__ {
+    call_counter++;
+    printf(".");
+    
+    // printf("insert id = %llu\n", event_info->event_id);
+    P(&call_table_mutex);
+    struct CallInfo *c_info = malloc(sizeof(*c_info));
+    c_info->call_info = *call_info;
+    c_info->event_info = *event_info;
+    hash_insert(call_table, &event_info->event_id, c_info);
+    V_nexus(&call_table_mutex);
+    CALL_PASSTHROUGH();
+    return 0;
+  }
+
+  __interpose__ Console_Blit_Init __Call__ {
+    CALL_PASSTHROUGH();
+    return 0;
+  }
+  __interpose__ Console_PrintChar __Call__ {
+    CALL_PASSTHROUGH();
+  }
+  __interpose__ Console_Blit_Frame __Call__ {
+    CALL_PASSTHROUGH();
+    return 0;
+  }
+  __interpose__ Console_Blit_Frame_Native __Call__ {
+    CALL_PASSTHROUGH();
+    return 0;
+  }
+  __interpose__ Console_SetPrintState __Call__ {
+    CALL_PASSTHROUGH();
+    return 0;
+  }
+  __interpose__ Console_GetKeymapEntry __Call__ {
+    CALL_PASSTHROUGH();
+    return 0;
+  }
+  __interpose__ Console_Kbd_Init __Call__ {
+    CALL_PASSTHROUGH();
+    return 0;
+  }
+  __interpose__ Console_HasLine __Call__ {
+    CALL_PASSTHROUGH();
+    return 0;
+  }
+  __interpose__ Console_SetInputMode __Call__ {
+    CALL_PASSTHROUGH();
+    return 0;
+  }
+  __interpose__ Console_MapFrameBuffer __Call__ {
+    CALL_PASSTHROUGH();
+    return 0;
+  }
+  __interpose__ Console_UnmapFrameBuffer __Call__ {
+    CALL_PASSTHROUGH();
+    return 0;
+  }
+  __interpose__ Console_Mouse_Init __Call__ {
+    CALL_PASSTHROUGH();
+    return 0;
+  }
+  __interpose__ Console_Mouse_SetProtocol __Call__ {
+    CALL_PASSTHROUGH();
+    return 0;
+  }
+  __interpose__ Console_Mouse_Poll __Call__ {
+    CALL_PASSTHROUGH();
+    return 0;
+  }
+  __interpose__ Console_Mouse_Read __Call__ {
+    CALL_PASSTHROUGH();
+    return 0;
+  }
+}
+

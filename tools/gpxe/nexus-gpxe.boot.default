@@ -1,0 +1,26 @@
+#!gpxe
+#
+# bootscript for gpxe 0.9.7
+#
+# by default you have to specificy the device to request a 
+# DHCP lease on. I have not changed this behavior, but
+# see http://etherboot.org/wiki/appnotes/autobootchainurl
+# for a hack that will scan all devices. Later versions of
+# gpxe will hopefully support this behavior out of the box.
+#
+# for now, make sure the following two settings are correct:
+# specify 
+#   the NIC you want to acquire a lease and 
+#   the host that hosts your files over TFTP 
+dhcp net0
+set next-server athens.systems.cs.cornell.edu
+
+# don't touch anything below this line
+kernel tftp://${next-server}/vmnexuz vga=792 server=${next-server}
+initrd tftp://${next-server}/initrd.tar
+boot
+
+# NB: identifier next-server is not arbitrarily chosen
+# gpxe 0.9.7 does not allow arbitrary variables, so
+# I reuse a DHCP field
+
