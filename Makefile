@@ -1,7 +1,7 @@
 # main Nexus makefile
 #
 # builds tools, user and kernel (in that order)
-# places binaries, headers and libs in build/ 
+# places binaries, headers and libs in build/
 
 ###### layout
 
@@ -9,7 +9,7 @@
 
 ###### bugs
 
-# * make stops immediately after building openssl. 
+# * make stops immediately after building openssl.
 #   reissuing the command suffices to continue.
 
 ###### top-level targets
@@ -78,6 +78,9 @@ STDERR		:= /tmp/nexus.stderr
 
 # top level build directories
 NEXUSROOT	:= $(shell pwd)
+
+$(info Building from Root Directory $(NEXUSROOT))
+
 BUILDROOT	:= $(NEXUSROOT)/build
 PREFIX		:= $(BUILDROOT)	# compatibility
 
@@ -131,8 +134,8 @@ IOREDIR		:= 1>>$(STDOUT) 2>$(STDERR) || (echo $(ERRORMSG); cat $(STDERR); exit 1
 else
 LINK		:= ln -vsf
 TAROPTS		:= cvf
-Q		:= 
-IOREDIR		:= 
+Q		:=
+IOREDIR		:=
 endif
 
 ## gcc parameters
@@ -145,14 +148,14 @@ INC_COMMON	:= -I . -I $(BUILDROOT)/common/include -nostdinc \
 
 INC_USER	:= -I $(USER_INCL) $(INC_COMMON)
 
-# INC_USER, but with duct tape to help internal libnexus code 
+# INC_USER, but with duct tape to help internal libnexus code
 # and old applications compile.
 #
 # for new apps we want to enforce INC_USER
 INC_LEGACY	:= -I $(BUILDROOT)/common/include/nexus \
 		   -I $(USER_INCL)/nexus \
 		   -I $(BUILDROOT)/common/code \
-		   $(INC_USER)    
+		   $(INC_USER)
 
 INC_UDRIVER	:= \
 		   -I $(BUILDROOT)/user/drivers/include \
@@ -237,9 +240,9 @@ cmd_info=@set -e;echo $(color-green)$(1)$(color-reset);
 	$(call cmd_exec,"[IDL] $<",$(IDLGEN) -k $< $(IOREDIR))
 
 # generate userspace syscall sourcecode from IDL
-# WARNING: nexus-idlgen generates different, but identically named interface.h 
+# WARNING: nexus-idlgen generates different, but identically named interface.h
 #	   files for user and kernelspace. We rename them to distinguish them.
-# NB: as work-around for files X.sc that except the X.interface.h in 
+# NB: as work-around for files X.sc that except the X.interface.h in
 # common/syscalls, we copy instead of move.
 # XXX have IDL generate distinguishable headers
 %.user.c %.server.c %.ucall-interface.h %.interface.h: %.sc
@@ -248,7 +251,7 @@ cmd_info=@set -e;echo $(color-green)$(1)$(color-reset);
 	@-cp -f $*.interface.h $*.ucall-interface.h
 	@-cp -uf $*.ucall-interface.h \
 		$(USER_INCL)/nexus/$(notdir $*).interface.h
-	         
+
 
 # generate kernelspace syscall sourcecode from IDL
 # see above statement
@@ -259,7 +262,7 @@ cmd_info=@set -e;echo $(color-green)$(1)$(color-reset);
 	@-cp -uf $*.kcall-interface.h \
 		$(BUILDROOT)/kernel/include/nexus/$(notdir $*).interface.h
 
-# generate a linux/nexus kernel keymap 
+# generate a linux/nexus kernel keymap
 %.loadkeys.c : %.map
 	@loadkeys --mktable $< | sed -e 's/^static *//' > $@
 
@@ -373,10 +376,10 @@ first:
 	@-rm `find . -name NAL.yyk.*.d`>/dev/null 2>/dev/null
 
 # a PHONY target to ensure that the file is rebuilt each time
-version: 
+version:
 	@-rm -f $(BUILDROOT)/common/include/nexus/version.h $(IOREDIR)
 
-setup: first $(BUILDDIRS) version 
+setup: first $(BUILDDIRS) version
 
 $(IDLGEN):
 	$(call cmd_info,Building Idlgen)
@@ -411,7 +414,7 @@ CLEANTARGETS  	+= $(patsubst %, -or -name \*%, $(CLEANTARGETSi))
 clean: kernel_clean
 	@-rm -f $(shell find $(BUILDROOT) $(CLEANTARGETS))
 
-distclean:  
+distclean:
 	@-rm -rf build $(IOREDIR)
 
 #### clean
@@ -430,7 +433,7 @@ dist: $(BUILDROOT)/boot/stage1/nexus.iso
 
 #### packages
 
-$(USER_LIBS)/libc.a: 
+$(USER_LIBS)/libc.a:
 	@echo "Building libc"
 	@make -C build/user/packages/uclibc 		$(IOREDIR)
 	@make -C build/user/packages/uclibc install 	$(IOREDIR)
@@ -450,7 +453,7 @@ $(USER_LIBS)/liblwip.a: $(PACKAGES_PRE) $(USER_LIBS)/libnexus.a
 	@make -C build/user/packages/lwip		$(IOREDIR)
 	@make -C build/user/packages/lwip install	$(IOREDIR)
 
-$(BINDIR)/mplayer $(BINDIR)/demo.mpg: $(PACKAGES_PRE) $(USER_LIBS)/liblwip.a 
+$(BINDIR)/mplayer $(BINDIR)/demo.mpg: $(PACKAGES_PRE) $(USER_LIBS)/liblwip.a
 	@echo "Building mplayer (go grab some coffee)"
 	@make -C build/user/packages/mplayer 		$(IOREDIR)
 	@make -C build/user/packages/mplayer install	$(IOREDIR)
@@ -465,28 +468,28 @@ $(BINDIR)/nc: $(PACKAGES_PRE) $(USER_LIBS)/liblwip.a $(USER_LIBS)/libnexus.a \
 PACKAGES_PRE	:= $(USER_LIBS)/libc.a \
 		   $(USER_LIBS)/libcrypto.a
 
-PACKAGES_POST	= 
+PACKAGES_POST	=
 
 ifdef CONFIG_MPLAYER
-PACKAGES_POST	+= $(BINDIR)/mplayer 
+PACKAGES_POST	+= $(BINDIR)/mplayer
 endif
 ifdef CONFIG_BUSYBOX
-PACKAGES_POST	+= $(BINDIR)/busybox 
+PACKAGES_POST	+= $(BINDIR)/busybox
 endif
 ifdef CONFIG_NETCAT
 PACKAGES_POST	+= $(BINDIR)/nc
 endif
 
 # packages on which no nexus code depends
-packages_post:  $(PACKAGES_POST) 
+packages_post:  $(PACKAGES_POST)
 
 #### library targets
 
 ## libnexus
 
 # manually supplied list of targets
-LIBNEXUS_USERi	:= IPC Net Thread Console Audio Debug Log Mem Profile Time 
-LIBNEXUS_CLTi	:= FS 
+LIBNEXUS_USERi	:= IPC Net Thread Console Audio Debug Log Mem Profile Time
+LIBNEXUS_CLTi	:= FS
 LIBNEXUS_SRVi	:= RamFS
 LIBNEXUS_OTHi	:= atomic debug init synch_asm synch tls ipc util \
 		   env pthread trap pci_pfault ipc-server
@@ -510,7 +513,7 @@ LIBNEXUS_HDR	:= $(patsubst %, $(USER_ROOT)/include/nexus/%.interface.h, $(LIBNEX
 # VPATH/vpath seems an option, until you see that it behaves differently with/without
 # directories in the target (GNU Makefile Manual Sec. 4.5)
 #
-# headers are copied to two locations: 
+# headers are copied to two locations:
 #	- inside the include dir belonging to the library: for packaging
 #	- to shared user/nexus/include: for linking
 $(LIBNEXUS_ROOT)/%.c: $(BUILDROOT)/common/code/%.c
@@ -617,7 +620,7 @@ define LDAPP
 endef
 
 ## applications that follow a basic order:
-#     single source in a standard location 
+#     single source in a standard location
 DEFAULT_APPS	:= explorer dhcp ownership httpget
 #analysis httpd nskgen tls_test \
 		   helloworld helloworld-posix profilestart profileend
@@ -726,7 +729,7 @@ $(USER_LIBS)/libnexus-udriver.a: \
 			       $(UDRV_ROOT)/compat/nexusethcompat.udriver.o \
 			       $(UDRV_ROOT)/compat/nexuseth.udriver.o \
 			       $(UDRV_ROOT)/compat/skbuff.udriver.o \
-			       $(COMMONROOT)/net/device.udriver.o 
+			       $(COMMONROOT)/net/device.udriver.o
 	$(call cmd_exec,"[LD] $@",$(LD) $(LDFLAGS) -r -static -nostdlib -o $@ $^ $(IOREDIR))
 
 $(BINDIR)/audio-i810.drv: $(USER_LIBS)/libnexus-udriver.a \
@@ -762,7 +765,7 @@ user_clean:
 
 #### kernel core
 
-KERN_CLTi 	:= FS 
+KERN_CLTi 	:= FS
 
 KERN_SRVi 	:= RamFS
 
@@ -846,9 +849,9 @@ $(BUILDROOT)/kernel/include/nexus/%.interface.h: $(SCROOT)/%.kcall-interface.h
 	$(call cmd_exec,"[LINK] $@",$(LINK) $(abspath $<) $@)
 ## END -- REPLACE FOR SHORTER IMPLICIT RULES
 
-KERN_OBJC	:= $(patsubst %.c, %.kern.o, $(KERN_SRC)) 	
-KERN_OBJSC	:= $(patsubst %.S, %.kern.o, $(KERN_OBJC))	
-KERN_OBJYSC	:= $(patsubst %.y, %.tab.kern.o, $(KERN_OBJSC))	
+KERN_OBJC	:= $(patsubst %.c, %.kern.o, $(KERN_SRC))
+KERN_OBJSC	:= $(patsubst %.S, %.kern.o, $(KERN_OBJC))
+KERN_OBJYSC	:= $(patsubst %.y, %.tab.kern.o, $(KERN_OBJSC))
 KERN_OBJ	:= $(patsubst %.lex, %.yyk.kern.o, $(KERN_OBJYSC))
 
 kcore: $(BUILDROOT)/common/include/nexus/version.h $(KERN_SRC) $(KERN_HDR) $(KERN_OBJ)
@@ -865,7 +868,7 @@ KDRIVER_SRC	:= sound/i810_audio sound/ac97_codec sound/sound_core \
 		   pci/setup-irq pci/setup-res compat
 
 KDRIVER_OBJ	:= $(KDRV_ROOT)/char/defkeymap.loadkeys.kdriver.o \
-		   $(patsubst %, $(KDRV_ROOT)/%.kdriver.o, $(KDRIVER_SRC)) 
+		   $(patsubst %, $(KDRV_ROOT)/%.kdriver.o, $(KDRIVER_SRC))
 
 $(KDRV_ROOT)/pci/devlist.h:
 	@ $(CC) -o $(KDRV_ROOT)/pci/gen-devlist $(KDRV_ROOT)/pci/gen-devlist.c
@@ -880,7 +883,7 @@ KINITROOT	:= build/kernel/init
 BZLINKFLAGS	:= -Ttext 0x100000 -e startup_32
 OBJCOPY		:= objcopy -O binary -R .note -R .comment -S
 
-#export ROOT_DEV	
+#export ROOT_DEV
 export SVGA_MODE	:= -DSVGA_MODE=NORMAL_VGA
 
 ## main nexus library
@@ -925,7 +928,7 @@ $(BUILDROOT)/kernel/include/nexus/asm-offsets.h: \
 			$(KINITROOT)/lib/lib.a
 	$(call cmd_info,Computing asm-offset.h)
 	@$(KINITROOT)/tools/compute-offsets.pl > $(KINITROOT)/kernel/comp-offsets.c
-	@$(CC) $(CFLAGS_KERNEL) -I $(BUILDROOT)/common/include -I $(BUILDROOT)/kernel/include -o $(KINITROOT)/kernel/comp-offsets $(KINITROOT)/kernel/comp-offsets.c 
+	@$(CC) $(CFLAGS_KERNEL) -I $(BUILDROOT)/common/include -I $(BUILDROOT)/kernel/include -o $(KINITROOT)/kernel/comp-offsets $(KINITROOT)/kernel/comp-offsets.c
 	@$(KINITROOT)/kernel/comp-offsets > $@
 	@-rm $(KINITROOT)/kernel/comp-offsets $(KINITROOT)/kernel/comp-offsets.c
 
@@ -955,7 +958,7 @@ $(KINITROOT)/vmnexus:	$(BUILDROOT)/kernel/include/nexus/asm-offsets.h \
 		$(GCC_HOME)/libgcc.a \
                 --end-group \
                 -o $@)
-	
+
 # created a compressed object
 $(KINITROOT)/piggy.o: $(KINITROOT)/vmnexus
 	$(call cmd_info,[LD] $@)
@@ -969,11 +972,11 @@ $(KINITROOT)/piggy.o: $(KINITROOT)/vmnexus
 # create a self-deflating compressed image
 $(KINITROOT)/bvmnexus: $(KINITROOT)/boot/compressed/head.kern.o \
 		       $(KINITROOT)/boot/compressed/misc.kold.o \
-		       $(KINITROOT)/piggy.o 
+		       $(KINITROOT)/piggy.o
 	$(call cmd_exec,"[LD] $@",ld $(BZLINKFLAGS) -o $@ $+)
 
 ## bootloader
-#  see also http://tldp.org/LDP/lki/lki-1.html 
+#  see also http://tldp.org/LDP/lki/lki-1.html
 $(KINITROOT)/boot/bbootsect:$(KINITROOT)/boot/bbootsect.lko
 	$(call cmd_exec,"[LD] $@",ld -Ttext 0x0 -s --oformat binary -o $@ $<)
 
@@ -983,10 +986,10 @@ $(KINITROOT)/boot/bsetup: $(KINITROOT)/boot/bsetup.lko
 $(KINITROOT)/boot/%.lko: $(KINITROOT)/boot/%.s
 	$(call cmd_exec,"[AS] $@",as --32 -o $@ $<)
 
-$(KINITROOT)/boot/bbootsect.s: $(KINITROOT)/boot/bootsect.S 
+$(KINITROOT)/boot/bbootsect.s: $(KINITROOT)/boot/bootsect.S
 	$(call cmd_exec,"[CC] $@",$(CC) -E -D__NEXUSKERNEL__ -D__KERNEL__ $(INC_KERNEL) -D__BIG_KERNEL__ -traditional $(SVGA_MODE) -o $@ $<)
 
-$(KINITROOT)/boot/bsetup.s: $(KINITROOT)/boot/setup.S $(KINITROOT)/boot/video.S 
+$(KINITROOT)/boot/bsetup.s: $(KINITROOT)/boot/setup.S $(KINITROOT)/boot/video.S
 	$(call cmd_exec,"[CC] $@",$(CC) -E -D__NEXUSKERNEL__ -D__KERNEL__ $(INC_KERNEL) -D__BIG_KERNEL__ -D__ASSEMBLY__ -traditional $(SVGA_MODE) -o $@ $<)
 
 $(KINITROOT)/tools/build: $(KINITROOT)/tools/build.c
@@ -1039,7 +1042,7 @@ INITRD_FILES :=	$(KINITROOT)/boot/initrd/initscript \
 	        $(BINDIR)/daemon.app 		\
 						\
 		$(BUILDROOT)/LICENSE		\
-		$(BUILDROOT)/README		
+		$(BUILDROOT)/README
 
 #						\
 		## stuff we need to fix		\
@@ -1106,4 +1109,3 @@ $(BUILDROOT)/boot/stage1/nexus.iso: $(ISOROOT)/vmnexuz $(INITRD)
 	rm $(ISOROOT)/isolinux.bin $(ISOROOT)/isolinux.cfg $(ISOROOT)/menu.c32
 
 iso: $(BUILDROOT)/boot/stage1/nexus.iso
-
