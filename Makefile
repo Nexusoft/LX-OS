@@ -78,11 +78,11 @@ STDERR		:= /tmp/nexus.stderr
 
 # top level build directories
 NEXUSROOT	:= $(shell pwd)
-
-$(info Building from Root Directory $(NEXUSROOT))
-
 BUILDROOT	:= $(NEXUSROOT)/build
 PREFIX		:= $(BUILDROOT)	# compatibility
+
+#log our directory for debugging
+$(info Building from Root Directory $(NEXUSROOT))
 
 # source directories
 COMMONROOT	:= $(BUILDROOT)/common

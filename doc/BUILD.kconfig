@@ -1,0 +1,10 @@
+### Building on x86_64 architecture
+
+This OS is old-skool, from 2010, so in order for it to build in our initial development stages we need to handle backwards compatible with tie i386 instruction set.
+Use the following command to enable the kConfig binaries to execute properly:
+
+```
+sudo apt-get install libc6-dev-i386
+```
+
+This will install a compatible i386 libstdc to work with the dynamic linking of the internal kconfig binaries included in this source code.
