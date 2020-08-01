@@ -1,1 +1,5 @@
 build/
+.config
+.config.old
+.kconfig.d
+.tmpconfig.h
