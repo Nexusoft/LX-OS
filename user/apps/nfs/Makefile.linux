@@ -1,0 +1,16 @@
+
+CFLAGS = -m32 -Wall -g -O0 -gdwarf-2 -I../../../common/include
+
+all: nfs.linux
+
+nfs.linux: xdr_linux.o nfs_linux.o
+	$(CC) $(CFLAGS) -o nfs.linux nfs_linux.o xdr_linux.o
+
+xdr_linux.o: xdr.c
+	$(CC) $(CFLAGS) -o xdr_linux.o -c xdr.c
+
+nfs_linux.o: nfs.c
+	$(CC) $(CFLAGS) -o nfs_linux.o -c nfs.c
+
+clean:
+	rm -f nfs.linux *_linux.o

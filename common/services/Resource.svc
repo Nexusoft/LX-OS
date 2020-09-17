@@ -1,0 +1,88 @@
+service Resource {
+
+	/** Resource control:
+	    - make reservations on behalf of a group of processes 
+	    - attest to state of reservations
+	 
+	    To ensure that attestations never become invalidated,
+	    (1) they are positive, enumerating account member elements and 
+	    (2) members can be added, but never removed from an account 
+	 
+	 */
+
+	/** Return a new account ID */
+	interface lf_generate { (0); } lf_check { 1; }
+	int Account_New(int limit) 
+	{
+		return -1;
+	}
+
+	/** Attach a process ID to an account ID (irreversibly) */
+	interface lf_generate { (0); } lf_check { 1; }
+	int Account_AddProcess(int account, int pid) 
+	{
+		return -1;
+	}
+
+	/** Lookup the account to which a process budgets */
+	interface lf_generate { (0); } lf_check { 1; }
+	int Account_ByProcess(int pid) 
+	{
+		return -1;
+	}
+
+	/** Increase an account's resource reservation by quantity
+	    @return 0 on success or -1 on failure */
+	interface lf_generate { (0); } lf_check { 1; }
+	int Account_AddResource(int account, int quantity) 
+	{
+		return -1;
+	}
+
+	/** Attach additional information about an account
+	    @return 0 on success or -1 on failure */
+	interface lf_generate { (0); } lf_check { 1; }
+	int Account_AddInfo(int account, __input__ struct VarLen fileinfo)
+	{
+		return -1;
+	}
+
+	/** Check if an account has certain information
+	    @return 1 on true, 0 on false, -1 on failure */
+	interface lf_generate { (0); } lf_check { 1; }
+	int Account_CheckInfo(int account, __input__ struct VarLen fileinfo)
+	{
+		return -1;
+	}
+
+	/** Insert a label of the type 
+	    ``resource.x says 
+	      (resource.x.i owns at least N out of M items and 
+	       process.[a, .., k] speaksfor resource.x.i) ''
+	    into the system labelstore
+	 
+	    @param filepath must say where the cert is to be stored
+	    @return 0 on success, -1 on failure */
+	interface lf_generate { (0); } lf_check { 1; }
+	int Account_Attest(int account, __input__ struct VarLen filepath)
+	{
+		return -1;
+	}
+
+        /** Return total number of resources */
+        interface lf_generate { (0); } lf_check { 1; }
+        int Info_SizeTotal(void)
+        {
+                return -1;
+        }
+
+        /** Return total number of resources */
+        interface lf_generate { (0); } lf_check { 1; }
+        int Info_SizeAccount(int account)
+        {
+                return -1;
+        }
+};
+
+/* vim: set ts=8 sw=8: */
+

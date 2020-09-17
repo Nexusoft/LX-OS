@@ -1,0 +1,618 @@
+service FatFS {
+__implements__ { "FS.svc" }
+
+	/* NexusOS: FatFS implements the Fat32 filesystem 
+	 
+           The Fat32 implementation exports an interface similar to Unix
+	   file IO, so we have to translate from Nexus FS calls back to
+	   Unix (while we probably converted from unix calls in caller.. sigh)
+
+	   Initialize with FatFS_Init() before use
+	   Cleanup with FatFs_Exit() after use
+	 */
+
+	decls {
+		int FatFS_Init(int port, int do_quota);
+		int FatFS_Exit(void);
+	}
+	
+	decls __callee__ {
+	
+    		includefiles { 	"<stdlib.h>",
+			 	"<stdio.h>", 
+		   		"<string.h>",
+				"<nexus/sema.h>",
+				"<nexus/hashtable.h>",
+				"<nexus/guard.h>",
+				"<nexus/fs.h>",
+				"../../user/apps/fat32/fat_filelib.h"
+		}
+	
+		Sema fatfs_mutex = SEMA_MUTEX_INIT;
+		int enable_quota = 0;
+
+		////////  lookup path <-> fsid <-> file  ////////
+
+		/** lookup path -> FSID 
+		    populated at runtime with Lookup calls */
+		struct HashTable *pathtable;
+
+		/** lookup FSID -> path */
+		struct HashTable *fsidtable;
+
+		// stupid IDL drops this. sigh.
+		// #define MAX_OPENDESC 10
+
+		/** lookup filepath by FSID
+		    where filepath is relative to root of partition */
+		static char *
+		__fatfs_getpath(FSID node)
+		{
+			char *filepath;
+
+			P(&fatfs_mutex);
+			filepath = hash_findItem(fsidtable, &node);
+			V_nexus(&fatfs_mutex);
+			
+			return filepath;
+		}
+
+		/** lookup FSID by filepath */
+		static FSID
+		__fatfs_getfsid(const char *filepath)
+		{
+			FSID node, *nodep = NULL;
+			
+			P(&fatfs_mutex);
+			nodep = (FSID *) hash_findItem(pathtable, filepath);
+			V_nexus(&fatfs_mutex);
+
+			if (nodep)
+				node = *nodep;
+			return node;
+		}
+
+		/** construct an FSID from a file structure
+		    we base our IDs on the start cluster in FAT */
+		static FSID
+		__fatfs_fsid(unsigned long startcluster, int type)
+		{
+			FSID node;
+
+			node.port = FatFS_server_port_num;
+			node.nodeid = startcluster;
+			node.nodetype = type;
+
+			return node;
+		}
+
+		/** bind FSID to filepath */
+		void
+		__fatfs_setpath(const char *filepath, FSID node)
+		{
+			FSID *pnode;
+
+			pnode = malloc(sizeof(node));
+			memcpy(pnode, &node, sizeof(node));
+
+			P(&fatfs_mutex);
+			hash_insert(fsidtable, &node, strdup(filepath));
+			hash_insert(pathtable, filepath, pnode);
+			V_nexus(&fatfs_mutex);
+		}
+
+		/** create childpath */
+		char *
+		__fatfs_concatpath(const char *parentpath, const char *name)
+		{
+			char *out;
+			int nlen;
+
+			nlen = strlen(parentpath) + strlen(name) + 2;
+			out = malloc(nlen);
+			if (parentpath[strlen(parentpath)-1] == '/')
+				sprintf(out, "%s%s", parentpath, name); 
+			else
+				sprintf(out, "%s/%s", parentpath, name); 
+			return out;
+		}
+
+		
+		////////  open descriptor table  ////////
+		
+		/** open descriptors: lookup FSID -> descriptor */
+		FSID desc_keys[10 /* MAX_OPENDESC */];
+		void *desc_values[10 /* MAX_OPENDESC */];
+		int desc_newest;
+
+
+		/** insert descriptor */
+		static void
+		__fatfs_add(FSID key, void *file)
+		{
+			P(&fatfs_mutex);
+
+			// if entry in use, remove existing
+			// NB: this implements a Least Recently Added, not LRU
+			if (!desc_values[desc_newest])
+				fl_fclose(desc_values[desc_newest]);
+
+			// insert entry
+			desc_keys[desc_newest] = key;
+			desc_values[desc_newest] = file;
+
+			// move insertion pointer
+			desc_newest++;
+			if (desc_newest == 10 /* MAX_OPENDESC */)
+				desc_newest = 0;
+
+			V_nexus(&fatfs_mutex);
+		}
+
+		static void
+		__fatfs_del(void *file)
+		{
+			int i;
+			
+			P(&fatfs_mutex);
+			for (i = 0; i < 10 /* MAX_OPENDESC */; i++) {
+				if (desc_values[i] == file) {
+					desc_keys[i].nodeid = 0;
+					desc_values[i] = NULL;
+					V_nexus(&fatfs_mutex);
+					return;
+				}
+			}
+			V_nexus(&fatfs_mutex);
+		}
+
+		/** _get, but do not open a file if it not yet opened */
+		static void *
+		__fatfs_get_existing(FSID node)
+		{
+			int i;
+			
+			P(&fatfs_mutex);
+			for (i = 0; i < 10 /* MAX_OPENDESC */; i++) {
+				if (FSID_equal(desc_keys[i], node)) {
+					V_nexus(&fatfs_mutex);
+					return desc_values[i];
+				}
+			}
+			V_nexus(&fatfs_mutex);
+			
+			return NULL;
+		}
+
+		/** lookup open file by node; open if not yet so */
+		static void *
+		__fatfs_get(FSID node)
+		{
+			char *filepath;
+			void *file;
+
+			// try to reuse handle
+			file = __fatfs_get_existing(node);
+			if (file)
+				return file;
+
+			// open 
+			filepath = __fatfs_getpath(node);
+			if (!filepath) 
+				return NULL;
+
+			file = fl_fopen(filepath, "r+");
+			if (!file)
+				fprintf(stderr, "[fatfs] open()\n");
+
+			// insert in descriptor table
+			__fatfs_add(node, file);
+
+			return file;
+		}
+
+		static int
+		__fatfs_close(void *file)
+		{
+			if (!file)
+				return 0;
+
+			fl_fclose(file);
+			__fatfs_del(file);
+			return 0;
+		}
+
+		// check if quota system is active
+		static int
+		__fatfs_quota_status(void)
+		{
+			return enable_quota;
+		}
+
+		
+		////////  init/exit  ////////
+		
+		/** Start listening on port. 
+		    @param port is 0 for autoconfiguration */
+		int
+		FatFS_Init(int port, int do_quota)
+		{
+			FSID node;
+
+			pathtable = hash_new_vlen(512 /*arbitrary */, hash_strlen);
+			fsidtable = hash_new(512 /*arbitrary */, sizeof(FSID));
+	  
+			FatFS_server_port_num = IPC_CreatePort(port);
+			FatFS_port_handle = FatFS_server_port_num;
+
+			// Create the root directory node (default id = 0)
+			node = __fatfs_fsid(0ULL, FS_NODE_DIR);
+			__fatfs_setpath("/", node);
+			enable_quota = do_quota;
+			return 0;
+		}
+
+		int
+		FatFS_Exit(void)
+		{
+			IPC_DestroyPort(FatFS_server_port_num);
+			FatFS_server_port_num = -1;
+			
+			// XXX memleak in table values
+			// Best to let hash table handle mm
+			hash_destroy(fsidtable);
+			hash_destroy(pathtable);
+			return 0;
+		}
+	}
+
+	/**** FatFS implementation of the FS.svc iface ********/
+
+	/** Create a new file. FAILS if the file already exists */
+	interface lf_generate { OID_NONE; } lf_check { 1; }
+	FSID Create(FSID parent_node, 
+		    __input__ struct VarLen node_name, 
+		    int nodeType) 
+	{
+		char name[FATFS_MAX_LONG_FILENAME];
+		FSID node;
+		char *filepath, *parentpath;
+		unsigned long nodeId;
+		struct nxguard_object object;
+
+		// input validation
+		if (nodeType != FS_NODE_DIR && nodeType != FS_NODE_FILE)
+			return FSID_ERROR(FS_INVALID);
+
+		// construct path
+		parentpath = __fatfs_getpath(parent_node);
+		if (!parentpath)
+			return FSID_ERROR(FS_NOTDIR);
+
+		if (node_name.len > FATFS_MAX_LONG_FILENAME || node_name.len <= 1)
+			return FSID_ERROR(FS_INVALID);
+
+    		if (IPC_TransferFrom(call_handle, node_name.desc_num, name, 0, node_name.len))
+      			return FSID_ERROR(FS_ACCESSERROR);
+    		name[node_name.len - 1] = '\0';
+
+		filepath = __fatfs_concatpath(parentpath, name);
+
+		// mkdir()
+		if (nodeType == FS_NODE_DIR) {
+			if (!fl_createdirectory(filepath)) {
+				free(filepath);
+				fprintf(stderr, "[fatfs] mkdir()\n");
+				return FSID_ERROR(FS_ACCESSERROR);
+			}
+			// should always succeed
+			nodeId = fl_opendirectory(filepath); 
+		}
+		// creat()
+		else {
+			void *file = fl_fopen(filepath, "w+");
+			// NB: DOES NOT ALLOW TRUNCATE, any
+			// creation on existing file will fail
+			if (!file) {
+				free(filepath);
+				fprintf(stderr, "[fatfs] creat()\n");
+				return FSID_ERROR(FS_ACCESSERROR);
+			}
+			nodeId = fl_fcluster(file);
+			fl_fclose(file);
+		}
+
+        	node = __fatfs_fsid(nodeId, nodeType);
+
+		// set quota check goal for this file onwards
+		if (__fatfs_quota_status()) {
+			nxguard_object_clear(&object);
+			object.fsid = node;
+			if (nxguard_goalproof_set("quota", SYS_FatFS_Write_CMD, &object, "str(write)", 1))
+				return FSID_ERROR(FS_QUOTA_SET);
+			if (nxguard_goalproof_set("quota", SYS_FatFS_Unlink_CMD, &object, "str(delete)", 1))
+				return FSID_ERROR(FS_QUOTA_SET);
+		}
+
+		// bind path to FSID
+		__fatfs_setpath(filepath, node);
+		free(filepath);
+
+        	return node;
+	}
+
+	interface lf_generate { OID_NONE; } lf_check { 1; }
+	int ReadDir(FSID node, 
+		    __output__ struct VarLen data, 
+		    int offset) 
+	{
+		char name[FATFS_MAX_LONG_FILENAME];
+		char *filepath;
+		int nlen, ret;
+		static int passed_dots = 0;
+
+		filepath = __fatfs_getpath(node);
+		if (!filepath)
+			return -1;
+
+		while (1) {
+			if (fl_getdirectory_n(filepath, offset + passed_dots, name)) {
+				// skip '.' and '..' items
+      				if (!strcmp(name, ".           ") ||
+      				    !strcmp(name, "..          ")) {
+				    passed_dots++;
+				    continue;
+				}
+			
+				// will the name fit?
+				nlen = strlen(name);
+				if (data.len < nlen + 1)
+					return -1;
+
+				// transfer name
+				if (IPC_TransferTo(call_handle, data.desc_num, 
+						   name, 0, nlen + 1))
+					return -1;
+			}
+			break;
+		}
+
+		// return 0 if last element, 1 otherwise
+		ret = fl_getdirectory_n(filepath, offset + passed_dots + 1, name) ? 1 : 0;
+		// restart, no interleaving!
+		if (!ret)
+			passed_dots = 0;
+		return ret;
+	}
+
+	interface lf_generate { OID_NONE; } lf_check { 1; }
+	int Read(FSID node, int file_position, 
+	    __output__ struct VarLen dest, int count) 
+	{
+		void *file;
+		unsigned long pos;
+		char *buf;
+		int len, ret = -1;
+
+		// lookup inode
+		file = __fatfs_get(node);
+		if (!file)
+			return -1;
+
+		buf = nxcompat_alloc(count);
+
+		// seek
+		if (fl_fseek(file, file_position, SEEK_SET))
+			goto cleanup;
+
+		// read
+		len = fl_fread(buf, 1, count, file);
+		if (len == 0)
+			ret = 0;
+		if (len > count || len <= 0)
+			goto cleanup;
+
+		// transfer data to user
+		if (IPC_TransferTo(call_handle, dest.desc_num, buf, 0, len))
+			goto cleanup;
+
+		// all done
+		ret = len;
+
+cleanup:
+		free(buf);
+		__fatfs_close(file);
+		return ret;
+	}
+
+	interface lf_generate { OID_NONE; } lf_check { 1; }
+	int Write(FSID node, int file_position,
+		   __input__ struct VarLen source, int count) 
+	{
+		void *file;
+		char *buf;
+		int ret;
+
+		// lookup inode
+		file = __fatfs_get(node);
+		if (!file)
+			return -1;
+
+		buf = nxcompat_alloc(count);
+
+		// transfer data from user
+		if (IPC_TransferFrom(call_handle, source.desc_num, buf, 0, count)) {
+			fprintf(stderr, "transferfrom: %d.%d 0-%d\n", 
+					call_handle, source.desc_num, count);
+			return -1;
+		}
+
+		// seek
+		if (fl_fseek(file, file_position, SEEK_SET))
+			return -1;
+
+		// write
+		ret = fl_fwrite(buf, 1, count, file);
+		free(buf);
+		if (fl_fflush(file))
+			ret = -1;
+
+		return ret;
+	}
+
+	interface lf_generate { OID_NONE; } lf_check { 1; }
+	int Truncate(FSID target_node, int target_len) 
+	{
+		void *file;
+
+		// lookup inode
+		file = __fatfs_get(target_node);
+		if (!file)
+			return -1;
+
+		return fl_truncate(file, target_len);
+	}
+
+	/** Flush contents to disk. Also closes the open file */
+	interface lf_generate { OID_NONE; } lf_check { 1; }
+	int Sync(FSID node) 
+	{
+		void *file;
+		int ret;
+		
+		file = __fatfs_get_existing(node);
+		if (!file)
+			return -1;
+
+		ret = fl_fflush(file);
+		__fatfs_close(file);
+
+		return ret;
+	}
+
+	interface lf_generate { OID_NONE; } lf_check { 1; }
+	int Size(FSID node) 
+	{
+		void *file;
+		unsigned long size;
+		
+		file = __fatfs_get(node);
+		if (!file)
+			return -1;
+
+		size = fl_fsize(file);
+		__fatfs_close(file);
+		return size;
+	}
+
+	/** Find a child of the given node by name. */
+	interface lf_generate { OID_NONE; } lf_check { 1; }
+	FSID Lookup(FSID parent_node, __input__ struct VarLen node_name, 
+		    int resolve_mounts) 
+	{
+		char name[FATFS_MAX_LONG_FILENAME];
+		char *childpath, *parentpath;
+		void *file;
+		FSID node;
+		int len, ret;
+
+		parentpath = __fatfs_getpath(parent_node);
+		if (!parentpath)
+			return FSID_ERROR(FS_NOTDIR);
+
+		if (node_name.len > FATFS_MAX_LONG_FILENAME || node_name.len <= 1)
+			return FSID_ERROR(FS_INVALID);
+
+    		if (IPC_TransferFrom(call_handle, node_name.desc_num, name, 0, node_name.len))
+      			return FSID_ERROR(FS_ACCESSERROR);
+    		name[node_name.len - 1] = '\0';
+
+		childpath = __fatfs_concatpath(parentpath, name);
+
+		// lookup child
+		node = __fatfs_getfsid(childpath);
+		if (FSID_isValid(node)) {
+			free(childpath);
+			return node;
+		}
+
+		// try to open child file
+		file = fl_fopen(childpath, "r");
+		if (!file) {
+			free(childpath);
+			return FSID_ERROR(FS_NOTFOUND);
+		}
+
+		ret = fl_isdirectory(parentpath, name);
+		if (ret == 1)
+			node = __fatfs_fsid(fl_opendirectory(childpath), FS_NODE_DIR);
+		else if (ret == 0) 
+			node = __fatfs_fsid(fl_fcluster(file), FS_NODE_FILE);
+		else 
+			node = FSID_ERROR(FS_INVALID);
+			
+		if (ret >= 0)
+			__fatfs_setpath(childpath, node);
+
+		free(childpath);
+		fl_fclose(file);
+
+		return node;
+	}
+
+	interface lf_generate { OID_NONE; } lf_check { 1; }
+	int Unlink(FSID parent_node, FSID child_node) 
+	{
+		char *path;
+		void *file;
+		int ret;
+
+		// close (if open)
+		file = __fatfs_get_existing(child_node);
+		if (file)
+			__fatfs_close(file);
+
+		// unlink
+		path = __fatfs_getpath(child_node);
+		if (!path)
+			return -1;
+		return fl_remove(path);
+	}
+
+	interface lf_generate { OID_NONE; } lf_check { 1; }
+	int Pin(FSID target_node) 
+	{ 
+		// noop
+		return 0;
+	}
+
+	interface lf_generate { OID_NONE; } lf_check { 1; }
+	int Unpin(FSID target_node, int do_sync) 
+	{
+		if (do_sync)
+			FatFS_Sync_Handler(ipd_id, call_handle, message_data, 0, target_node);
+		// noop
+		return 0;
+	}
+
+	interface lf_generate { OID_NONE; } lf_check { 1; }
+	int Mount(FSID target_node, FSID mount_node) 
+	{
+		// not supported: mounting another filesystem on a FatFS dir
+		return -FS_INVALID;
+	}
+	  
+
+	interface lf_generate { OID_NONE; } lf_check { 1; }
+	int Unmount(FSID parent_node) 
+	{ 
+		// not supported: see mount
+		return -FS_INVALID;
+	}
+
+	interface lf_generate { (0); } lf_check { 1; }
+	FSID Link(FSID target_dir, FSID source_node) {
+		nxcompat_fprintf(stderr, "[fatfs] link(): unsupported\n");
+		return FSID_ERROR(FS_UNSUPPORTED);
+	}
+}

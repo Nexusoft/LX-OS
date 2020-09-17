@@ -1,0 +1,38 @@
+Quick tips for running a TFTP server.
+
+## Implementation
+
+There are multiple tftpd implementations in the wild, with
+incompatible flags. I suggest picking up atftpd. The latest
+version is 0.7; this is unlikely to change.
+
+In the (unlikely) case that atftpd does not work for your Linux
+distribution, try the tftp-server package. Documentation should be
+easily accessible online.
+
+## Installation
+
+I abhor (x)inetd. The following describes how to get the
+server running without any dependencies or installation.
+Alternatively, you can just get the version with inetd
+through apt-get or yum. 
+
+Download the .tar.gz and .diff for version 7.0 from a
+debian or ubuntu tree, e.g.,
+
+	http://packages.ubuntu.com/jaunty/atftpd
+
+Unpack the archive, apply the patch and compile
+
+	cd atftp-0.7; patch -p1 < ../atftp_0.7.$PATCH.diff; configure && make
+
+## Running
+
+In the source directory, simply call
+
+	sudo ./atftpd --daemon --user $USERNAME $FILEPATH
+
+where $USERNAME is your own accountname
+where $FILEPATH will probably point to $NEXUS/build/boot/stage1
+
+

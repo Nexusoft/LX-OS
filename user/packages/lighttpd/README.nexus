@@ -1,0 +1,31 @@
+Lighttpd Nexus port
+
+Compilation is straightforward apart from
+
+1) the server compiles its own parser generator (lemon) from source. Since 
+   we compile lighttpd for a different target, but the parser generator has
+   to work on the development host, we split compilation in two phases.
+
+2) the patchfile works around a few minor issues:
+   - we hardcode use of select(..) for blocking, otherwise SIGIO is selected
+   - even on a static system, the dynamic loader header dlfn...h is expected
+   - nexus does not yet implement madvise, but ./configure finds it: disabled
+
+3) lighty wants to dynamically load its modules. We force it to statically 
+   link the ones we need. See also 
+   http://codemonkeytips.blogspot.com/2010/02/lighttpd-with-static-modules.html
+
+
+## Patch versions
+
+There are two versions of the Nexus patch:
+
+- nexus.patch is faster, running lighty with non-blocking I/O and handling 
+  multiple connections in parallel. This version was unstable on last testing.
+
+- nexus.patch-blocking is slower, running lighty with blocking and I/O and 
+  therefore having to serialize connections. This version proved stable.
+
+Choose between the preferred version by modifying the `patch -p1 < PATCHFILE'
+line in the Makefile
+

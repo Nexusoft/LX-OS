@@ -1,0 +1,26 @@
+# Qemu 
+
+To run the live CD, start qemu as follows:
+
+	qemu -m 512 -cdrom build/boot/stage1/nexus.iso /dev/null
+
+To run the virtual disk, use the following:
+
+	qemu -m 512 -boot c -hda build/boot/stage1/nexus.qcow2 /dev/null
+
+# Networking
+
+To enable networking support, use this command: 
+
+	qemu -net nic,model=e1000 -net user -m 512 -cdrom build/boot/stage1/nexus.iso /dev/null
+
+or,
+
+	qemu -net nic,model=e1000 -net user -m 512 -boot c -hda build/boot/stage1/nexus.qcow2 /dev/null
+
+# Tested
+
+These commands worked with Qemu 0.12.5 and Nexus GIT builds of September 2010.
+They should continue to work, please let us know if it fails for later versions
+of either.
+

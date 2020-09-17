@@ -1,0 +1,678 @@
+service ProcFS {
+__implements__ { "FS.svc" }
+
+	/* NexusOS: ProcFS exports a virtual filesystem of volatile data by
+	            registering callback functions when a client performs an
+		    operation on an inode.
+
+	            ProcFS.svc allows any process to export information by
+	            exporting and mounting their own proc filesystem 
+	 
+	   Implementation Info:
+	 
+	            Elements are in-memory structures. They are mapped onto
+	 	    FSIDs by embedding the 4byte pointer into the 56bit 
+	            FSID nodeid 
+	 
+	 	    Like files, directories can be dynamically generated.
+		    This is the case if readdir is not NULL on create. Otherwise, a
+		    static directory is assumed and firstchild is accessed. 
+	 */
+
+	decls {
+
+    		includefiles {	"<nexus/fs.h>",
+				"<nexus/defs.h>",
+	       			"<nexus/hashtable.h>",
+	        		"k:<nexus/user_compat.h>"	}
+		
+		////////  exported to procfs implementers  ////////
+	
+		struct dnode;
+
+		typedef int (*procfs_read)(struct dnode *dnode, char *buf, int off, int len);
+		typedef int (*procfs_write)(struct dnode *dnode, const char *buf, int off, int len);
+		typedef struct dnode * (*procfs_readdir)(struct dnode *parent, int n);
+
+		// file element
+		struct inode_ops {
+			procfs_read read;
+			procfs_write write;
+		};
+
+		struct dnode_ops {
+			procfs_readdir readdir;		// get directory element n
+			procfs_readdir readdirchild;	// n is a dir
+			procfs_read    readchild;	// n is a file, interpret data 
+		};
+		
+		// directory element
+		struct dnode {
+
+			char *name;
+			int isdir;	// file or dir node?
+			void *priv;
+			long priv2;
+
+			union {
+				struct inode_ops file;
+				struct dnode_ops dir;
+			};
+
+			// tree structure
+			struct dnode *firstchild;
+			struct dnode *next;
+		};
+
+		int procfs_init(FSID parent);
+		int procfs_exit(void);
+		
+		struct dnode * procfs_createdir(struct dnode *parent, 
+				                const char *name);
+		struct dnode * procfs_createdir_ex(struct dnode *parent, 
+				                   const char *name,
+						   void *priv,
+			 	                   procfs_readdir readdir,
+						   procfs_read read);
+		struct dnode * procfs_createdir_exdir(struct dnode *parent, 
+				                      const char *name,
+						      void *priv,
+			 	                      procfs_readdir readdir,
+						      procfs_readdir readchild);
+		struct dnode * procfs_createfile(struct dnode *parent, 
+						 const char *name,
+				  		 procfs_read read, 
+						 procfs_write write);
+		
+		// standard readdirs over common datastructures
+		struct dnode * procfs_readdir_hash_string(struct dnode *parent, int n);
+		struct dnode * procfs_readdir_hash_int(struct dnode *parent, int n);
+		struct dnode * procfs_readdir_hash_bin(struct dnode *parent, int n);
+		
+		// standard reads for common cases
+		int procfs_read_bin(struct dnode *dnode, char *buf, int off, int len);
+		int procfs_read_string(struct dnode *dnode, char *buf, int off, int len);
+		int procfs_read_int(struct dnode *dnode, char *buf, int off, int len);
+	}	
+
+	decls __callee__ {
+	
+    		includefiles { 	"u:<stdlib.h>",
+			 	"u:<stdio.h>", 
+		   		"u:<string.h>",
+				"u:<unistd.h>"
+		}
+	
+
+		static struct dnode *procfs_root;
+		static int procthread_stop;
+
+		////////  main filesystem implementation  ////////
+		
+		static void
+		__procfs_attach(struct dnode *parent, struct dnode *child)
+		{
+			struct dnode *eldersibling;
+
+			// no parent? then child of root
+			if (!parent)
+				parent = procfs_root;
+			
+			// base case: first child
+			if (!parent->firstchild) {
+				parent->firstchild = child;
+				return;
+			}
+
+			// common case: add to list
+			eldersibling = parent->firstchild;
+			while (eldersibling->next)
+				eldersibling = eldersibling->next;
+			eldersibling->next = child;
+		}
+		
+		/** readdir for a static directory (one that uses the tree) */
+		static struct dnode *
+		procfs_readdir_static(struct dnode *dnode, int off)
+		{
+			int i;
+			
+			// get firstchild
+			dnode = dnode->firstchild;
+			if (!dnode)
+				return NULL;
+			
+			// spool to offset
+			for (i = 0; i < off; i++) {
+				dnode = dnode->next;
+				if (!dnode) {
+					return NULL;
+				}
+			}
+			return dnode;
+		}
+
+		/** Add a dynamic directory node whose children are files
+		    @param read sets the method to use on the childnodes
+		           if null, read access is disabled */
+		struct dnode *
+		procfs_createdir_ex(struct dnode *parent, const char *name, void *priv,
+				    procfs_readdir readdir, procfs_read read)
+		{
+			struct dnode *node;
+
+			node = nxcompat_calloc(1, sizeof(*node));
+			node->name = strdup(name);
+			node->isdir = 1;
+			node->priv = priv;
+
+			// set callbacks
+			if (readdir)
+				node->dir.readdir = readdir;
+			else
+				node->dir.readdir = procfs_readdir_static;
+			node->dir.readchild = read;
+
+			// attach to parent
+			__procfs_attach(parent, node);
+			return node;
+		}
+
+		/** Add a dynamic directory node whose children are dirs */
+		struct dnode *
+		procfs_createdir_exdir(struct dnode *parent, const char *name, 
+				       void *priv,
+				       procfs_readdir readdir, 
+				       procfs_readdir readdirchild)
+		{
+			struct dnode *dnode;
+
+			dnode = procfs_createdir_ex(parent, name, priv, 
+						    readdir, NULL);
+			dnode->dir.readdirchild = readdirchild;
+			return dnode;
+		}
+
+		/** Add a static directory to the procfs */
+		struct dnode *
+		procfs_createdir(struct dnode *parent, const char *name)
+		{
+			return procfs_createdir_ex(parent, name, NULL, NULL, NULL);
+		}
+
+		struct dnode *
+		procfs_createfile(struct dnode *parent, const char *name,
+				  procfs_read read, procfs_write write)
+		{
+			struct dnode *node;
+
+			node = nxcompat_alloc(sizeof(*node));
+			node->name = strdup(name);
+			node->isdir = 0;
+
+			// set callbacks
+			node->file.read = read;
+			node->file.write = write;
+
+			// attach to parent
+			__procfs_attach(parent, node);
+			return node;
+		}
+
+		/** special case of create dir: root dir */
+		static struct dnode *
+		procfs_createroot(void)
+		{
+			struct dnode *node;
+
+			if (procfs_root)
+				nxcompat_fprintf(stderr, "WARNING: replacing procfs root\n");
+
+			node = nxcompat_alloc(sizeof(*node));
+			node->name = "<root>";
+			node->isdir = 1;
+			node->dir.readdir = procfs_readdir_static;
+
+			procfs_root = node;
+			return node;
+		}
+
+		
+		////////  FSID <-> dnode translation  ////////
+		
+		static inline void *
+		procfs_dnode(FSID node)
+		{
+			return (void *) ((unsigned long) node.nodeid & 0xffffffff /* 32bit arch specific */);
+		}
+
+		static inline FSID
+		procfs_fsid(struct dnode *dnode)
+		{
+			FSID node;
+			
+			node.port = ProcFS_server_port_num;
+			node.nodetype = dnode->isdir ? FS_NODE_DIR : FS_NODE_FILE;
+			node.nodeid = 0ULL | (unsigned long) dnode;
+			return node;
+		}
+
+
+		////////  init/exit  ////////
+		
+		/** server listening thread */
+		static void *
+		procfs_thread(void *unused)
+		{
+#ifndef __NEXUSKERNEL__
+			while (!procthread_stop)
+				ProcFS_processNextCommand();
+#endif
+			return NULL;
+		}
+
+		/** wrapper */
+		void procfs_kcallback(void *t) 
+		{
+#ifdef __NEXUSKERNEL__
+			ProcFS_kernelProcessNextCommand(
+				SERVERPROCESSOR_SYNC,
+				((KernelServerProcessorData) {.caller_thread = t}));
+#endif
+		}
+
+		/** start a procfs server thread and mount under parent/<pid> */
+		int
+		procfs_init(FSID parent)
+		{
+			FSID procfs_root;
+			char filename[12];
+
+			// create listening port 
+			// (weird magic variables are courtesy of IDL)
+			ProcFS_server_port_num = IPC_CreatePort(0);
+	  		ProcFS_port_handle = ProcFS_server_port_num;
+
+			// start server
+#ifdef __NEXUSKERNEL__
+      			IPCPort_setKernelHandlers(IPCPort_find(ProcFS_server_port_num), 
+						  kernelIPD, 
+		      				  procfs_kcallback, 
+						  kernel_bind_accept_all);
+#else
+			pthread_t thread;
+			pthread_create(&thread, NULL, procfs_thread, NULL);
+#endif
+
+			// create filesystem root
+			procfs_root = procfs_fsid(procfs_createroot());
+
+			// mount
+			// XXX naming should be guarded by os to avoid spoofing
+#ifdef __NEXUSKERNEL__
+			sprintf(filename, "os");
+#else
+			sprintf(filename, "%d", getpid());
+#endif
+			parent = nexusfs_mkdir(parent, filename);
+			if (!FSID_isDir(parent))
+				return -1;  // XXX revert changes
+			nexusfs_mount(parent, procfs_root);
+			
+			return 0;
+		}
+
+		int
+		procfs_exit(void)
+		{
+			procthread_stop = 1;
+
+			// send useless command to wake listening thread
+			FS_Sync_ext(ProcFS_server_port_num, 
+				    procfs_fsid(procfs_root));
+
+			return 0;
+		}
+		
+
+		////////  std implementations for common structures  ////////
+		
+		/** Read as if dnode->priv points to a region of binary data and 
+		               dnode->priv2 holds the length of the region */
+		int 
+		procfs_read_bin(struct dnode *dnode, char *buf, int off, int len)
+		{
+			if (off < 0 || len <= 0)
+				return -1;
+
+			len = min((long) len, dnode->priv2 - off);
+			if (len <= 0)
+				return 0;
+
+			memcpy(buf, dnode->priv + off, len);
+			return len;
+		}
+
+		/** Read as if dnode->priv points to a \0 terminated string */
+		int
+		procfs_read_string(struct dnode *dnode, char *buf, int off, int len)
+		{
+			int nlen;
+
+			nlen = strnlen(dnode->priv, min(off + len, 4000));
+			if (nlen == 4000) // no endline found
+				return -1;
+
+			len = min(off + len, nlen + 1);
+			memcpy(buf, ((char *) dnode->priv) + off, len);
+			return len;
+		}
+
+		/** Read as if dnode->priv holds a long integer, not an address */
+		int procfs_read_int(struct dnode *dnode, char *buf, int off, int len)
+		{
+			char ibuf[25];
+			int blen;
+
+			blen = sprintf(ibuf, "%ld", (long) dnode->priv);
+			if (off < 0)
+				return -1;
+			if (off >= blen)
+				return 0;
+
+			len = min(blen - off, len);
+			memcpy(buf, ibuf + off, len);
+			return len;
+		}
+
+		/** Iterate over the entries in a hashtable
+		    Expects - keys to be strings
+		            - parent->priv to point to a struct HashTable 
+		    
+		    NOT multithread safe: returns static struct dnode
+		    NOT hash_delete() safe: names directly point to hash entries
+		 */
+		struct dnode *
+		procfs_readdir_hash_string(struct dnode *parent, int n)
+		{
+			static int next_n, next_idx;
+			static struct dnode dnode;
+			struct dnode dnext;
+			int idx;
+
+			// optimization: use hint next_idx if next_n == n
+			if (next_n == n)
+				idx = next_idx;
+			else
+				idx = 0;
+			
+			// create new child
+			next_n = n + 1;
+			next_idx = hash_findByIndex(parent->priv, idx, 
+					            (void **) &dnode.name, 
+						    (char **) &dnode.priv);
+			if (next_idx == -1) {
+				next_n = 0;
+				return NULL;
+			}
+
+			
+			// check whether last
+			dnext.name = NULL; // for gcc
+			dnext.priv = NULL; // for gcc
+			if (hash_findByIndex(parent->priv, next_idx, 
+					     (void **) &dnext.name, 
+					     (char **) &dnext.priv) != -1)
+				dnode.next = (void *) 1; // .. more to come
+			else
+				dnode.next = 0;
+
+			// fill in child elements
+			if (parent->dir.readdirchild) {
+				dnode.isdir = 1;
+				dnode.dir.readdir = parent->dir.readdirchild;
+			}
+			else {
+				dnode.isdir = 0;
+				dnode.file.read = parent->dir.readchild;
+			}
+			return &dnode;
+		}
+
+		/** Like .._readdir_hash_string, but expect keys to be integers
+		    NOT multithread-safe: returns static string */
+		struct dnode *
+		procfs_readdir_hash_int(struct dnode *parent, int n)
+		{
+			struct dnode *dnode;
+			char namebuf[16];
+			long name;
+
+			dnode = procfs_readdir_hash_string(parent, n);
+			if (dnode) {
+				name = *(long *) dnode->name;
+				sprintf(namebuf, "%lu", name);
+				dnode->name = strdup(namebuf);
+			}
+			return dnode;
+		}
+
+		/** Like .._readdir_hash_string, 
+		    but expect keys to be binary data of at least 4B
+		    NOT multithread-safe: returns static string */
+		struct dnode *
+		procfs_readdir_hash_bin(struct dnode *parent, int n)
+		{
+			static char namebuf[32];
+			struct dnode *dnode;
+
+			dnode = procfs_readdir_hash_string(parent, n);
+			if (dnode) {
+				sprintf(namebuf, "%hx%hx%hx%hx..", 
+					dnode->name[0], dnode->name[1],
+					dnode->name[2], dnode->name[3]);
+				dnode->name = namebuf;
+			}
+			return dnode;
+		}
+	}
+
+	/**** ProcFS implementation of the FS.svc iface ********/
+
+	interface lf_generate { OID_NONE; } lf_check { 1; }
+	FSID Create(FSID parent_node, 
+		    __input__ struct VarLen node_name, 
+		    int nodeType) 
+	{
+		// noop: clients cannot modify filesystem structure 
+		return FSID_ERROR(FS_ACCESSERROR);
+	}
+
+	/** return 0 if last element, -1 on error, 1 otherwise */
+	interface lf_generate { OID_NONE; } lf_check { 1; }
+	int ReadDir(FSID node, __output__ struct VarLen data, int offset) 
+	{
+		struct dnode *dnode;
+
+		dnode = procfs_dnode(node);
+		if (!dnode)
+			dnode = procfs_root;
+		if (!dnode->isdir)
+			return -1;
+		
+		// dynamic or static dir?
+		dnode = dnode->dir.readdir(dnode, offset);
+		if (!dnode)
+			return -1;
+
+		// transfer name
+		if (IPC_TransferTo(call_handle, data.desc_num, 
+				   dnode->name, 0, strlen(dnode->name) + 1))
+			return -1;
+
+		return dnode->next ? 1 : 0;
+	}
+
+	interface lf_generate { OID_NONE; } lf_check { 1; }
+	int Read(FSID node, int file_position, 
+	         __output__ struct VarLen dest, int count) 
+	{
+		struct dnode *dnode;
+		char *buf;
+		int ret;
+
+		dnode = procfs_dnode(node);
+		if (dnode->isdir || !dnode->file.read)
+			return -1;
+		if (count > /* fairly arbitrary */ 1024)
+			return -1;
+
+		buf = nxcompat_alloc(count);
+		ret = dnode->file.read(dnode, buf, file_position, count);
+		if (ret < 0) {
+			nxcompat_free(buf);
+			return -1;
+		}
+
+		if (IPC_TransferTo(call_handle, dest.desc_num, buf, 0, ret)) {
+			nxcompat_free(buf);
+			return -1;
+		}
+		nxcompat_free(buf);
+
+		return ret;
+	}
+
+	interface lf_generate { OID_NONE; } lf_check { 1; }
+	int Write(FSID node, int file_position,
+		   __input__ struct VarLen source, int count) 
+	{
+		struct dnode *dnode;
+		char *buf;
+		int ret;
+
+		dnode = procfs_dnode(node);
+		if (dnode->isdir || !dnode->file.write)
+			return -1;
+		if (count > /* fairly arbitrary */ 1024)
+			return -1;
+
+		buf = nxcompat_alloc(count);
+		if (IPC_TransferFrom(call_handle, source.desc_num, 
+				     buf, 0, count)) {
+			nxcompat_free(buf);
+			return -1;
+		}
+
+		ret = dnode->file.write(dnode, buf, file_position, count);
+		nxcompat_free(buf);
+
+		return ret;
+	}
+
+	interface lf_generate { OID_NONE; } lf_check { 1; }
+	int Truncate(FSID target_node, int target_len) 
+	{
+		// noop
+		return 0;
+	}
+
+	/** Flush contents to disk. Also closes the open file */
+	interface lf_generate { OID_NONE; } lf_check { 1; }
+	int Sync(FSID node) 
+	{
+		// noop
+		return 0;
+	}
+
+	interface lf_generate { OID_NONE; } lf_check { 1; }
+	int Size(FSID node) 
+	{
+		// noop
+		return 0;
+	}
+
+	/** Find a child of the given node by name. */
+	interface lf_generate { OID_NONE; } lf_check { 1; }
+	FSID Lookup(FSID parent_node, __input__ struct VarLen node_name, 
+		    int resolve_mounts) 
+	{
+		struct dnode *dnode, *parent;
+		FSID node;
+		char *name;
+		int i;
+
+		parent = procfs_dnode(parent_node);
+		if (!parent)
+			parent = procfs_root;
+		if (!parent->isdir)
+			return FSID_ERROR(FS_INVALID);
+
+		// get name
+		if (node_name.len > /* fairly arbitrary */ 128)
+			return FSID_ERROR(FS_INVALID);
+		name = nxcompat_alloc(node_name.len);
+		if (IPC_TransferFrom(call_handle, node_name.desc_num, 
+				     name, 0, node_name.len)) {
+			nxcompat_free(name);
+			return FSID_ERROR(FS_INVALID);
+		}
+
+		// slow: iterate over an internally iterating implementation
+		i = 0;
+		dnode = parent->dir.readdir(parent, i++);
+		while (dnode) {
+			if (!strcmp(dnode->name, name))
+				break;
+			if (!dnode->next) {
+				dnode = NULL; // fail
+				break;
+			}
+			dnode = parent->dir.readdir(parent, i++);
+		} 
+		nxcompat_free(name);
+
+		if (!dnode)
+			return FSID_ERROR(FS_INVALID);
+		
+		// convert to FSID
+		return procfs_fsid(dnode);
+	}
+
+	interface lf_generate { OID_NONE; } lf_check { 1; }
+	int Unlink(FSID parent_node, FSID child_node) 
+	{
+		// noop: clients cannot modify filesystem structure 
+		return 0;
+	}
+
+	interface lf_generate { OID_NONE; } lf_check { 1; }
+	int Pin(FSID target_node) 
+	{ 
+		// noop
+		return 0;
+	}
+
+	interface lf_generate { OID_NONE; } lf_check { 1; }
+	int Unpin(FSID target_node, int do_sync) 
+	{
+		// noop
+		return 0;
+	}
+
+	interface lf_generate { OID_NONE; } lf_check { 1; }
+	int Mount(FSID target_node, FSID mount_node) 
+	{
+		// not supported: mounting another filesystem on a ProcFS dir
+		return -FS_INVALID;
+	}
+	  
+
+	interface lf_generate { OID_NONE; } lf_check { 1; }
+	int Unmount(FSID parent_node) 
+	{ 
+		// not supported: see mount
+		return -FS_INVALID;
+	}
+}
+

@@ -1,0 +1,18 @@
+HOWTO program authorities
+
+Authorities are processes that listen on an IPC port for NAL statements.
+They implement an RPC protocol using Auth.svc: Auth_Answer replies true
+or false, depending on whether the authority believes the statement or
+not.
+
+To implement an authority, 
+  1. link an application against Auth.user.server.o and 
+  2. implement in the main file `int auth_answer(const char *formula, int pid)'
+  3. in the main file, start and register the Auth service by
+     a. calling Auth_serverInit() to acquire an IPC port
+     b. calling Guard_SetAuth_ext to register the authority
+     c. calling Auth_processNextCommand() to handle Auth_Answer requests
+
+See user/apps/auth/allow.c for a trivial implementation
+
+

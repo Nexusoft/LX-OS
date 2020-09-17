@@ -1,0 +1,38 @@
+diff -Nur tboot-20100427-orig/lcptools/crtpolelt.c tboot-20100427/lcptools/crtpolelt.c
+--- tboot-20100427-orig/lcptools/crtpolelt.c	2010-07-22 12:09:15.338931030 -0400
++++ tboot-20100427/lcptools/crtpolelt.c	2010-07-22 12:10:49.107682055 -0400
+@@ -115,7 +115,7 @@
+             ERROR("Error: too many plugin options\n");
+ 
+         /* copy help text */
+-        strncat(help, plugin->help_txt, MAX_HELP_TEXT);
++        strncat(help, plugin->help_txt, MAX_HELP_TEXT - strlen(help) - 1);
+     }
+ }
+ 
+diff -Nur tboot-20100427-orig/lcptools/Makefile tboot-20100427/lcptools/Makefile
+--- tboot-20100427-orig/lcptools/Makefile	2010-07-22 12:09:15.338931030 -0400
++++ tboot-20100427/lcptools/Makefile	2010-07-22 12:09:57.219930910 -0400
+@@ -70,7 +70,7 @@
+ #
+ 
+ trousers_dep:
+-	@echo -e "#include <trousers/tss.h>" | $(CC) -x c $(CFLAGS) $(LDFLAGS) $(LIBS) - -Wl,--defsym=main=0 -o $@ >/dev/null 2>&1 || (echo trousers-devel package is not installed && false)
++	@/bin/echo -e "#include <trousers/tss.h>" | $(CC) -x c $(CFLAGS) $(LDFLAGS) $(LIBS) - -Wl,--defsym=main=0 -o $@ >/dev/null 2>&1 || (echo trousers-dbg or trousers-devel package is not installed && false)
+ 
+ #
+ # dependencies
+diff -Nur tboot-20100427-orig/tboot/include/txt/config_regs.h tboot-20100427/tboot/include/txt/config_regs.h
+--- tboot-20100427-orig/tboot/include/txt/config_regs.h	2010-07-22 12:09:15.321680604 -0400
++++ tboot-20100427/tboot/include/txt/config_regs.h	2010-07-22 12:11:47.156678777 -0400
+@@ -43,6 +43,10 @@
+ #define TXT_PUB_CONFIG_REGS_BASE       0xfed30000
+ #define TXT_PRIV_CONFIG_REGS_BASE      0xfed20000
+ 
++#ifndef PAGE_SHIFT
++#define PAGE_SHIFT	12
++#endif
++
+ /* # pages for each config regs space - used by fixmap */
+ #define NR_TXT_CONFIG_PAGES            ((TXT_PUB_CONFIG_REGS_BASE - \
+                                         TXT_PRIV_CONFIG_REGS_BASE) >>    \

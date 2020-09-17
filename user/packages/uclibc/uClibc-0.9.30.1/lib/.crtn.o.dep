@@ -1,0 +1,6 @@
+lib/crtn.o: libc/sysdeps/linux/i386/crtn.S include/libc-symbols.h \
+ include/bits/uClibc_arch_features.h
+
+include/libc-symbols.h:
+
+include/bits/uClibc_arch_features.h:

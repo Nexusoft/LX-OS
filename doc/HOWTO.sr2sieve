@@ -1,0 +1,43 @@
+The above steps for the installation presuppose the use of Linux (Ubuntu).
+Our boinc-client system is implemented by the file client.c.
+In order boinc-client to be executed, you have to install both BOINC and Nexus.
+
+Firstly, you have to become a member of BOINC system and copy the personal information that you will get in the client.c :
+1)Download BOINC software and install it.
+2)Start BOINC.
+3)Select PrimeGrid for your project.
+4)Go direclty to BOINC directory, copy the file sched_request_ www.primegrid.com.xml and past it somewhere else.
+5)At the file client.c, at the end, there are some fields with “?????” (personal information). Copy the corresponding fields of the above xml file into “?????” fields of client.c.
+
+Then, you have to get Nexus source code. You will find it here: git://git.systems.cs.cornell.edu/nexus .
+In order Nexus to be executed, you have to download and install VMware.
+
+When you get the Nexus source code, a directory named “nexus” will be created. Now, you have to incorporate the modified client.c in Nexus. The only thing you have to do is copying the contents of modified client.c into the existing file nexus/user/apps/boinc/client.c .
+
+Now, you have to install and run Nexus:
+1)Go to nexus/ and execute
+	1.make menuconfig
+		1.Go to Trusted Software Stack and check TPM emulator
+		2.Go to Applications and check Sr2sieve
+	2.make (2 times because it stacks)
+2)Open VMware
+3)Select “open virtual machine” and open nexus/tools/vmware/nexus-e1000.vmx
+4)Go to “edit virtual machine setting”
+	1.set memory = 1GB
+	2.set CD/DVD = .iso file in nexus/build/boot/stage1
+5)Go at the main menu of VM ware and select “play”, in order the new virtual machine to be executed.
+6)Go to http://www.cs.cornell.edu/People/egs/nexus/guide.php to see how to handle the terminal of Nexus.
+7)When Nexus boots, write “bin/tpmd &” to start the TPM emulator.
+8)Write “bin/sysinfo.app” to generate the system certificate.
+9)Write “bin/boinc_client” to execute our system.
+10)We can see the process of the communication with the Server
+and the creation of the certificates.
+11)boinc-client waits until sr2sieve complete its execution (7+ hours).
+12)We can press ctrl+tab several times to go to the terminal that sr2sieve is executing.
+13)After a while, we can stop the virtual machine.
+14)If we want to see the complete process, we can restart again the virtual machine
+and execute “bin/boinc_client.app -p4e6 -P5e6”. In this case, we give a small
+range of numbers sr2sieve to scan. After the termination of sr2sieve we see
+the rest certificates be generated. We can go to bin/ to see the certificates.
+
+

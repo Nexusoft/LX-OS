@@ -1,0 +1,28 @@
+README:
+
+Welcome to the Nexus operating system! For an overview of
+system requirements for booting on bare metal or for executing in a
+virtual machine, see the online User Guide at:
+
+       http://www.cs.cornell.edu/People/egs/nexus/
+
+Once booted, the system will boot up to a command prompt with multiple
+active processes. Use Alt-Tab to scroll through the list of active
+processes. For each, the name is displayed in the top-left corner of the
+screen:
+
+ - explorer.app is the first application you will see. This is a
+   user-level shell that will let you browse the filesystem and start
+   additional tasks from /bin. Enter 'help' for the list of commands.
+
+ - kernel is an in-kernel console showing system information.
+
+Don't hesitate to send questions and bug reports. The online contact
+page has the addresses.
+
+Enjoy!
+
+The Nexus team
+Cornell, Ithaca, NY
+
+

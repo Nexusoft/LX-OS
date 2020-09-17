@@ -1,0 +1,12 @@
+
+service foo {
+	includefiles {
+		"a.h", "b.h"
+	}
+	includefiles {
+		"c.h",
+	}
+	includefiles {
+		"d.h"
+	}
+}

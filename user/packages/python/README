@@ -1,0 +1,38 @@
+Building Python for Nexus
+
+## Download
+
+Because Python is large, we do not include the source in the distribution,
+but download it at build.
+
+
+## Patch stability
+
+The current patch has been verified to work with Ubuntu 9.10: gcc 4.4.1.
+Because we partly rely on ./configure to discover system settings, it 
+is not impossible that the patch will fail to apply to systems with other
+compilers. 
+
+## Double compilation
+
+When the base library and interpreter have been compiled, Python switches to
+compiling the standard library items in Lib/. When cross compiling python
+for Nexus, this step fails. 
+
+To have both a python for development and for installation, we build the
+interpreter twice.
+
+The Makefile dependencies are a bit weird to ensure that hostpython does in
+not depend on python. Otherwise, the host gets rebuild each time you issue
+a 'make distclean' in python, for instance. And this is really irritating
+during debugging.
+
+## Acknowledgements
+
+The patch cherrypicks changes from Chris Lambacher's patch at
+http://whatschrisdoing.com/blog/2006/10/06/howto-cross-compile-python-25/
+
+and Klaus Reimer's information at
+http://www.ailis.de/~k/archives/19-ARM-cross-compiling-howto.html
+
+Thanks!

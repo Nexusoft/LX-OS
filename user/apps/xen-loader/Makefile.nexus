@@ -1,0 +1,21 @@
+TARGET := $(d)/n-loader
+OBJS := $(d)/loader.o $(d)/xc_linux_build.o $(d)/xc_load_elf.o $(d)/xg_private.o $(d)/xc_private.o $(d)/compat.o $(d)/hypercalls.o $(d)/tests.o $(d)/mem.o $(d)/entry.o $(d)/net.o $(d)/io.o compat/netcomp-components.o 
+
+$(d)/compute-offsets.c: $(d)/compute-offsets.pl 
+	perl $^ > $@
+
+$(d)/compute-offsets:  $(d)/compute-offsets.c
+	$(CC) $(CFLAGS) $^ -o $@
+
+$(d)/offsets.h: $(d)/compute-offsets
+	./$^ > $@
+
+$(d)/entry.o: $(d)/offsets.h
+
+$(TARGET): drivers/compat/skbuff.o
+
+CFLAGS_$(d)/xc_linux_build.o := -D__XEN_TOOLS__
+CFLAGS_$(d)/loader.o := -D__XEN_TOOLS__
+LDFLAGS_$(TARGET) := -T $(d)/xen-loader.x lib/libz.a 
+include Makefile.app
+

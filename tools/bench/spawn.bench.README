@@ -1,0 +1,29 @@
+## HOWTO run the spawn test
+
+# Server Setup
+
+Run 
+
+	bin/spawn -p 8000 $CONFIG_TEST
+
+
+# Configuration Parameters
+
+$CONFIG_TEST tells the server whether to use access control and 
+whether to run as parent, in which case it generates files.
+The only valid options are:
+- 0 : run as parent without access control
+- 2 : run as parent with access control
+
+(internally, the parent spawns children with 1 or 3, respectively)
+
+
+# Client Execution
+
+Run
+
+	bench/tools/spawn.bench.sh
+
+Before executing, make sure that parameter ENCRYPT corresponds with
+the selection of access control on the server side.
+

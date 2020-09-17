@@ -1,0 +1,59 @@
+#### Debugging the Nexus in qemu and gdb
+
+Warning: there are reports of failures on older Linux distributions &
+qemu installations. As of September 2010, the latest qemu package is
+working on Ubuntu 10.04 and Fedora Core 13.
+
+An alternative solution is to debug using VMWare. See that HOWTO.
+
+## 1: start the Nexus in Qemu
+
+After having installed qemu (a simple `apt-get install qemu` on ubuntu),
+start it with the following command (from the nexus rootdir):
+
+	qemu -S -s -m 512 -cdrom build/boot/stage1/nexus.iso /dev/null
+
+or,
+
+	qemu -S -s -m 512 -boot c -hda build/boot/stage1/nexus.qcow2 /dev/null
+
+This starts the nexus kernel as GPXE would. Two remarks:
+1) -S makes the CPU pause, so that you can start if from gdb
+   -s opens connection to gdb over network port 1234
+2) the /dev/null is our replacement for a disk image. 
+3) You may use additional arguments "-net nic,model=e1000 -net user"
+   to enable networking.
+
+## 2: attach gdb
+
+Start gdb with the kernel image with symbols
+
+	gdb build/boot/stage1/nexus.multiboot
+
+and in gdb issue
+
+	target remote :1234
+
+add breakpoints if necessary
+
+	break nexus_init
+
+then hit
+
+	continue
+
+to start debugging!
+
+# Tip
+1. To make it easier to reissue the set, combine them:
+
+	gdb  --eval-command="target remote :1234" build/boot/stage1/nexus.multiboot
+
+2. Note that issuing Ctrl+Alt+2 in your QEMU window triggers a somewhat useful
+   QEMU monitor that provides memory mappings, hardware info and etc.
+   See http://wiki.qemu.org/download/qemu-doc.html#pcsys_005fmonitor 
+
+## TODO:
+
+Add support for networking and TFTP root. Qemu can expose both
+a BOOTP and TFTP server.

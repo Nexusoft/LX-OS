@@ -1,0 +1,7 @@
+lib/crti.o: libc/sysdeps/linux/i386/crti.S include/libc-symbols.h \
+ include/bits/uClibc_arch_features.h
+
+include/libc-symbols.h:
+
+include/bits/uClibc_arch_features.h:
+cmd_lib_crti.o := gcc -c libc/sysdeps/linux/i386/crti.S -o lib/crti.o -include include/libc-symbols.h -Wall -Wstrict-prototypes -fno-strict-aliasing -ffunction-sections -fdata-sections -m32 -march=i686 -fno-stack-protector -fno-builtin -nostdinc -Iinclude -I. -Ilibc/sysdeps/linux/i386 -fno-asm -DUCLIBC_INTERNAL -DSTATIC -Os -funit-at-a-time -fomit-frame-pointer -mpreferred-stack-boundary=4 -falign-functions=1 -falign-jumps=1 -falign-labels=1 -falign-loops=1 -Ilibpthread/linuxthreads.old/sysdeps/unix/sysv/linux/i386 -Ilibpthread/linuxthreads.old/sysdeps/i386 -Ilibpthread/linuxthreads.old/sysdeps/unix/sysv/linux -Ilibpthread/linuxthreads.old/sysdeps/pthread -Ilibpthread/linuxthreads.old -Ilibpthread -I...include/ -I/usr/lib/gcc/x86_64-linux-gnu/9//include-fixed -I/usr/lib/gcc/x86_64-linux-gnu/9/include -DNDEBUG -fPIC -MT lib/crti.o -MD -MP -MF lib/.crti.o.dep -D__ASSEMBLER__ -Wa,--noexecstack -fPIC -fno-stack-protector

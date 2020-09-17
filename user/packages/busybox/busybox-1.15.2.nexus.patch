@@ -1,0 +1,84 @@
+diff -Nur busybox-1.15.2-orig/Makefile busybox-1.15.2/Makefile
+--- busybox-1.15.2-orig/Makefile	2009-10-08 01:06:38.000000000 +0000
++++ busybox-1.15.2/Makefile	2009-11-15 21:11:54.000000000 +0000
+@@ -288,9 +288,12 @@
+ 
+ # Make variables (CC, etc...)
+ 
++GCC_HOME	:= /usr/lib/gcc/$(shell gcc -dumpmachine)/$(shell gcc -dumpversion)
++NXHOME		= ../../..
++
+ AS		= $(CROSS_COMPILE)as
+ CC		= $(CROSS_COMPILE)gcc
+-LD		= $(CC) -nostdlib
++LD		= $(CC)
+ CPP		= $(CC) -E
+ AR		= $(CROSS_COMPILE)ar
+ NM		= $(CROSS_COMPILE)nm
+@@ -315,13 +318,13 @@
+ 
+ # Use LINUXINCLUDE when you must reference the include/ directory.
+ # Needed to be compatible with the O= option
+-CFLAGS		:= $(CFLAGS)
++CFLAGS		:= $(CFLAGS) -nostdinc -I $(NXHOME)/include -isystem $(GCC_HOME)/include -isystem $(GCC_HOME)/include-fixed
+ # Added only to final link stage of busybox binary
+ CFLAGS_busybox	:= $(CFLAGS_busybox)
+ CPPFLAGS	:= $(CPPFLAGS)
+ AFLAGS		:= $(AFLAGS)
+-LDFLAGS		:= $(LDFLAGS)
+-LDLIBS		:=
++LDFLAGS		:= -nostdlib -e compatmain $(LDFLAGS)
++LDLIBS		:= 
+ 
+ # Read KERNELRELEASE from .kernelrelease (if it exists)
+ KERNELRELEASE = $(shell cat .kernelrelease 2> /dev/null)
+@@ -581,14 +584,28 @@
+ # Rule to link busybox - also used during CONFIG_KALLSYMS
+ # May be overridden by arch/$(ARCH)/Makefile
+ quiet_cmd_busybox__ ?= LINK    $@
+-      cmd_busybox__ ?= $(srctree)/scripts/trylink \
+-      "$@" \
+-      "$(CC)" \
+-      "$(CFLAGS) $(CFLAGS_busybox)" \
+-      "$(LDFLAGS) $(EXTRA_LDFLAGS)" \
+-      "$(core-y)" \
+-      "$(libs-y)" \
+-      "$(LDLIBS)"
++# Nexus: replace the busybox linker script with plain GCC
++#cmd_busybox__ ?= $(srctree)/scripts/trylink
++      cmd_busybox__ ?= \
++      $(CC) -o $@ \
++      $(LDFLAGS) $(EXTRA_LDFLAGS) \
++      -Wl,--start-group \
++      $(core-y) \
++      $(libs-y) \
++      $(LDLIBS) \
++      $(NXHOME)/lib/liblwip.a \
++      $(NXHOME)/lib/libcrypto.a \
++      $(NXHOME)/lib/libnexus-sys.a \
++      $(NXHOME)/lib/libnexus-sec.a \
++      $(NXHOME)/lib/libnexus.a \
++      $(NXHOME)/lib/libcrypt.a \
++      $(NXHOME)/lib/libm.a \
++      $(NXHOME)/lib/crt1.o \
++      $(NXHOME)/lib/libc.a \
++      $(NXHOME)/lib/crti.o \
++      $(NXHOME)/lib/crtn.o \
++      $(GCC_HOME)/libgcc.a \
++      -Wl,--end-group
+ 
+ # Generate System.map
+ quiet_cmd_sysmap = SYSMAP
+diff -Nur busybox-1.15.2-orig/Makefile.flags busybox-1.15.2/Makefile.flags
+--- busybox-1.15.2-orig/Makefile.flags	2009-09-26 13:14:56.000000000 +0000
++++ busybox-1.15.2/Makefile.flags	2009-11-15 21:11:37.000000000 +0000
+@@ -96,7 +96,8 @@
+ #"))
+ endif
+ 
+-LDLIBS += m crypt
++# Nexus supplies own versions in Makefile
++#LDLIBS += m crypt
+ 
+ ifeq ($(CONFIG_PAM),y)
+ LDLIBS += pam pam_misc

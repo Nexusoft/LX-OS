@@ -1,0 +1,9 @@
+The various drivers use these Linux header files:
+
+* user use linux-headers-legacy.tbz2
+* user drivers use linux-headers-legacy-udrivers.tbz2
+* kernel core sources use linux-headers-kernel.tbz2
+* kernel drivers use these as well as linux-headers-kdrivers.tbz2
+
+Thare (AFAIK) all linux 2.4.22 headers, but the various sets may
+contain specific hacks for the Nexus kernel or userspace environment.

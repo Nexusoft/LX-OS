@@ -1,0 +1,5 @@
+Create bootable CDROMs using ISOLINUX and mkisofs.
+
+Files isolinux.bin, menu.c32 and memdisk taken from syslinux 3.63 and subject to GPL
+Tried with genisoimage 1.1.9 (pretending to be mkisofs 2.01)
+

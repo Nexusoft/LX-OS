@@ -1,0 +1,73 @@
+Nexus Drivers
+  last update: March 23rd, 2010
+
+## Overview
+
+Nexus aims to keep the trusted computing base, and with that the OS kernel, 
+small. For this purpuse it moves device drivers to userspace processes
+as much as possible. Device driver processes are not privileged: their 
+interaction with the kernel is mediated through a Device Driver Reference
+Monitor (DDRM), see below.
+
+
+## Device Driver API
+
+Userspace drivers are derived (mainly) from Linux 2.4.22. Nexus exposes
+a subset of the Linux kernel API to userspace, to facilitate fast porting
+of additional drivers from this release. These interfaces are translated
+into calls into Nexus systemcalls, particularly of the ddrm.sc and pci.sc
+interface. In the kernel, then, these calls are translated back into 
+Linux calls.
+
+	## Device Driver Reference Monitor
+	
+	First off, read the OSDI'08 paper for a technical overview of
+	the DDRM. Practically, the DDRM works as follows: it limits 
+	interaction between drivers and the kernel device code 
+	(e.g., PCI probing) in two ways:
+
+	1) it translates userspace Linux kernel API calls into Nexus
+	   system calls that are intercepted and subject to access
+	   control checks. 
+
+	2) it limits memory access. All traps to memory outside the
+	   driver virtual address are redirected to the DDRM. This
+	   maintains a list of ioport and memory space to which the
+	   driver has explicitly been given access. All other access
+	   is blocked. Even within an allowed region, access may be
+	   denied, if temporal constraints written in the device
+	   policy are not met.
+
+
+	## Device Driver Programming Tips
+
+	- Make sure that after probing in the kernel, the driver has
+          been granted access to all ioport and memory regions it
+          requires. If your driver segfauls on an io or memory operation,
+	  usuall in its probe routine, this is the likely cause.	  
+
+	- Since the kernel and user interfaces are practically identical,
+	  it can be helpful to first make the driver work in the kernel
+	  and only then move it to userspace.
+
+## /dev Device Interface
+
+Device drivers can implement any interface they please. A logical
+approach is to present a device in /dev. Two current examples are
+/dev/tpm0 implemented by the TPM emulator and /dev/ram0 implemented
+by the kernelfs. The latter is just a ram-backed file in the RamFS
+filesystem like any other.
+
+Because the Nexus filesystem is stateless (it does not remember a
+file offset), all read and write calls explicitly communicate
+their offset from the start of a file. As a result, there is no
+difference between character and block devices in Nexus, as there
+is in Unix.
+
+To implement a new device driver, add a FS.sc implementation in
+common/services and fill in at the least the Read() and Write()
+calls. 
+
+(NB: this is not how /dev/tpm0 works, but forget that implementation)
+
+

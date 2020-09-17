@@ -1,0 +1,39 @@
+Nexus Jargon
+
+AIK		Attestation Identity Key (see TPM specs)
+DIR		Data Integrity Register: 20B persistent storage on the TPM (see TPM specs)
+DDRM		Device Driver Resource Manager: support for safe userlevel drivers
+DER		Distinguished Encoding Rules. Not Nexus-specific; see Wikipedia, etc.
+FFZ		Find First Zero: bitmap operation
+GPXE		A network bootloader, formerly Etherboot. Not Nexus-specific; see etherboot.org
+IDL		Interface Definition Language. Also used for code generater that takes .svc/.sc IDL files
+IEvent		(?) interpose event?
+IPD		Isolated Protection Domain: process, but more strict isolation: no debugging, no superuser
+kvkey		Kernel VKEY. See: VKEY
+NAL		Nexus Authorization Logic
+NSK		Nexus Signing Key: a key used for signing data. Think of it as a virtualized AIK (see user/nexus/vkey.h)
+NRK		Nexus ? Key: a key used for encrypting data. Think of it as a virtualized SRK (see user/nexus/vkey.h)
+PDBR		Page Directory Base Register (see Intel x86 specs, CR3)
+PEM		Privacy Enhanced Mail. Not Nexus-specific; see Wikipedia, etc.
+Pickle		Synonym of Serialize. Common in the python world to serialize objects.
+QVAR		Quantified Logic Variable (in the NAL)
+Reflection	Virtual filesystem layer that reflects calls to specific handlers (see Linux VFS)
+RWPSS		Read Write Protected Secure Storage: memory with integrity and confidentiality. See: WPSS
+SMM		Secure Memory Region
+SRK		Storage Root Key (see TPM specs)
+SVAR		State variable (in the NAL)
+VDIR		Virtual Data Integrity Register
+VKEY		A key built from a VDIR, either an NSK or an NRK.
+WPSS		Write Protected Secure Storage: persistent storage that offers integrity.
+
+IPC terms
+
+Port		Systemwide unique identifier that identifies a service
+Connection	Bond between a client process and a service port
+Msg		Packet for asynchronous communication
+
+Network terms
+
+Plug		Equivalent of a network cable. Combines two connections for bidirectional communication
+
+

@@ -1,0 +1,11 @@
+Linux kernel config, menuconfig
+
+These x86 binaries were taken from the busybox port of the 
+linux kconfig scripts. 
+
+The original source is contained in user/packages/busybox/busybox-$VERSION.tar.gz
+The only change made to the source is in scripts/kconfig.mconf.c:328, from
+	        cprint("./scripts/kconfig/lxdialog/lxdialog");
+to
+	        cprint("./tools/kconfig/lxdialog");
+			

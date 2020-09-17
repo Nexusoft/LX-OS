@@ -1,0 +1,119 @@
+service Auth {
+
+  /** Define an Authority: a process that listens on an IPC port
+            for a statement and either subscribes to the statement
+      or denies this. For instance, an authority on time may
+      subscribe to the statement
+
+    auth.time says date > 1969
+
+      but should deny believing
+
+    auth.time says date < 1969
+
+      unless you have ported Nexus to some really vintage hardware.
+
+      ## HOWTO use
+
+            To implement an authority, link against this service and 
+            implement the function auth_answer. Be sure to implement
+            the correct calling convention */
+
+  decls {
+    int auth_answer(const char *formula, int caller_id);
+  }
+
+  decls __callee__ {
+
+    includefiles {
+        "<string.h>",
+      
+        "<openssl/rsa.h>",
+
+        "<nexus/defs.h>",
+        "<nexus/log.h>",
+        "<nexus/test.h>",
+        "<nexus/guard.h>",
+        "<nexus/Guard.interface.h>",
+    }
+
+    /** Open an authenticated channel to the guard 
+        @return 0 on success, else error */
+    int
+    nxguard_auth_register(int guard_port, int auth_port, const char *name)
+    {
+#ifdef DO_AUTH_KEY
+      RSA *rsakey;
+      char *pubkey;
+#endif
+      int nlen, ret;
+
+      // sanity check input
+      nlen = strlen(name);
+      if (nlen > AUTHNAME_LEN)
+        ReturnError(-1, "authority name too long");
+
+      // create unique identifier: public key
+#ifdef DO_AUTH_KEY
+      rsakey = rsakey_create();
+      
+      // claim readable name: write public key to /var/auth/[name]
+      snprintf(filepath, 254, "/var/auth/%s", name); 
+      if (rsakey_public_export_file(rsakey, filepath))
+        ReturnError(1, "write key");
+      pubkey = rsakey_public_export(rsakey);
+#endif
+
+      // register to guard
+      // XXX use the RSA key for binding
+      ret = Guard_SetAuth_ext(guard_port, auth_port, VARLENSTR(name)); 
+#ifdef DO_AUTH_KEY
+      free(pubkey);
+      rsakey_destroy(rsakey);
+#endif
+
+      return ret ? -1 : 0;
+    }
+
+    /** Wrapper around standard authority control loop.
+        @param sema is an optional semaphore to signal when initialized */
+    int 
+    nxguard_auth(int guard_port, const char *name, Sema *sema)
+    {
+      Auth_serverInit();
+      if (nxguard_auth_register(guard_port, Auth_port_handle, name))
+        return 1;
+
+      nxlog_write_ex(2, "[auth.%s] up at ipc.%d", name, Auth_port_handle);
+      if (sema)
+        V_nexus(sema);
+
+      // Handle requests
+      while (1)
+        Auth_processNextCommand();
+      
+      // never reached. 
+      // NB: to avoid naming attacks, names are never recycled
+      return 0;
+    }
+
+  }
+
+  /** @param statement of the type ``name.<NAME> says S''
+      @return same convention as Guard_InterposeIn */
+  interface lf_generate { (0); } lf_check { 1; }
+  int 
+  Answer(__input__ struct VarLen statement) 
+  {
+    char * _statement;
+    int ret;
+
+    _statement = ipc_transferfrom(1, statement.len);
+    ret = auth_answer(_statement, ipd_id);
+    free(_statement);
+
+    return ret;
+  }
+
+}
+

@@ -1,0 +1,297 @@
+diff -Nur lighttpd-1.4.25-orig/src/fdevent.h lighttpd-1.4.25/src/fdevent.h
+--- lighttpd-1.4.25-orig/src/fdevent.h	2010-08-29 19:20:37.011027146 -0400
++++ lighttpd-1.4.25/src/fdevent.h	2010-08-29 19:20:41.955027275 -0400
+@@ -18,6 +18,8 @@
+ 
+ /* select event-system */
+ 
++#ifdef NONEXUS
++
+ #if defined(HAVE_EPOLL_CTL) && defined(HAVE_SYS_EPOLL_H)
+ # define USE_LINUX_EPOLL
+ # include <sys/epoll.h>
+@@ -38,6 +40,8 @@
+ # endif
+ #endif
+ 
++#endif
++
+ #if defined HAVE_SELECT
+ # ifdef __WIN32
+ #  include <winsock2.h>
+@@ -48,6 +52,8 @@
+ # endif
+ #endif
+ 
++#ifdef NONEXUS
++
+ #if defined HAVE_SYS_DEVPOLL_H && defined(__sun)
+ # define USE_SOLARIS_DEVPOLL
+ # include <sys/devpoll.h>
+@@ -63,6 +69,7 @@
+ # include <sys/port.h>
+ #endif
+ 
++#endif
+ 
+ typedef handler_t (*fdevent_handler)(void *srv, void *ctx, int revents);
+ 
+diff -Nur lighttpd-1.4.25-orig/src/Makefile.in lighttpd-1.4.25/src/Makefile.in
+--- lighttpd-1.4.25-orig/src/Makefile.in	2010-08-29 19:20:37.015027656 -0400
++++ lighttpd-1.4.25/src/Makefile.in	2010-08-29 19:20:41.959027784 -0400
+@@ -38,7 +38,7 @@
+ host_triplet = @host@
+ target_triplet = @target@
+ noinst_PROGRAMS = proc_open$(EXEEXT) lemon$(EXEEXT)
+-sbin_PROGRAMS = lighttpd$(EXEEXT) lighttpd-angel$(EXEEXT)
++sbin_PROGRAMS = lighttpd$(EXEEXT)
+ 
+ # if the linker doesn't allow referencing symbols of the binary
+ # we have to put everything into a shared-lib and link it into
+@@ -97,7 +97,8 @@
+ 	http-header-glue.c network_write.c network_linux_sendfile.c \
+ 	network_freebsd_sendfile.c network_writev.c \
+ 	network_solaris_sendfilev.c network_openssl.c splaytree.c \
+-	status_counter.c
++	status_counter.c mod_staticfile.c mod_access.c mod_dirlisting.c \
++	mod_fastcgi.c
+ am__objects_1 = liblightcomp_la-buffer.lo liblightcomp_la-log.lo \
+ 	liblightcomp_la-keyvalue.lo liblightcomp_la-chunk.lo \
+ 	liblightcomp_la-http_chunk.lo liblightcomp_la-stream.lo \
+@@ -124,7 +125,12 @@
+ 	liblightcomp_la-network_writev.lo \
+ 	liblightcomp_la-network_solaris_sendfilev.lo \
+ 	liblightcomp_la-network_openssl.lo \
+-	liblightcomp_la-splaytree.lo liblightcomp_la-status_counter.lo
++	liblightcomp_la-splaytree.lo liblightcomp_la-status_counter.lo \
++	liblightcomp_la-mod_staticfile.lo \
++	liblightcomp_la-mod_access.lo \
++	liblightcomp_la-mod_dirlisting.lo  \
++	liblightcomp_la-mod_fastcgi.lo  
++	
+ @NO_RDYNAMIC_TRUE@am_liblightcomp_la_OBJECTS = $(am__objects_1)
+ liblightcomp_la_OBJECTS = $(am_liblightcomp_la_OBJECTS)
+ AM_V_lt = $(am__v_lt_$(V))
+@@ -378,7 +384,8 @@
+ 	network_write.c network_linux_sendfile.c \
+ 	network_freebsd_sendfile.c network_writev.c \
+ 	network_solaris_sendfilev.c network_openssl.c splaytree.c \
+-	status_counter.c
++	status_counter.c mod_staticfile.c mod_access.c mod_dirlisting.c \
++	mod_fastcgi.c
+ am__objects_2 = buffer.$(OBJEXT) log.$(OBJEXT) keyvalue.$(OBJEXT) \
+ 	chunk.$(OBJEXT) http_chunk.$(OBJEXT) stream.$(OBJEXT) \
+ 	fdevent.$(OBJEXT) stat_cache.$(OBJEXT) plugin.$(OBJEXT) \
+@@ -396,7 +403,11 @@
+ 	network_linux_sendfile.$(OBJEXT) \
+ 	network_freebsd_sendfile.$(OBJEXT) network_writev.$(OBJEXT) \
+ 	network_solaris_sendfilev.$(OBJEXT) network_openssl.$(OBJEXT) \
+-	splaytree.$(OBJEXT) status_counter.$(OBJEXT)
++	splaytree.$(OBJEXT) status_counter.$(OBJEXT) \
++	mod_staticfile.$(OBJEXT) \
++	mod_access.$(OBJEXT)\
++	mod_fastcgi.$(OBJEXT)\
++	mod_dirlisting.$(OBJEXT)
+ @NO_RDYNAMIC_FALSE@am__objects_3 = $(am__objects_2)
+ am__objects_4 = server.$(OBJEXT) response.$(OBJEXT) \
+ 	connections.$(OBJEXT) network.$(OBJEXT) configfile.$(OBJEXT) \
+@@ -673,7 +684,7 @@
+ @NO_RDYNAMIC_TRUE@liblightcomp_la_SOURCES = $(common_src)
+ @NO_RDYNAMIC_TRUE@liblightcomp_la_CFLAGS = $(AM_CFLAGS)
+ @NO_RDYNAMIC_TRUE@liblightcomp_la_LDFLAGS = -avoid-version -no-undefined
+-@NO_RDYNAMIC_TRUE@liblightcomp_la_LIBADD = $(PCRE_LIB) $(SSL_LIB) $(FAM_LIBS)
++@NO_RDYNAMIC_TRUE@liblightcomp_la_LIBADD = $(PCRE_LIB) $(FAM_LIBS)
+ @NO_RDYNAMIC_FALSE@common_libadd = 
+ @NO_RDYNAMIC_TRUE@common_libadd = liblightcomp.la
+ mod_flv_streaming_la_SOURCES = mod_flv_streaming.c
+@@ -792,8 +803,8 @@
+       version.h
+ 
+ lighttpd_SOURCES = $(src)
+-lighttpd_LDADD = $(PCRE_LIB) $(DL_LIB) $(SENDFILE_LIB) $(ATTR_LIB) $(common_libadd) $(SSL_LIB) $(FAM_LIBS)
+-lighttpd_LDFLAGS = -export-dynamic
++lighttpd_LDADD = $(PCRE_LIB) $(DL_LIB) $(SENDFILE_LIB) $(ATTR_LIB) $(common_libadd) $(FAM_LIBS)
++lighttpd_LDFLAGS = 
+ lighttpd_CCPFLAGS = $(FAM_CFLAGS)
+ proc_open_SOURCES = proc_open.c buffer.c
+ proc_open_CPPFLAGS = -DDEBUG_PROC_OPEN
+diff -Nur lighttpd-1.4.25-orig/src/network_backends.h lighttpd-1.4.25/src/network_backends.h
+--- lighttpd-1.4.25-orig/src/network_backends.h	2010-08-29 19:20:37.007027475 -0400
++++ lighttpd-1.4.25/src/network_backends.h	2010-08-29 19:20:41.959027784 -0400
+@@ -26,6 +26,9 @@
+ # include <sys/uio.h>
+ #endif
+ 
++// disable mmap on Nexus
++#ifdef NONEXUS
++
+ #if defined HAVE_SYS_UIO_H && defined HAVE_WRITEV
+ # define USE_WRITEV
+ # include <sys/uio.h>
+@@ -40,6 +43,8 @@
+ # endif
+ #endif
+ 
++#endif
++
+ #if defined HAVE_SYS_UIO_H && defined HAVE_WRITEV && defined HAVE_SEND_FILE && defined(__aix)
+ # define USE_AIX_SENDFILE
+ #endif
+diff -Nur lighttpd-1.4.25-orig/src/network.c lighttpd-1.4.25/src/network.c
+--- lighttpd-1.4.25-orig/src/network.c	2010-08-29 19:20:37.011027146 -0400
++++ lighttpd-1.4.25/src/network.c	2010-08-29 19:21:28.971026799 -0400
+@@ -221,11 +221,13 @@
+ 	/* */
+ 	srv->cur_fds = srv_socket->fd;
+ 
++#ifdef NONEXUS
+ 	val = 1;
+ 	if (setsockopt(srv_socket->fd, SOL_SOCKET, SO_REUSEADDR, &val, sizeof(val)) < 0) {
+ 		log_error_write(srv, __FILE__, __LINE__, "ss", "socketsockopt failed:", strerror(errno));
+ 		goto error_free_socket;
+ 	}
++#endif
+ 
+ 	switch(srv_socket->addr.plain.sa_family) {
+ #ifdef HAVE_IPV6
+@@ -373,7 +375,7 @@
+ 
+ 		goto error_free_socket;
+ #endif
+-#ifdef TCP_DEFER_ACCEPT
++#ifdef NONEXUS
+ 	} else if (s->defer_accept) {
+ 		int v = s->defer_accept;
+ 		if (-1 == setsockopt(srv_socket->fd, IPPROTO_TCP, TCP_DEFER_ACCEPT, &v, sizeof(v))) {
+@@ -381,7 +383,7 @@
+ 		}
+ #endif
+ 	} else {
+-#ifdef SO_ACCEPTFILTER
++#ifdef NONEXUS
+ 		/* FreeBSD accf_http filter */
+ 		struct accept_filter_arg afa;
+ 		memset(&afa, 0, sizeof(afa));
+@@ -736,7 +738,7 @@
+ 
+ 	written = cq->bytes_out;
+ 
+-#ifdef TCP_CORK
++#ifdef NONEXUS
+ 	/* Linux: put a cork into the socket as we want to combine the write() calls
+ 	 * but only if we really have multiple chunks
+ 	 */
+@@ -759,7 +761,7 @@
+ 		ret = chunkqueue_is_empty(cq) ? 0 : 1;
+ 	}
+ 
+-#ifdef TCP_CORK
++#ifdef NONEXUS
+ 	if (corked) {
+ 		corked = 0;
+ 		setsockopt(con->fd, IPPROTO_TCP, TCP_CORK, &corked, sizeof(corked));
+diff -Nur lighttpd-1.4.25-orig/src/network_writev.c lighttpd-1.4.25/src/network_writev.c
+--- lighttpd-1.4.25-orig/src/network_writev.c	2010-08-29 19:20:37.015027656 -0400
++++ lighttpd-1.4.25/src/network_writev.c	2010-08-29 19:20:41.959027784 -0400
+@@ -263,7 +263,7 @@
+ 					 * detect this at runtime.i
+ 					 *
+ 					 * ignore the return value for now */
+-					madvise(c->file.mmap.start, c->file.mmap.length, MADV_WILLNEED);
++//					madvise(c->file.mmap.start, c->file.mmap.length, MADV_WILLNEED);
+ 				}
+ #endif
+ #endif
+diff -Nur lighttpd-1.4.25-orig/src/plugin.c lighttpd-1.4.25/src/plugin.c
+--- lighttpd-1.4.25-orig/src/plugin.c	2010-08-29 19:20:37.011027146 -0400
++++ lighttpd-1.4.25/src/plugin.c	2010-08-29 19:20:41.959027784 -0400
+@@ -10,9 +10,14 @@
+ # include <valgrind/valgrind.h>
+ #endif
+ 
++#ifdef NONEXUS
++
+ #ifndef __WIN32
+ # include <dlfcn.h>
+ #endif
++
++#endif
++
+ /*
+  *
+  * if you change this enum to add a new callback, be sure
+@@ -111,7 +116,12 @@
+ 	}\
+ 	plugins_register(srv, p);
+ 
+-#include "plugin-static.h"
++//#include "plugin-static.h"
++
++	PLUGIN_INIT(mod_dirlisting)
++	PLUGIN_INIT(mod_staticfile)
++	PLUGIN_INIT(mod_access)
++	PLUGIN_INIT(mod_fastcgi)
+ 
+ 	return 0;
+ }
+diff -Nur lighttpd-1.4.25-orig/src/server.c lighttpd-1.4.25/src/server.c
+--- lighttpd-1.4.25-orig/src/server.c	2010-08-29 19:20:37.007027475 -0400
++++ lighttpd-1.4.25/src/server.c	2010-08-29 19:20:41.959027784 -0400
+@@ -406,7 +406,7 @@
+   #ifdef USE_MMAP
+       "\t+ mmap support\n"
+   #else
+-      "\t- mmap support\n"
++      "\t- mmap backend support\n"
+   #endif
+ #endif
+       "\nFeatures:\n\n"
+@@ -534,6 +534,9 @@
+ 	interval.it_value.tv_usec = 0;
+ #endif
+ 
++	/* Nexus: enable mmap(), because stream_open uses it */
++	extern int nxlibc_enable_mmap;
++	nxlibc_enable_mmap = 1;
+ 
+ 	/* for nice %b handling in strfime() */
+ 	setlocale(LC_TIME, "C");
+@@ -605,9 +608,11 @@
+ 		return 0;
+ 	}
+ 
++#ifdef NONEXUS
+ 	/* close stdin and stdout, as they are not needed */
+ 	openDevNull(STDIN_FILENO);
+ 	openDevNull(STDOUT_FILENO);
++#endif
+ 
+ 	if (0 != config_set_defaults(srv)) {
+ 		log_error_write(srv, __FILE__, __LINE__, "s",
+@@ -697,7 +702,7 @@
+ 		if (RUNNING_ON_VALGRIND) use_rlimit = 0;
+ #endif
+ 
+-#ifdef HAVE_GETRLIMIT
++#ifdef NONEXUS
+ 		if (0 != getrlimit(RLIMIT_NOFILE, &rlim)) {
+ 			log_error_write(srv, __FILE__, __LINE__,
+ 					"ss", "couldn't get 'max filedescriptors'",
+@@ -980,7 +985,7 @@
+ 
+ 
+ 
+-#ifdef HAVE_SIGACTION
++#ifdef NONEXUS
+ 	memset(&act, 0, sizeof(act));
+ 	act.sa_handler = SIG_IGN;
+ 	sigaction(SIGPIPE, &act, NULL);
+@@ -1000,7 +1005,7 @@
+ 	sigaction(SIGALRM, &act, NULL);
+ 	sigaction(SIGCHLD, &act, NULL);
+ 
+-#elif defined(HAVE_SIGNAL)
++#elif defined(NONEXUS)
+ 	/* ignore the SIGPIPE from sendfile() */
+ 	signal(SIGPIPE, SIG_IGN);
+ 	signal(SIGUSR1, SIG_IGN);

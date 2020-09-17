@@ -1,0 +1,38 @@
+# initial bootscript for virtual disk-based images
+
+bin/kbd.drv &
+
+bin/pci.drv &
+sleep 1
+
+# disk
+bin/stor-ide.drv &
+sleep 2
+bin/fat32.app &
+
+# net
+#usr/bin/net.drv &
+knetdev
+sleep 2
+usr/bin/dhcp.app &
+sleep 2
+
+# tpm
+usr/bin/tpmd &
+sleep 2
+
+## net: web frontend servers
+usr/bin/lighttpd -D -f usr/etc/lighttpd.usr.conf &
+sleep 2
+
+# cp fauxbook files
+#usr/bin/busybox mkdir -p /var/cgi-bin/fauxbook
+#usr/bin/busybox cp -r /usr/var/cgi-bin/fauxbook /var/cgi-bin
+#usr/bin/busybox mkdir -p /var/www/fauxbook
+#usr/bin/busybox cp -r /usr/var/www/fauxbook /var/www
+
+#usr/bin/python -B usr/var/cgi-bin/admin/nxserver.py &
+#sleep 30
+#usr/bin/python -B usr/var/cgi-bin/protect/pserver.py usr/var/cgi-bin/fauxbook &
+echo [ok] Nexus up 
+

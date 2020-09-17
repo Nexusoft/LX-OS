@@ -1,0 +1,35 @@
+GPXE network bootloader for Nexus
+
+
+-- Overview ----
+
+GPXE is the new name for Etherboot (which we used before). 
+This build process customizes GPXE 0.9.7 to 
+
+1) configure a network device, 
+2) retrieve a nexus kernel and initrd environment over the network (TFTP) and 
+3) chain load that image.
+
+
+-- Install ----
+
+Call `make` to generate a set of three GPXE images:
+
+* nexus-gpxe.bzimage 	can be started like a Linux kernel, e.g., from grub
+* nexus-gpxe.iso 	can be started as a bootable CD
+* nexus-gpxe.usb	can be started as a bootable USB key image
+
+
+-- Customize ----
+
+It specializes two variables to your configuration: 
+
+* the IP address of the TFTP server.
+    By default it uses `hostname -i` to learn this. 
+    Set environment variable GPXE_SERVER to override its default.
+
+* the network interface ID. 
+    Default is the equivalent of eth0.
+    Set environment variable GPXE_NIC to override this.
+
+

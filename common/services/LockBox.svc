@@ -1,0 +1,243 @@
+service LockBox {
+
+  decls {
+    int LockBoxSvc_Init(int port);
+    int LockBoxSvc_Exit(void);
+  }
+
+  decls __callee__ {
+    includefiles { "<stdlib.h>",
+                   "<stdio.h>",
+	    	   "<string.h>",
+	    	   "<unistd.h>",
+	           "<nexus/defs.h>",
+	    	   "<nexus/lockbox.h>" }
+
+    int
+    /** Start listening for requests. 
+        @param port a hardcoded portnumber, or 0 for dynamic assignment */
+    LockBoxSvc_Init(int port)
+    {
+	  LockBox_server_port_num = IPC_CreatePort(port);
+	  LockBox_port_handle = LockBox_server_port_num;
+	  return 0;
+    }
+
+    int
+    LockBoxSvc_Exit(void)
+    {
+	  IPC_DestroyPort(LockBox_server_port_num);
+	  LockBox_server_port_num = -1;
+	  return 0;
+    }
+  }
+
+  interface 
+  lf_generate { OID_NONE; } lf_check { 1; }
+  int Shutdown(void) 
+  {
+	  return nxkey_shutdown();
+  }
+
+  /** Generate a key and store it in the keytable 
+      @return the keytable index */
+  interface 
+  lf_generate { OID_NONE; } lf_check { 1; } 
+  int Create(int type)
+  {
+	  return 0;
+  }
+
+  /** Insert a data item (probably a key) 
+      @return key index on success or -1 on failure */
+  interface 
+  lf_generate { OID_NONE; } lf_check { 1; }
+  int Insert(int index, struct VarLen data, int dlen)
+  {
+	  char * __data;
+	  int ret;
+
+	  __data = ipctransfer_from(&data, dlen, 512);
+	  if (!__data)
+		  return -1;
+
+	  ret = nxkey_insert(index, __data, dlen);
+	
+	  nxcompat_free(__data);
+	  return ret;
+  }
+
+  /** Delete a key
+      @return 0 on success, -1 on failure */
+  interface 
+  lf_generate { OID_NONE; } lf_check { 1; }
+  int Delete(int index)
+  {
+	  return nxkey_delete(index) == -1 ? -1 : 0;
+  }
+
+  interface 
+  lf_generate { OID_NONE; } lf_check { 1; }
+  int Save(__input__ struct VarLen filepath, int flen,
+	   __input__ struct VarLen data, int dlen)
+  {
+	  char *__filepath, *__data;
+	  int ret;
+
+	  __filepath = ipctransfer_from(&filepath, flen, 512);
+	  if (!__filepath)
+		  return -1;
+
+	  __data = ipctransfer_from(&data, dlen, 512);
+	  if (!__data)
+		  return -1;
+
+	  ret = nxkey_save_app(__filepath, __data, dlen);
+	  
+	  nxcompat_free(__data);
+	  nxcompat_free(__filepath);
+	  return ret;
+  }
+  
+  interface 
+  lf_generate { OID_NONE; } lf_check { 1; }
+  int Restore(__input__ struct VarLen filepath, int flen,
+	      __output__ struct VarLen data, int dlen)
+  {
+	  char *__filepath, *__data;
+	  int ret;
+
+	  __filepath = ipctransfer_from(&filepath, flen, 512);
+	  if (!__filepath)
+		  return -1;
+
+	  __data = nxkey_restore_app(__filepath);
+
+	  if (ipctransfer_to(&data, __data, dlen))
+		  return -1; // memleak
+
+	  nxcompat_free(__data);
+	  nxcompat_free(__filepath);
+	  return 0;
+  }
+
+  /** Encrypt with key at index.
+      @len is the length (may be restricted to standard block length) 
+      @off is the optional offset in blocks for block ciphers:
+
+      @return 0 on success or -1 on failure */
+  interface 
+  lf_generate { OID_NONE; } lf_check { 1; }
+  int Encrypt(int index,
+		__input__  struct VarLen plaintext, 
+		__output__ struct VarLen ciphertext, 
+		__input__  struct VarLen ivec, 
+		int len, int off)
+  {
+	  char *__plaintext, *__ciphertext, *__ivec;
+	
+	  // transfer plaintext from caller
+	  __plaintext = ipctransfer_from(&plaintext, len, 512);
+	  if (!__plaintext)
+		  return -1;
+	  
+	  __ivec = ipctransfer_from(&ivec, AES_BLOCK_SIZE, AES_BLOCK_SIZE);
+	  if (!__ivec)
+		  return -1;
+
+	  // encode
+	  __ciphertext = nxkey_encrypt(index, __plaintext, __ivec);
+	  if (!__ciphertext)
+		return -1; // memleak
+	  
+	  // transfer back
+	  if (ipctransfer_to(&ciphertext, __ciphertext, len))
+		  return -1; // memleak
+
+	  nxcompat_free(__ciphertext);
+	  nxcompat_free(__ivec);
+	  nxcompat_free(__plaintext);
+	  return 0;
+  }
+
+  /** Near-duplicate of Encrypt. XXX consolidate */
+  interface 
+  lf_generate { OID_NONE; } lf_check { 1; }
+  int Decrypt(int index, 
+		__input__  struct VarLen ciphertext, 
+		__output__ struct VarLen plaintext, 
+		__input__  struct VarLen ivec, 
+		int len, int off)
+  {
+	  char *__plaintext, *__ciphertext, *__ivec;
+	
+	  // transfer ciphertext from caller
+	  __ciphertext = ipctransfer_from(&ciphertext, len, 512);
+	  if (!__ciphertext)
+		  return -1;
+
+	  __ivec = ipctransfer_from(&ivec, AES_BLOCK_SIZE, AES_BLOCK_SIZE);
+	  if (!__ivec)
+		  return -1;
+
+	  // encode 
+	  __plaintext = nxkey_decrypt(index, __ciphertext, __ivec);
+	  if (!__plaintext)
+		  return -1; // memleak
+
+	  // transfer back
+	  if (ipctransfer_to(&plaintext, __plaintext, len))
+		  return -1; // memleak
+
+	  nxcompat_free(__plaintext);
+	  nxcompat_free(__ivec);
+	  nxcompat_free(__ciphertext);
+	  return 0;
+  }
+
+  interface 
+  lf_generate { OID_NONE; } lf_check { 1; }
+  int Sign(__input__  struct VarLen data, int dlen, 
+	   __output__ struct VarLen digest)
+  {
+	  char *__data;
+	  char __digest[20];
+
+	  // transfer data
+	  __data = ipctransfer_from(&data, dlen, PAGESIZE /* see IPC_TransferHelper */);
+	  if (!__data)
+		  return 1;
+
+	  // generate digest
+	  if (nxkey_sign(__data, dlen, __digest))
+		  return 1;
+
+	  // return digest
+	  if (ipctransfer_to(&digest, __digest, 20))
+		  return -1; // memleak
+
+	  nxcompat_free(__data);
+	  return 0;
+  }
+
+  /** Verify a signature with signature stored at @param index
+      @return 0 on success, -1 on failure */
+  interface 
+  lf_generate { OID_NONE; } lf_check { 1; }
+  int Verify(int index, struct VarLen digest)
+  {
+	  char * __data;
+	  int ret;
+
+	  __data = ipctransfer_from(&digest, 20, 512);
+	  if (!__data)
+		  return -1;
+
+	  ret =  nxkey_verify(index, __data);
+
+	  nxcompat_free(__data);
+	  return ret;
+  }
+
+}
+

@@ -1,0 +1,260 @@
+/*
+ * Automatically generated C config: don't edit
+ */
+#define AUTOCONF_INCLUDED
+#define CONFIG_X86 1
+#undef  CONFIG_SBUS
+#define CONFIG_UID16 1
+
+/*
+ * Code maturity level options
+ */
+#undef  CONFIG_EXPERIMENTAL
+
+/*
+ * Loadable module support
+ */
+#undef  CONFIG_MODULES
+
+/*
+ * Processor type and features
+ */
+#undef  CONFIG_M386
+#undef  CONFIG_M486
+#undef  CONFIG_M586
+#undef  CONFIG_M586TSC
+#undef  CONFIG_M586MMX
+#undef  CONFIG_M686
+#define CONFIG_MPENTIUMIII 1
+#undef  CONFIG_MPENTIUM4
+#undef  CONFIG_MK6
+#undef  CONFIG_MK7
+#undef  CONFIG_MK8
+#undef  CONFIG_MELAN
+#undef  CONFIG_MCRUSOE
+#undef  CONFIG_MWINCHIPC6
+#undef  CONFIG_MWINCHIP2
+#undef  CONFIG_MWINCHIP3D
+#undef  CONFIG_MCYRIXIII
+#undef  CONFIG_MVIAC3_2
+#define CONFIG_X86_WP_WORKS_OK 1
+#define CONFIG_X86_INVLPG 1
+#define CONFIG_X86_CMPXCHG 1
+#define CONFIG_X86_XADD 1
+#define CONFIG_X86_BSWAP 1
+#define CONFIG_X86_POPAD_OK 1
+#undef  CONFIG_RWSEM_GENERIC_SPINLOCK
+#define CONFIG_RWSEM_XCHGADD_ALGORITHM 1
+#define CONFIG_X86_L1_CACHE_SHIFT (5)
+#define CONFIG_X86_HAS_TSC 1
+#define CONFIG_X86_GOOD_APIC 1
+#define CONFIG_X86_PGE 1
+#define CONFIG_X86_USE_PPRO_CHECKSUM 1
+#define CONFIG_X86_F00F_WORKS_OK 1
+#define CONFIG_X86_MCE 1
+#undef  CONFIG_TOSHIBA
+#undef  CONFIG_I8K
+#undef  CONFIG_MICROCODE
+#undef  CONFIG_X86_MSR
+#undef  CONFIG_X86_CPUID
+#define CONFIG_NOHIGHMEM 1
+#undef  CONFIG_HIGHMEM4G
+#undef  CONFIG_HIGHMEM64G
+#undef  CONFIG_HIGHMEM
+#undef  CONFIG_MATH_EMULATION
+#undef  CONFIG_MTRR
+#undef  CONFIG_SMP
+#undef  CONFIG_X86_UP_APIC
+#undef  CONFIG_X86_UP_IOAPIC
+#undef  CONFIG_X86_TSC_DISABLE
+#define CONFIG_X86_TSC 1
+
+/*
+ * General setup
+ */
+#define CONFIG_NET 1
+#define CONFIG_PCI 1
+#undef  CONFIG_PCI_GOBIOS
+#undef  CONFIG_PCI_GODIRECT
+#define CONFIG_PCI_GOANY 1
+#define CONFIG_PCI_BIOS 1
+#define CONFIG_PCI_DIRECT 1
+#define CONFIG_ISA 1
+#define CONFIG_PCI_NAMES 1
+#undef  CONFIG_EISA
+#undef  CONFIG_MCA
+#define CONFIG_HOTPLUG 1
+#define CONFIG_SYSVIPC 1
+#undef  CONFIG_BSD_PROCESS_ACCT
+#define CONFIG_SYSCTL 1
+#define CONFIG_BINFMT_AOUT 1
+#define CONFIG_BINFMT_ELF 1
+#define CONFIG_BINFMT_MISC 1
+#define CONFIG_PM 1
+#undef  CONFIG_APM
+
+/*
+ * ATA/IDE/MFM/RLL support
+ */
+#define CONFIG_IDE 1
+
+/*
+ * SCSI support
+ */
+#define CONFIG_SCSI 1
+
+/*
+ * Network device support
+ */
+#define CONFIG_NETDEVICES 1
+
+/*
+ * ISDN subsystem
+ */
+#undef  CONFIG_ISDN
+
+/*
+ * Old CD-ROM drivers (not SCSI, not IDE)
+ */
+#undef  CONFIG_CD_NO_IDESCSI
+
+/*
+ * Character devices
+ */
+#define CONFIG_VT 1
+#define CONFIG_VT_CONSOLE 1
+#define CONFIG_SERIAL 1
+#undef  CONFIG_SERIAL_CONSOLE
+#undef  CONFIG_SERIAL_EXTENDED
+#undef  CONFIG_SERIAL_NONSTANDARD
+#define CONFIG_UNIX98_PTYS 1
+#define CONFIG_UNIX98_PTY_COUNT (256)
+#undef  CONFIG_PRINTER
+#undef  CONFIG_PPDEV
+#undef  CONFIG_TIPAR
+
+/*
+ * Mice
+ */
+#undef  CONFIG_BUSMOUSE
+#define CONFIG_MOUSE 1
+#define CONFIG_PSMOUSE 1
+#undef  CONFIG_82C710_MOUSE
+#undef  CONFIG_PC110_PAD
+#undef  CONFIG_MK712_MOUSE
+#undef  CONFIG_QIC02_TAPE
+#undef  CONFIG_IPMI_HANDLER
+#undef  CONFIG_IPMI_PANIC_EVENT
+#undef  CONFIG_IPMI_DEVICE_INTERFACE
+#undef  CONFIG_IPMI_KCS
+#undef  CONFIG_IPMI_WATCHDOG
+
+/*
+ * Watchdog Cards
+ */
+#undef  CONFIG_WATCHDOG
+#undef  CONFIG_SCx200_GPIO
+#undef  CONFIG_AMD_RNG
+#undef  CONFIG_INTEL_RNG
+#undef  CONFIG_AMD_PM768
+#undef  CONFIG_NVRAM
+#undef  CONFIG_RTC
+#undef  CONFIG_DTLK
+#undef  CONFIG_R3964
+#undef  CONFIG_APPLICOM
+
+/*
+ * Ftape, the floppy tape device driver
+ */
+#undef  CONFIG_FTAPE
+#define CONFIG_AGP 1
+#define CONFIG_AGP_INTEL 1
+#define CONFIG_AGP_I810 1
+#define CONFIG_AGP_VIA 1
+#define CONFIG_AGP_AMD 1
+#undef  CONFIG_AGP_AMD_8151
+#define CONFIG_AGP_SIS 1
+#define CONFIG_AGP_ALI 1
+#undef  CONFIG_AGP_SWORKS
+#undef  CONFIG_AGP_NVIDIA
+#define CONFIG_DRM 1
+#undef  CONFIG_DRM_OLD
+
+/*
+ * DRM 4.1 drivers
+ */
+#define CONFIG_DRM_NEW 1
+#undef  CONFIG_MWAVE
+
+/*
+ * Console drivers
+ */
+#define CONFIG_VGA_CONSOLE 1
+#define CONFIG_VIDEO_SELECT 1
+
+/*
+ * Sound
+ */
+#define CONFIG_SOUND 1
+#undef  CONFIG_SOUND_ALI5455
+#undef  CONFIG_SOUND_BT878
+#undef  CONFIG_SOUND_CMPCI
+#undef  CONFIG_SOUND_EMU10K1
+#undef  CONFIG_MIDI_EMU10K1
+#undef  CONFIG_SOUND_FUSION
+#undef  CONFIG_SOUND_CS4281
+#undef  CONFIG_SOUND_ES1370
+#define CONFIG_SOUND_ES1371 1
+#undef  CONFIG_SOUND_ESSSOLO1
+#undef  CONFIG_SOUND_MAESTRO
+#undef  CONFIG_SOUND_MAESTRO3
+#undef  CONFIG_SOUND_FORTE
+#undef  CONFIG_SOUND_ICH
+#undef  CONFIG_SOUND_RME96XX
+#undef  CONFIG_SOUND_SONICVIBES
+#undef  CONFIG_SOUND_TRIDENT
+#undef  CONFIG_SOUND_MSNDCLAS
+#undef  CONFIG_SOUND_MSNDPIN
+#undef  CONFIG_SOUND_VIA82CXXX
+#undef  CONFIG_MIDI_VIA82CXXX
+#undef  CONFIG_SOUND_OSS
+#undef  CONFIG_SOUND_TVMIXER
+#define CONFIG_INPUT_GAMEPORT 1
+
+/*
+ * Kernel hacking
+ */
+#define CONFIG_DEBUG_KERNEL 1
+#undef  CONFIG_DEBUG_STACKOVERFLOW
+#undef  CONFIG_DEBUG_HIGHMEM
+#undef  CONFIG_DEBUG_SLAB
+#undef  CONFIG_DEBUG_IOVIRT
+#undef  CONFIG_MAGIC_SYSRQ
+#undef  CONFIG_DEBUG_SPINLOCK
+#define CONFIG_FRAME_POINTER 1
+
+/*
+ * Cryptographic options
+ */
+#define CONFIG_CRYPTO 1
+#define CONFIG_CRYPTO_HMAC 1
+#undef  CONFIG_CRYPTO_NULL
+#define CONFIG_CRYPTO_MD4 1
+#define CONFIG_CRYPTO_MD5 1
+#define CONFIG_CRYPTO_SHA1 1
+#define CONFIG_CRYPTO_SHA256 1
+#define CONFIG_CRYPTO_SHA512 1
+#define CONFIG_CRYPTO_DES 1
+#define CONFIG_CRYPTO_BLOWFISH 1
+#define CONFIG_CRYPTO_TWOFISH 1
+#define CONFIG_CRYPTO_SERPENT 1
+#define CONFIG_CRYPTO_AES 1
+#define CONFIG_CRYPTO_DEFLATE 1
+#undef  CONFIG_CRYPTO_TEST
+
+/*
+ * Library routines
+ */
+#undef  CONFIG_CRC32
+#define CONFIG_ZLIB_INFLATE 1
+#define CONFIG_ZLIB_DEFLATE 1

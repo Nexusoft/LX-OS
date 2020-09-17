@@ -1,0 +1,49 @@
+How to make this compile (written on 2010 04 06)
+This code is old and not standard compliant.
+
+## circumventing use of deprecated #include <iostream.h> and friends
+
+The last known version of g++ that can compile it is 4.2. That
+version included the iostream.h headers (in backward). I hardcoded
+use of g++ 4.1 because I had that on my Ubuntu 9.10
+
+configure with
+
+	./configure.nexus
+
+to setup the makefiles correctly
+
+## TOK_... undeclared errors
+
+Just copy-paste the enum from ast/agrampar.tab.h to ast/agramlex.yy.cc
+
+## fixing comment error in elsa
+
+Elsa seems to insert a comment that does not get terminated due to
+another code rewriting tool. See also:
+
+	http://holycall.tistory.com/111
+
+Long story short, whenever the compiler fails on an embedded comment,
+Search for
+
+	/* The contents of this function are C++ specific, ...
+
+and remove that non-terminated comment
+
+## fixing fstream not declared
+
+add
+
+#include <iostream.h>
+#include <fstream.h>
+
+(nb: do NOT forget the .h)
+
+## fixing "multiple definion of ...yywrap()"
+
+Remove line 324 from nexus-idl/astxml_lexer.yy.cc
+
+	int yyFlexLexer::yywrap() { return 1; }
+
+

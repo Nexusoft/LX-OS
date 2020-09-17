@@ -1,0 +1,117 @@
+#!/usr/bin/vmplayer
+.encoding = "UTF-8"
+
+# Filename: nexusvm.vmx
+# Generated 2009-09-21;00:23:44 by EasyVMX! 2.0 (beta)
+# http://www.easyvmx.com
+
+# This is a Workstation 6 config file
+# It can be used with Player
+config.version = "8"
+virtualHW.version = "6"
+
+#debugStub.listen.guest32 = "TRUE"
+#monitor.debugOnStartGuest32 = "TRUE"
+#debug = "TRUE"
+#monitor.suspendOnTriplefault = "TRUE"
+#monitor.suspend_on_triplefault = "TRUE"
+
+# Selected operating system for your virtual machine
+guestOS = "other"
+
+# displayName is your own name for the virtual machine
+displayName = "nexusvm"
+
+# These fields are free text description fields
+guestinfo.vmware.product.url = "http://www.easyvmx.com/"
+guestinfo.vmware.product.class = "virtual machine"
+
+# Number of virtual CPUs. Your virtual machine will not
+# work if this number is higher than the number of your physical CPUs
+numvcpus = "1"
+
+# Memory size and other memory settings
+memsize = "512"
+MemAllowAutoScaleDown = "FALSE"
+MemTrimRate = "-1"
+
+# PowerOn/Off options
+gui.powerOnAtStartup = "FALSE"
+gui.fullScreenAtPowerOn = "FALSE"
+gui.exitAtPowerOff = "FALSE"
+
+# Unique ID for the virtual machine will be created
+uuid.action = "create"
+
+# Settings for VMware Tools
+tools.remindInstall = "FALSE"
+tools.upgrade.policy = "manual"
+
+# Startup hints interfers with automatic startup of a virtual machine
+# This setting has no effect in VMware Player
+hints.hideAll = "TRUE"
+
+# Enable time synchronization between computer
+# and virtual machine
+tools.syncTime = "TRUE"
+
+# First serial port, physical COM1 is not available
+serial0.present = "FALSE"
+
+# Optional second serial port, physical COM2 is not available
+serial1.present = "FALSE"
+
+# First parallell port, physical LPT1 is not available
+parallel0.present = "FALSE"
+
+# Sound settings
+sound.present = "TRUE"
+sound.fileName = "-1"
+sound.autodetect = "TRUE"
+
+# Logging
+# This config activates logging, and keeps last log
+logging = "TRUE"
+log.fileName = "nexusvm.log"
+log.append = "TRUE"
+log.keepOld = "3"
+
+# These settings decides interaction between your
+# computer and the virtual machine
+isolation.tools.hgfs.disable = "TRUE"
+isolation.tools.dnd.disable = "TRUE"
+isolation.tools.copy.enable = "TRUE"
+isolation.tools.paste.enabled = "TRUE"
+
+# Other default settings
+svga.autodetect = "TRUE"
+mks.keyboardFilter = "allow"
+snapshot.action = "keep"
+
+# First network interface card
+ethernet0.present = "TRUE"
+ethernet0.virtualDev = "e1000"
+#ethernet0.virtualDev = "vlance"
+ethernet0.connectionType = "nat"
+ethernet0.addressType = "generated"
+ethernet0.generatedAddressOffset = "0"
+
+# Settings for physical floppy drive
+floppy0.present = "FALSE"
+
+# Settings for physical CDROM drive
+ide1:0.present = "TRUE"
+ide1:0.deviceType = "cdrom-image"
+ide1:0.startConnected = "FALSE"
+#ide1:0.fileName = "/home/willem/src/nexus/build/boot/stage1/nexus.iso"
+ide1:0.autodetect = "FALSE"
+
+# First IDE disk, size 500Mb
+ide0:0.present = "TRUE"
+ide0:0.fileName = "nexus-2011-1.vmdk"
+ide0:0.mode = "persistent"
+ide0:0.startConnected = "TRUE"
+ide0:0.writeThrough = "TRUE"
+
+# END OF EasyVMX! CONFIG
+

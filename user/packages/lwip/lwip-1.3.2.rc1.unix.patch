@@ -1,0 +1,1327 @@
+diff -Nur lwip-orig/src/arch/perf.c lwip-unix/src/arch/perf.c
+--- lwip-orig/src/arch/perf.c	1970-01-01 00:00:00.000000000 +0000
++++ lwip-unix/src/arch/perf.c	2009-11-11 03:41:14.000000000 +0000
+@@ -0,0 +1,65 @@
++/*
++ * Copyright (c) 2001-2003 Swedish Institute of Computer Science.
++ * All rights reserved. 
++ * 
++ * Redistribution and use in source and binary forms, with or without modification, 
++ * are permitted provided that the following conditions are met:
++ *
++ * 1. Redistributions of source code must retain the above copyright notice,
++ *    this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright notice,
++ *    this list of conditions and the following disclaimer in the documentation
++ *    and/or other materials provided with the distribution.
++ * 3. The name of the author may not be used to endorse or promote products
++ *    derived from this software without specific prior written permission. 
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR IMPLIED 
++ * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF 
++ * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT 
++ * SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, 
++ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT 
++ * OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS 
++ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN 
++ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING 
++ * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY 
++ * OF SUCH DAMAGE.
++ *
++ * This file is part of the lwIP TCP/IP stack.
++ * 
++ * Author: Adam Dunkels <adam@sics.se>
++ *
++ */
++
++#include "arch/perf.h"
++
++#include <stdio.h>
++
++static FILE *f;
++
++void
++perf_print(unsigned long c1l, unsigned long c1h,
++	   unsigned long c2l, unsigned long c2h,
++	   char *key)
++{
++  unsigned long sub_ms, sub_ls;
++  
++  sub_ms = c2h - c1h;
++  sub_ls = c2l - c1l;
++  if (c2l < c1l) sub_ms--;
++  fprintf(f, "%s: %.8lu%.8lu\n", key, sub_ms, sub_ls);
++  fflush(NULL);
++}
++
++void
++perf_print_times(struct tms *start, struct tms *end, char *key)
++{
++  fprintf(f, "%s: %lu\n", key, end->tms_stime - start->tms_stime);
++  fflush(NULL);  
++}
++
++void
++perf_init(char *fname)
++{
++  f = fopen(fname, "w");  
++}
++	
+diff -Nur lwip-orig/src/arch/sys_arch.c lwip-unix/src/arch/sys_arch.c
+--- lwip-orig/src/arch/sys_arch.c	1970-01-01 00:00:00.000000000 +0000
++++ lwip-unix/src/arch/sys_arch.c	2009-11-11 03:41:14.000000000 +0000
+@@ -0,0 +1,613 @@
++/*
++ * Copyright (c) 2001-2003 Swedish Institute of Computer Science.
++ * All rights reserved. 
++ * 
++ * Redistribution and use in source and binary forms, with or without modification, 
++ * are permitted provided that the following conditions are met:
++ *
++ * 1. Redistributions of source code must retain the above copyright notice,
++ *    this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright notice,
++ *    this list of conditions and the following disclaimer in the documentation
++ *    and/or other materials provided with the distribution.
++ * 3. The name of the author may not be used to endorse or promote products
++ *    derived from this software without specific prior written permission. 
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR IMPLIED 
++ * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF 
++ * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT 
++ * SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, 
++ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT 
++ * OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS 
++ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN 
++ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING 
++ * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY 
++ * OF SUCH DAMAGE.
++ *
++ * This file is part of the lwIP TCP/IP stack.
++ * 
++ * Author: Adam Dunkels <adam@sics.se>
++ *
++ */
++
++/*
++ * Wed Apr 17 16:05:29 EDT 2002 (James Roth)
++ *
++ *  - Fixed an unlikely sys_thread_new() race condition.
++ *
++ *  - Made current_thread() work with threads which where
++ *    not created with sys_thread_new().  This includes
++ *    the main thread and threads made with pthread_create().
++ *
++ *  - Catch overflows where more than SYS_MBOX_SIZE messages
++ *    are waiting to be read.  The sys_mbox_post() routine
++ *    will block until there is more room instead of just
++ *    leaking messages.
++ */
++#include "lwip/debug.h"
++
++#include <string.h>
++#include <sys/time.h>
++#include <sys/types.h>
++#include <stdlib.h>
++#include <unistd.h>
++#include <pthread.h>
++
++#include "lwip/sys.h"
++#include "lwip/opt.h"
++#include "lwip/stats.h"
++
++#define UMAX(a, b)      ((a) > (b) ? (a) : (b))
++
++static struct sys_thread *threads = NULL;
++static pthread_mutex_t threads_mutex = PTHREAD_MUTEX_INITIALIZER;
++
++struct sys_mbox_msg {
++  struct sys_mbox_msg *next;
++  void *msg;
++};
++
++#define SYS_MBOX_SIZE 128
++
++struct sys_mbox {
++  int first, last;
++  void *msgs[SYS_MBOX_SIZE];
++  struct sys_sem *mail;
++  struct sys_sem *mutex;
++  int wait_send;
++};
++
++struct sys_sem {
++  unsigned int c;
++  pthread_cond_t cond;
++  pthread_mutex_t mutex;
++};
++
++struct sys_thread {
++  struct sys_thread *next;
++  struct sys_timeouts timeouts;
++  pthread_t pthread;
++};
++
++
++static struct timeval starttime;
++
++static pthread_mutex_t lwprot_mutex = PTHREAD_MUTEX_INITIALIZER;
++static pthread_t lwprot_thread = (pthread_t) 0xDEAD;
++static int lwprot_count = 0;
++
++static struct sys_sem *sys_sem_new_(u8_t count);
++static void sys_sem_free_(struct sys_sem *sem);
++
++static u32_t cond_wait(pthread_cond_t * cond, pthread_mutex_t * mutex,
++                       u32_t timeout);
++
++/*-----------------------------------------------------------------------------------*/
++static struct sys_thread * 
++introduce_thread(pthread_t id)
++{
++  struct sys_thread *thread;
++  
++  thread = malloc(sizeof(struct sys_thread));
++    
++  if (thread != NULL) {
++    pthread_mutex_lock(&threads_mutex);
++    thread->next = threads;
++    thread->timeouts.next = NULL;
++    thread->pthread = id;
++    threads = thread;
++    pthread_mutex_unlock(&threads_mutex);
++  }
++    
++  return thread;
++}
++/*-----------------------------------------------------------------------------------*/
++static struct sys_thread *
++current_thread(void)
++{
++  struct sys_thread *st;
++  pthread_t pt;
++  pt = pthread_self();
++  pthread_mutex_lock(&threads_mutex);
++
++  for(st = threads; st != NULL; st = st->next) {    
++    if (pthread_equal(st->pthread, pt)) {
++      pthread_mutex_unlock(&threads_mutex);
++      
++      return st;
++    }
++  }
++
++  pthread_mutex_unlock(&threads_mutex);
++
++  st = introduce_thread(pt);
++
++  if (!st) {
++    printf("current_thread???\n");
++    abort();
++  }
++
++  return st;
++}
++/*-----------------------------------------------------------------------------------*/
++sys_thread_t
++sys_thread_new(char *name, void (* function)(void *arg), void *arg, int stacksize, int prio)
++{
++  int code;
++  pthread_t tmp;
++  struct sys_thread *st = NULL;
++  
++  code = pthread_create(&tmp,
++                        NULL, 
++                        (void *(*)(void *)) 
++                        function, 
++                        arg);
++  
++  if (0 == code) {
++    st = introduce_thread(tmp);
++  }
++  
++  if (NULL == st) {
++    LWIP_DEBUGF(SYS_DEBUG, ("sys_thread_new: pthread_create %d, st = 0x%x",
++                       code, (int)st));
++    abort();
++  }
++  return st;
++}
++/*-----------------------------------------------------------------------------------*/
++struct sys_mbox *
++sys_mbox_new(int size)
++{
++  struct sys_mbox *mbox;
++  
++  mbox = malloc(sizeof(struct sys_mbox));
++  if (mbox != NULL) {
++    mbox->first = mbox->last = 0;
++    mbox->mail = sys_sem_new_(0);
++    mbox->mutex = sys_sem_new_(1);
++    mbox->wait_send = 0;
++  
++#if SYS_STATS
++    lwip_stats.sys.mbox.used++;
++    if (lwip_stats.sys.mbox.used > lwip_stats.sys.mbox.max) {
++      lwip_stats.sys.mbox.max = lwip_stats.sys.mbox.used;
++    }
++#endif /* SYS_STATS */
++  }
++  return mbox;
++}
++/*-----------------------------------------------------------------------------------*/
++void
++sys_mbox_free(struct sys_mbox *mbox)
++{
++  if (mbox != SYS_MBOX_NULL) {
++#if SYS_STATS
++    lwip_stats.sys.mbox.used--;
++#endif /* SYS_STATS */
++    sys_sem_wait(mbox->mutex);
++    
++    sys_sem_free_(mbox->mail);
++    sys_sem_free_(mbox->mutex);
++    mbox->mail = mbox->mutex = NULL;
++    /*  LWIP_DEBUGF("sys_mbox_free: mbox 0x%lx\n", mbox); */
++    free(mbox);
++  }
++}
++/*-----------------------------------------------------------------------------------*/
++err_t
++sys_mbox_trypost(struct sys_mbox *mbox, void *msg)
++{
++  u8_t first;
++  
++  sys_sem_wait(mbox->mutex);
++  
++  LWIP_DEBUGF(SYS_DEBUG, ("sys_mbox_trypost: mbox %p msg %p\n",
++                          (void *)mbox, (void *)msg));
++  
++  if ((mbox->last + 1) >= (mbox->first + SYS_MBOX_SIZE))
++    return ERR_MEM;
++
++  mbox->msgs[mbox->last % SYS_MBOX_SIZE] = msg;
++  
++  if (mbox->last == mbox->first) {
++    first = 1;
++  } else {
++    first = 0;
++  }
++  
++  mbox->last++;
++  
++  if (first) {
++    sys_sem_signal(mbox->mail);
++  }
++
++  sys_sem_signal(mbox->mutex);
++
++  return ERR_OK;
++}
++/*-----------------------------------------------------------------------------------*/
++void
++sys_mbox_post(struct sys_mbox *mbox, void *msg)
++{
++  u8_t first;
++  
++  sys_sem_wait(mbox->mutex);
++  
++  LWIP_DEBUGF(SYS_DEBUG, ("sys_mbox_post: mbox %p msg %p\n", (void *)mbox, (void *)msg));
++  
++  while ((mbox->last + 1) >= (mbox->first + SYS_MBOX_SIZE)) {
++    mbox->wait_send++;
++    sys_sem_signal(mbox->mutex);
++    sys_arch_sem_wait(mbox->mail, 0);
++    sys_arch_sem_wait(mbox->mutex, 0);
++    mbox->wait_send--;
++  }
++  
++  mbox->msgs[mbox->last % SYS_MBOX_SIZE] = msg;
++  
++  if (mbox->last == mbox->first) {
++    first = 1;
++  } else {
++    first = 0;
++  }
++  
++  mbox->last++;
++  
++  if (first) {
++    sys_sem_signal(mbox->mail);
++  }
++
++  sys_sem_signal(mbox->mutex);
++}
++/*-----------------------------------------------------------------------------------*/
++u32_t
++sys_arch_mbox_tryfetch(struct sys_mbox *mbox, void **msg)
++{
++  sys_arch_sem_wait(mbox->mutex, 0);
++
++  if (mbox->first == mbox->last) {
++    sys_sem_signal(mbox->mutex);
++    return SYS_MBOX_EMPTY;
++  }
++
++  if (msg != NULL) {
++    LWIP_DEBUGF(SYS_DEBUG, ("sys_mbox_tryfetch: mbox %p msg %p\n", (void *)mbox, *msg));
++    *msg = mbox->msgs[mbox->first % SYS_MBOX_SIZE];
++  }
++  else{
++    LWIP_DEBUGF(SYS_DEBUG, ("sys_mbox_tryfetch: mbox %p, null msg\n", (void *)mbox));
++  }
++
++  mbox->first++;
++  
++  if (mbox->wait_send) {
++    sys_sem_signal(mbox->mail);
++  }
++
++  sys_sem_signal(mbox->mutex);
++
++  return 0;
++}
++/*-----------------------------------------------------------------------------------*/
++u32_t
++sys_arch_mbox_fetch(struct sys_mbox *mbox, void **msg, u32_t timeout)
++{
++  u32_t time = 0;
++  
++  /* The mutex lock is quick so we don't bother with the timeout
++     stuff here. */
++  sys_arch_sem_wait(mbox->mutex, 0);
++
++  while (mbox->first == mbox->last) {
++    sys_sem_signal(mbox->mutex);
++    
++    /* We block while waiting for a mail to arrive in the mailbox. We
++       must be prepared to timeout. */
++    if (timeout != 0) {
++      time = sys_arch_sem_wait(mbox->mail, timeout);
++      
++      if (time == SYS_ARCH_TIMEOUT) {
++        return SYS_ARCH_TIMEOUT;
++      }
++    } else {
++      sys_arch_sem_wait(mbox->mail, 0);
++    }
++    
++    sys_arch_sem_wait(mbox->mutex, 0);
++  }
++
++  if (msg != NULL) {
++    LWIP_DEBUGF(SYS_DEBUG, ("sys_mbox_fetch: mbox %p msg %p\n", (void *)mbox, *msg));
++    *msg = mbox->msgs[mbox->first % SYS_MBOX_SIZE];
++  }
++  else{
++    LWIP_DEBUGF(SYS_DEBUG, ("sys_mbox_fetch: mbox %p, null msg\n", (void *)mbox));
++  }
++
++  mbox->first++;
++  
++  if (mbox->wait_send) {
++    sys_sem_signal(mbox->mail);
++  }
++
++  sys_sem_signal(mbox->mutex);
++
++  return time;
++}
++/*-----------------------------------------------------------------------------------*/
++struct sys_sem *
++sys_sem_new(u8_t count)
++{
++#if SYS_STATS
++  lwip_stats.sys.sem.used++;
++  if (lwip_stats.sys.sem.used > lwip_stats.sys.sem.max) {
++    lwip_stats.sys.sem.max = lwip_stats.sys.sem.used;
++  }
++#endif /* SYS_STATS */
++  return sys_sem_new_(count);
++}
++
++/*-----------------------------------------------------------------------------------*/
++static struct sys_sem *
++sys_sem_new_(u8_t count)
++{
++  struct sys_sem *sem;
++  
++  sem = malloc(sizeof(struct sys_sem));
++  if (sem != NULL) {
++    sem->c = count;
++    pthread_cond_init(&(sem->cond), NULL);
++    pthread_mutex_init(&(sem->mutex), NULL);
++  }
++  return sem;
++}
++
++/*-----------------------------------------------------------------------------------*/
++static u32_t
++cond_wait(pthread_cond_t *cond, pthread_mutex_t *mutex, u32_t timeout)
++{
++  int tdiff;
++  unsigned long sec, usec;
++  struct timeval rtime1, rtime2;
++  struct timespec ts;
++  struct timezone tz;
++  int retval;
++  
++  if (timeout > 0) {
++    /* Get a timestamp and add the timeout value. */
++    gettimeofday(&rtime1, &tz);
++    sec = rtime1.tv_sec;
++    usec = rtime1.tv_usec;
++    usec += timeout % 1000 * 1000;
++    sec += (int)(timeout / 1000) + (int)(usec / 1000000);
++    usec = usec % 1000000;
++    ts.tv_nsec = usec * 1000;
++    ts.tv_sec = sec;
++    
++    retval = pthread_cond_timedwait(cond, mutex, &ts);
++    
++    if (retval == ETIMEDOUT) {
++      return SYS_ARCH_TIMEOUT;
++    } else {
++      /* Calculate for how long we waited for the cond. */
++      gettimeofday(&rtime2, &tz);
++      tdiff = (rtime2.tv_sec - rtime1.tv_sec) * 1000 +
++        (rtime2.tv_usec - rtime1.tv_usec) / 1000;
++      
++      if (tdiff <= 0) {
++        return 0;
++      }
++      
++      return tdiff;
++    }
++  } else {
++    pthread_cond_wait(cond, mutex);
++    return SYS_ARCH_TIMEOUT;
++  }
++}
++/*-----------------------------------------------------------------------------------*/
++u32_t
++sys_arch_sem_wait(struct sys_sem *sem, u32_t timeout)
++{
++  u32_t time = 0;
++  
++  pthread_mutex_lock(&(sem->mutex));
++  while (sem->c <= 0) {
++    if (timeout > 0) {
++      time = cond_wait(&(sem->cond), &(sem->mutex), timeout);
++      
++      if (time == SYS_ARCH_TIMEOUT) {
++        pthread_mutex_unlock(&(sem->mutex));
++        return SYS_ARCH_TIMEOUT;
++      }
++      /*      pthread_mutex_unlock(&(sem->mutex));
++              return time; */
++    } else {
++      cond_wait(&(sem->cond), &(sem->mutex), 0);
++    }
++  }
++  sem->c--;
++  pthread_mutex_unlock(&(sem->mutex));
++  return time;
++}
++/*-----------------------------------------------------------------------------------*/
++void
++sys_sem_signal(struct sys_sem *sem)
++{
++  pthread_mutex_lock(&(sem->mutex));
++  sem->c++;
++
++  if (sem->c > 1) {
++    sem->c = 1;
++  }
++
++  pthread_cond_broadcast(&(sem->cond));
++  pthread_mutex_unlock(&(sem->mutex));
++}
++/*-----------------------------------------------------------------------------------*/
++void
++sys_sem_free(struct sys_sem *sem)
++{
++  if (sem != SYS_SEM_NULL) {
++#if SYS_STATS
++    lwip_stats.sys.sem.used--;
++#endif /* SYS_STATS */
++    sys_sem_free_(sem);
++  }
++}
++
++/*-----------------------------------------------------------------------------------*/
++static void
++sys_sem_free_(struct sys_sem *sem)
++{
++  pthread_cond_destroy(&(sem->cond));
++  pthread_mutex_destroy(&(sem->mutex));
++  free(sem);
++}
++/*-----------------------------------------------------------------------------------*/
++unsigned long
++sys_unix_now()
++{
++  struct timeval tv;
++  struct timezone tz;
++  long sec, usec;
++  unsigned long msec;
++  gettimeofday(&tv, &tz);
++  
++  sec = tv.tv_sec - starttime.tv_sec;
++  usec = tv.tv_usec - starttime.tv_usec;
++  msec = sec * 1000 + usec / 1000;
++    
++  return msec;
++}
++/*-----------------------------------------------------------------------------------*/
++void
++sys_init()
++{
++  struct timezone tz;
++  gettimeofday(&starttime, &tz);
++}
++/*-----------------------------------------------------------------------------------*/
++struct sys_timeouts *
++sys_arch_timeouts(void)
++{
++  struct sys_thread *thread;
++
++  thread = current_thread();
++  return &thread->timeouts;
++}
++/*-----------------------------------------------------------------------------------*/
++/** sys_prot_t sys_arch_protect(void)
++
++This optional function does a "fast" critical region protection and returns
++the previous protection level. This function is only called during very short
++critical regions. An embedded system which supports ISR-based drivers might
++want to implement this function by disabling interrupts. Task-based systems
++might want to implement this by using a mutex or disabling tasking. This
++function should support recursive calls from the same task or interrupt. In
++other words, sys_arch_protect() could be called while already protected. In
++that case the return value indicates that it is already protected.
++
++sys_arch_protect() is only required if your port is supporting an operating
++system.
++*/
++sys_prot_t
++sys_arch_protect(void)
++{
++    /* Note that for the UNIX port, we are using a lightweight mutex, and our
++     * own counter (which is locked by the mutex). The return code is not actually
++     * used. */
++    if (lwprot_thread != pthread_self())
++    {
++        /* We are locking the mutex where it has not been locked before *
++        * or is being locked by another thread */
++        pthread_mutex_lock(&lwprot_mutex);
++        lwprot_thread = pthread_self();
++        lwprot_count = 1;
++    }
++    else
++        /* It is already locked by THIS thread */
++        lwprot_count++;
++    return 0;
++}
++/*-----------------------------------------------------------------------------------*/
++/** void sys_arch_unprotect(sys_prot_t pval)
++
++This optional function does a "fast" set of critical region protection to the
++value specified by pval. See the documentation for sys_arch_protect() for
++more information. This function is only required if your port is supporting
++an operating system.
++*/
++void
++sys_arch_unprotect(sys_prot_t pval)
++{
++    if (lwprot_thread == pthread_self())
++    {
++        if (--lwprot_count == 0)
++        {
++            lwprot_thread = (pthread_t) 0xDEAD;
++            pthread_mutex_unlock(&lwprot_mutex);
++        }
++    }
++}
++
++/*-----------------------------------------------------------------------------------*/
++
++#ifndef MAX_JIFFY_OFFSET
++#define MAX_JIFFY_OFFSET ((~0UL >> 1)-1)
++#endif
++
++#ifndef HZ
++#define HZ 100
++#endif
++
++unsigned long
++sys_jiffies(void)
++{
++    struct timeval tv;
++    unsigned long sec = tv.tv_sec;
++    long usec = tv.tv_usec;
++
++    gettimeofday(&tv,NULL);
++
++    if (sec >= (MAX_JIFFY_OFFSET / HZ))
++	return MAX_JIFFY_OFFSET;
++    usec += 1000000L / HZ - 1;
++    usec /= 1000000L / HZ;
++    return HZ * sec + usec;
++}
++
++#if PPP_DEBUG
++
++#include <stdarg.h>
++
++void ppp_trace(int level, const char *format, ...)
++{
++    va_list args;
++
++    (void)level;
++    va_start(args, format);
++    vprintf(format, args);
++    va_end(args);
++}
++#endif
+diff -Nur lwip-orig/src/include/arch/cc.h lwip-unix/src/include/arch/cc.h
+--- lwip-orig/src/include/arch/cc.h	1970-01-01 00:00:00.000000000 +0000
++++ lwip-unix/src/include/arch/cc.h	2009-11-11 14:43:42.000000000 +0000
+@@ -0,0 +1,78 @@
++/*
++ * Copyright (c) 2001-2003 Swedish Institute of Computer Science.
++ * All rights reserved. 
++ * 
++ * Redistribution and use in source and binary forms, with or without modification, 
++ * are permitted provided that the following conditions are met:
++ *
++ * 1. Redistributions of source code must retain the above copyright notice,
++ *    this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright notice,
++ *    this list of conditions and the following disclaimer in the documentation
++ *    and/or other materials provided with the distribution.
++ * 3. The name of the author may not be used to endorse or promote products
++ *    derived from this software without specific prior written permission. 
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR IMPLIED 
++ * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF 
++ * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT 
++ * SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, 
++ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT 
++ * OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS 
++ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN 
++ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING 
++ * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY 
++ * OF SUCH DAMAGE.
++ *
++ * This file is part of the lwIP TCP/IP stack.
++ * 
++ * Author: Adam Dunkels <adam@sics.se>
++ *
++ */
++#ifndef __ARCH_CC_H__
++#define __ARCH_CC_H__
++
++/* Include some files for defining library routines */
++#include <string.h>
++#include <sys/time.h>
++#include <sys/types.h>
++
++/* Define platform endianness */
++#ifndef BYTE_ORDER
++#define BYTE_ORDER LITTLE_ENDIAN
++#endif /* BYTE_ORDER */
++
++/* Define generic types used in lwIP */
++typedef unsigned   char    u8_t;
++typedef signed     char    s8_t;
++typedef unsigned   short   u16_t;
++typedef signed     short   s16_t;
++typedef unsigned   long    u32_t;
++typedef signed     long    s32_t;
++
++typedef u32_t mem_ptr_t;
++
++/* Define (sn)printf formatters for these lwIP types */
++#define U16_F "hu"
++#define S16_F "hd"
++#define X16_F "hx"
++#define U32_F "lu"
++#define S32_F "ld"
++#define X32_F "lx"
++
++/* Compiler hints for packing structures */
++#define PACK_STRUCT_FIELD(x) x __attribute__((packed))
++#define PACK_STRUCT_STRUCT __attribute__((packed))
++#define PACK_STRUCT_BEGIN
++#define PACK_STRUCT_END
++
++/* prototypes for printf() and abort() */
++#include <stdio.h>
++#include <stdlib.h>
++/* Plaform specific diagnostic output */
++#define LWIP_PLATFORM_DIAG(x)	do {printf x;} while(0)
++
++#define LWIP_PLATFORM_ASSERT(x) do {printf("Assertion \"%s\" failed at line %d in %s\n", \
++                                     x, __LINE__, __FILE__); fflush(NULL); abort();} while(0)
++				     
++#endif /* __ARCH_CC_H__ */
+diff -Nur lwip-orig/src/include/arch/perf.h lwip-unix/src/include/arch/perf.h
+--- lwip-orig/src/include/arch/perf.h	1970-01-01 00:00:00.000000000 +0000
++++ lwip-unix/src/include/arch/perf.h	2009-11-11 03:41:14.000000000 +0000
+@@ -0,0 +1,63 @@
++/*
++ * Copyright (c) 2001-2003 Swedish Institute of Computer Science.
++ * All rights reserved. 
++ * 
++ * Redistribution and use in source and binary forms, with or without modification, 
++ * are permitted provided that the following conditions are met:
++ *
++ * 1. Redistributions of source code must retain the above copyright notice,
++ *    this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright notice,
++ *    this list of conditions and the following disclaimer in the documentation
++ *    and/or other materials provided with the distribution.
++ * 3. The name of the author may not be used to endorse or promote products
++ *    derived from this software without specific prior written permission. 
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR IMPLIED 
++ * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF 
++ * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT 
++ * SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, 
++ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT 
++ * OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS 
++ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN 
++ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING 
++ * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY 
++ * OF SUCH DAMAGE.
++ *
++ * This file is part of the lwIP TCP/IP stack.
++ * 
++ * Author: Adam Dunkels <adam@sics.se>
++ *
++ */
++#ifndef __ARCH_PERF_H__
++#define __ARCH_PERF_H__
++
++#include <sys/times.h>
++
++#ifdef PERF
++#define PERF_START  { \
++                         unsigned long __c1l, __c1h, __c2l, __c2h; \
++                         __asm__(".byte 0x0f, 0x31" : "=a" (__c1l), "=d" (__c1h))
++#define PERF_STOP(x)   __asm__(".byte 0x0f, 0x31" : "=a" (__c2l), "=d" (__c2h)); \
++                       perf_print(__c1l, __c1h, __c2l, __c2h, x);}
++
++/*#define PERF_START do { \
++                     struct tms __perf_start, __perf_end; \
++                     times(&__perf_start)
++#define PERF_STOP(x) times(&__perf_end); \
++                     perf_print_times(&__perf_start, &__perf_end, x);\
++                     } while(0)*/
++#else /* PERF */
++#define PERF_START    /* null definition */
++#define PERF_STOP(x)  /* null definition */
++#endif /* PERF */
++
++void perf_print(unsigned long c1l, unsigned long c1h,
++		unsigned long c2l, unsigned long c2h,
++		char *key);
++
++void perf_print_times(struct tms *start, struct tms *end, char *key);
++
++void perf_init(char *fname);
++
++#endif /* __ARCH_PERF_H__ */
+diff -Nur lwip-orig/src/include/arch/sys_arch.h lwip-unix/src/include/arch/sys_arch.h
+--- lwip-orig/src/include/arch/sys_arch.h	1970-01-01 00:00:00.000000000 +0000
++++ lwip-unix/src/include/arch/sys_arch.h	2009-11-11 03:41:14.000000000 +0000
+@@ -0,0 +1,52 @@
++/*
++ * Copyright (c) 2001-2003 Swedish Institute of Computer Science.
++ * All rights reserved. 
++ * 
++ * Redistribution and use in source and binary forms, with or without modification, 
++ * are permitted provided that the following conditions are met:
++ *
++ * 1. Redistributions of source code must retain the above copyright notice,
++ *    this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright notice,
++ *    this list of conditions and the following disclaimer in the documentation
++ *    and/or other materials provided with the distribution.
++ * 3. The name of the author may not be used to endorse or promote products
++ *    derived from this software without specific prior written permission. 
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR IMPLIED 
++ * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF 
++ * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT 
++ * SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, 
++ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT 
++ * OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS 
++ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN 
++ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING 
++ * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY 
++ * OF SUCH DAMAGE.
++ *
++ * This file is part of the lwIP TCP/IP stack.
++ * 
++ * Author: Adam Dunkels <adam@sics.se>
++ *
++ */
++#ifndef __ARCH_SYS_ARCH_H__
++#define __ARCH_SYS_ARCH_H__
++
++#include <errno.h>
++
++#define SYS_MBOX_NULL NULL
++#define SYS_SEM_NULL  NULL
++
++typedef u32_t sys_prot_t;
++
++struct sys_sem;
++typedef struct sys_sem * sys_sem_t;
++
++struct sys_mbox;
++typedef struct sys_mbox *sys_mbox_t;
++
++struct sys_thread;
++typedef struct sys_thread * sys_thread_t;
++
++#endif /* __ARCH_SYS_ARCH_H__ */
++
+diff -Nur lwip-orig/src/include/lwip/arch.h lwip-unix/src/include/lwip/arch.h
+--- lwip-orig/src/include/lwip/arch.h	2007-06-13 08:08:42.000000000 +0000
++++ lwip-unix/src/include/lwip/arch.h	2009-11-11 14:45:01.000000000 +0000
+@@ -32,6 +32,8 @@
+ #ifndef __LWIP_ARCH_H__
+ #define __LWIP_ARCH_H__
+ 
++#include <sys/types.h>
++
+ #ifndef LITTLE_ENDIAN
+ #define LITTLE_ENDIAN 1234
+ #endif
+diff -Nur lwip-orig/src/include/lwip/lwipopts.h lwip-unix/src/include/lwip/lwipopts.h
+--- lwip-orig/src/include/lwip/lwipopts.h	1970-01-01 00:00:00.000000000 +0000
++++ lwip-unix/src/include/lwip/lwipopts.h	2009-11-11 15:11:24.000000000 +0000
+@@ -0,0 +1,420 @@
++/**
++ * @file
++ *
++ * lwIP Options Configuration
++ */
++
++/*
++ * Copyright (c) 2001-2004 Swedish Institute of Computer Science.
++ * All rights reserved. 
++ * 
++ * Redistribution and use in source and binary forms, with or without modification, 
++ * are permitted provided that the following conditions are met:
++ *
++ * 1. Redistributions of source code must retain the above copyright notice,
++ *    this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright notice,
++ *    this list of conditions and the following disclaimer in the documentation
++ *    and/or other materials provided with the distribution.
++ * 3. The name of the author may not be used to endorse or promote products
++ *    derived from this software without specific prior written permission. 
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR IMPLIED 
++ * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF 
++ * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT 
++ * SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, 
++ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT 
++ * OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS 
++ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN 
++ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING 
++ * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY 
++ * OF SUCH DAMAGE.
++ *
++ * This file is part of the lwIP TCP/IP stack.
++ * 
++ * Author: Adam Dunkels <adam@sics.se>
++ *
++ */
++#ifndef __LWIPOPTS_H__
++#define __LWIPOPTS_H__
++
++/*
++ * Include user defined options first. Anything not defined in these files
++ * will be set to standard values. Override anything you dont like!
++ */
++#include "lwip/debug.h"
++
++/*
++   -----------------------------------------------
++   ---------- Platform specific locking ----------
++   -----------------------------------------------
++*/
++
++/**
++ * SYS_LIGHTWEIGHT_PROT==1: if you want inter-task protection for certain
++ * critical regions during buffer allocation, deallocation and memory
++ * allocation and deallocation.
++ */
++#define SYS_LIGHTWEIGHT_PROT            0
++
++/** 
++ * NO_SYS==1: Provides VERY minimal functionality. Otherwise,
++ * use lwIP facilities.
++ */
++#define NO_SYS                          0
++
++/*
++   ------------------------------------
++   ---------- Memory options ----------
++   ------------------------------------
++*/
++
++/**
++ * MEM_ALIGNMENT: should be set to the alignment of the CPU
++ *    4 byte alignment -> #define MEM_ALIGNMENT 4
++ *    2 byte alignment -> #define MEM_ALIGNMENT 2
++ */
++#define MEM_ALIGNMENT                   4
++
++/**
++ * MEM_SIZE: the size of the heap memory. If the application will send
++ * a lot of data that needs to be copied, this should be set high.
++ */
++#define MEM_SIZE                        8192
++
++/*
++   ------------------------------------------------
++   ---------- Internal Memory Pool Sizes ----------
++   ------------------------------------------------
++*/
++/**
++ * MEMP_NUM_PBUF: the number of memp struct pbufs (used for PBUF_ROM and PBUF_REF).
++ * If the application sends a lot of data out of ROM (or other static memory),
++ * this should be set high.
++ */
++#define MEMP_NUM_PBUF                   16
++
++/**
++ * MEMP_NUM_RAW_PCB: Number of raw connection PCBs
++ * (requires the LWIP_RAW option)
++ */
++#define MEMP_NUM_RAW_PCB                4
++
++/**
++ * MEMP_NUM_UDP_PCB: the number of UDP protocol control blocks. One
++ * per active UDP "connection".
++ * (requires the LWIP_UDP option)
++ */
++#define MEMP_NUM_UDP_PCB                4
++
++/**
++ * MEMP_NUM_TCP_PCB: the number of simulatenously active TCP connections.
++ * (requires the LWIP_TCP option)
++ */
++#define MEMP_NUM_TCP_PCB                4
++
++/**
++ * MEMP_NUM_TCP_PCB_LISTEN: the number of listening TCP connections.
++ * (requires the LWIP_TCP option)
++ */
++#define MEMP_NUM_TCP_PCB_LISTEN         4
++
++/**
++ * MEMP_NUM_TCP_SEG: the number of simultaneously queued TCP segments.
++ * (requires the LWIP_TCP option)
++ */
++#define MEMP_NUM_TCP_SEG                16
++
++/**
++ * MEMP_NUM_REASSDATA: the number of simultaneously IP packets queued for
++ * reassembly (whole packets, not fragments!)
++ */
++#define MEMP_NUM_REASSDATA              1
++
++/**
++ * MEMP_NUM_ARP_QUEUE: the number of simulateously queued outgoing
++ * packets (pbufs) that are waiting for an ARP request (to resolve
++ * their destination address) to finish.
++ * (requires the ARP_QUEUEING option)
++ */
++#define MEMP_NUM_ARP_QUEUE              2
++
++/**
++ * MEMP_NUM_SYS_TIMEOUT: the number of simulateously active timeouts.
++ * (requires NO_SYS==0)
++ */
++#define MEMP_NUM_SYS_TIMEOUT            8
++
++/**
++ * MEMP_NUM_NETBUF: the number of struct netbufs.
++ * (only needed if you use the sequential API, like api_lib.c)
++ */
++#define MEMP_NUM_NETBUF                 2
++
++/**
++ * MEMP_NUM_NETCONN: the number of struct netconns.
++ * (only needed if you use the sequential API, like api_lib.c)
++ */
++#define MEMP_NUM_NETCONN                4
++
++/**
++ * MEMP_NUM_TCPIP_MSG_API: the number of struct tcpip_msg, which are used
++ * for callback/timeout API communication. 
++ * (only needed if you use tcpip.c)
++ */
++#define MEMP_NUM_TCPIP_MSG_API          8
++
++/**
++ * MEMP_NUM_TCPIP_MSG_INPKT: the number of struct tcpip_msg, which are used
++ * for incoming packets. 
++ * (only needed if you use tcpip.c)
++ */
++#define MEMP_NUM_TCPIP_MSG_INPKT        8
++
++/**
++ * PBUF_POOL_SIZE: the number of buffers in the pbuf pool. 
++ */
++#define PBUF_POOL_SIZE                  8
++
++/*
++   ---------------------------------
++   ---------- ARP options ----------
++   ---------------------------------
++*/
++/**
++ * LWIP_ARP==1: Enable ARP functionality.
++ */
++#define LWIP_ARP                        1
++
++/*
++   --------------------------------
++   ---------- IP options ----------
++   --------------------------------
++*/
++/**
++ * IP_FORWARD==1: Enables the ability to forward IP packets across network
++ * interfaces. If you are going to run lwIP on a device with only one network
++ * interface, define this to 0.
++ */
++#define IP_FORWARD                      0
++
++/**
++ * IP_OPTIONS: Defines the behavior for IP options.
++ *      IP_OPTIONS_ALLOWED==0: All packets with IP options are dropped.
++ *      IP_OPTIONS_ALLOWED==1: IP options are allowed (but not parsed).
++ */
++#define IP_OPTIONS_ALLOWED              1
++
++/**
++ * IP_REASSEMBLY==1: Reassemble incoming fragmented IP packets. Note that
++ * this option does not affect outgoing packet sizes, which can be controlled
++ * via IP_FRAG.
++ */
++#define IP_REASSEMBLY                   1
++
++/**
++ * IP_FRAG==1: Fragment outgoing IP packets if their size exceeds MTU. Note
++ * that this option does not affect incoming packet sizes, which can be
++ * controlled via IP_REASSEMBLY.
++ */
++#define IP_FRAG                         1
++
++/**
++ * IP_REASS_MAXAGE: Maximum time (in multiples of IP_TMR_INTERVAL - so seconds, normally)
++ * a fragmented IP packet waits for all fragments to arrive. If not all fragments arrived
++ * in this time, the whole packet is discarded.
++ */
++#define IP_REASS_MAXAGE                 3
++
++/**
++ * IP_REASS_MAX_PBUFS: Total maximum amount of pbufs waiting to be reassembled.
++ * Since the received pbufs are enqueued, be sure to configure
++ * PBUF_POOL_SIZE > IP_REASS_MAX_PBUFS so that the stack is still able to receive
++ * packets even if the maximum amount of fragments is enqueued for reassembly!
++ */
++#define IP_REASS_MAX_PBUFS              4
++
++/**
++ * IP_FRAG_USES_STATIC_BUF==1: Use a static MTU-sized buffer for IP
++ * fragmentation. Otherwise pbufs are allocated and reference the original
++    * packet data to be fragmented.
++*/
++#define IP_FRAG_USES_STATIC_BUF         0
++
++/**
++ * IP_DEFAULT_TTL: Default value for Time-To-Live used by transport layers.
++ */
++#define IP_DEFAULT_TTL                  255
++
++/*
++   ----------------------------------
++   ---------- ICMP options ----------
++   ----------------------------------
++*/
++/**
++ * LWIP_ICMP==1: Enable ICMP module inside the IP stack.
++ * Be careful, disable that make your product non-compliant to RFC1122
++ */
++#define LWIP_ICMP                       1
++
++/*
++   ---------------------------------
++   ---------- RAW options ----------
++   ---------------------------------
++*/
++/**
++ * LWIP_RAW==1: Enable application layer to hook into the IP layer itself.
++ */
++#define LWIP_RAW                        1
++
++/*
++   ----------------------------------
++   ---------- DHCP options ----------
++   ----------------------------------
++*/
++/**
++ * LWIP_DHCP==1: Enable DHCP module.
++ */
++#define LWIP_DHCP                       1
++
++
++/*
++   ------------------------------------
++   ---------- AUTOIP options ----------
++   ------------------------------------
++*/
++/**
++ * LWIP_AUTOIP==1: Enable AUTOIP module.
++ */
++#define LWIP_AUTOIP                     0
++
++/*
++   ----------------------------------
++   ---------- SNMP options ----------
++   ----------------------------------
++*/
++/**
++ * LWIP_SNMP==1: Turn on SNMP module. UDP must be available for SNMP
++ * transport.
++ */
++#define LWIP_SNMP                       0
++
++/*
++   ----------------------------------
++   ---------- IGMP options ----------
++   ----------------------------------
++*/
++/**
++ * LWIP_IGMP==1: Turn on IGMP module. 
++ */
++#define LWIP_IGMP                       0
++
++/*
++   ----------------------------------
++   ---------- DNS options -----------
++   ----------------------------------
++*/
++/**
++ * LWIP_DNS==1: Turn on DNS module. UDP must be available for DNS
++ * transport.
++ */
++#define LWIP_DNS                        1
++
++/*
++   ---------------------------------
++   ---------- UDP options ----------
++   ---------------------------------
++*/
++/**
++ * LWIP_UDP==1: Turn on UDP.
++ */
++#define LWIP_UDP                        1
++
++/*
++   ---------------------------------
++   ---------- TCP options ----------
++   ---------------------------------
++*/
++/**
++ * LWIP_TCP==1: Turn on TCP.
++ */
++#define LWIP_TCP                        1
++
++#define LWIP_LISTEN_BACKLOG             0
++
++/*
++   ----------------------------------
++   ---------- Pbuf options ----------
++   ----------------------------------
++*/
++/**
++ * PBUF_LINK_HLEN: the number of bytes that should be allocated for a
++ * link level header. The default is 14, the standard value for
++ * Ethernet.
++ */
++#define PBUF_LINK_HLEN                  16
++
++/**
++ * PBUF_POOL_BUFSIZE: the size of each pbuf in the pbuf pool. The default is
++ * designed to accomodate single full size TCP frame in one pbuf, including
++ * TCP_MSS, IP header, and link header.
++*
++ */
++#define PBUF_POOL_BUFSIZE               LWIP_MEM_ALIGN_SIZE(TCP_MSS+40+PBUF_LINK_HLEN)
++
++/*
++   ------------------------------------
++   ---------- LOOPIF options ----------
++   ------------------------------------
++*/
++/**
++ * LWIP_HAVE_LOOPIF==1: Support loop interface (127.0.0.1) and loopif.c
++ */
++#define LWIP_HAVE_LOOPIF                1
++
++/*
++   ----------------------------------------------
++   ---------- Sequential layer options ----------
++   ----------------------------------------------
++*/
++
++/**
++ * LWIP_NETCONN==1: Enable Netconn API (require to use api_lib.c)
++ */
++#define LWIP_NETCONN                    1
++
++/*
++   ------------------------------------
++   ---------- Socket options ----------
++   ------------------------------------
++*/
++/**
++ * LWIP_SOCKET==1: Enable Socket API (require to use sockets.c)
++ */
++#define LWIP_SOCKET                     1
++
++/*
++   ----------------------------------------
++   ---------- Statistics options ----------
++   ----------------------------------------
++*/
++/**
++ * LWIP_STATS==1: Enable statistics collection in lwip_stats.
++ */
++#define LWIP_STATS                      0
++/*
++   ---------------------------------
++   ---------- PPP options ----------
++   ---------------------------------
++*/
++/**
++ * PPP_SUPPORT==1: Enable PPP.
++ */
++#define PPP_SUPPORT                     0
++
++
++/* Misc */
++
++#define LWIP_TIMEVAL_PRIVATE 0
++
++#endif /* __LWIPOPTS_H__ */

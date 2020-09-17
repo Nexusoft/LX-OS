@@ -1,0 +1,12 @@
+Doxygen automatically creates a reference manual from source.
+
+-- Dependencies ----
+
+This configuration relies on the following package besides doxygen:
+  graphviz 
+
+-- Installation ----
+
+from the nexus root directory (directly above kernel, user, tools, ...)
+run doxygen tools/doxygen/nexus.doxygen
+

@@ -1,0 +1,390 @@
+diff -Nur tpm-emulator-orig/config.h tpm-emulator/config.h
+--- tpm-emulator-orig/config.h	1969-12-31 19:00:00.000000000 -0500
++++ tpm-emulator/config.h	2010-04-12 14:06:41.000000000 -0400
+@@ -0,0 +1,32 @@
++/* Software-based Trusted Platform Module (TPM) Emulator
++ * Copyright (C) 2004-2010 Mario Strasser <mast@gmx.net>
++ *
++ * This module is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published
++ * by the Free Software Foundation; either version 2 of the License,
++ * or (at your option) any later version.
++ *
++ * This module is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * $Id: config.h.in 426 2010-02-22 17:11:58Z mast $
++ */
++
++#ifndef _CONFIG_H_
++#define _CONFIG_H_
++
++/* project and build version */
++#define VERSION_MAJOR 0
++#define VERSION_MINOR 7
++#define VERSION_BUILD 430
++
++/* TDDL and LKM configuration */
++#define TPM_STORAGE_NAME "/var/lib/tpm/tpm_emulator-1_2_0_7"
++#define TPM_DEVICE_NAME  "/dev/tpm0"
++#define TPM_LOG_FILE     ""
++#define TPM_CMD_BUF_SIZE 4096
++
++#endif /* _CONFIG_H_ */
++
+diff -Nur tpm-emulator-orig/tpm/tpm_cmd_handler.c tpm-emulator/tpm/tpm_cmd_handler.c
+--- tpm-emulator-orig/tpm/tpm_cmd_handler.c	2010-04-12 14:06:28.000000000 -0400
++++ tpm-emulator/tpm/tpm_cmd_handler.c	2010-04-12 14:08:30.000000000 -0400
+@@ -4032,6 +4032,7 @@
+     case TPM_ORD_DirWriteAuth:
+       debug("[TPM_ORD_DirWriteAuth]");
+       res = execute_TPM_DirWriteAuth(req, rsp);
++      rsp->tag = TPM_TAG_RSP_COMMAND;
+     break;
+ 
+     case TPM_ORD_DirRead:
+diff -Nur tpm-emulator-orig/tpm/tpm_deprecated.c tpm-emulator/tpm/tpm_deprecated.c
+--- tpm-emulator-orig/tpm/tpm_deprecated.c	2010-04-12 14:06:28.000000000 -0400
++++ tpm-emulator/tpm/tpm_deprecated.c	2010-04-12 14:18:05.000000000 -0400
+@@ -117,11 +117,13 @@
+ {
+   TPM_RESULT res;
+   info("TPM_DirWriteAuth()");
+-  res = tpm_verify_auth(auth1, tpmData.permanent.data.ownerAuth, TPM_KH_OWNER);
+-  if (res != TPM_SUCCESS) return res;
+-  if (dirIndex != 0) return TPM_BADINDEX;
++  // Nexus hack: disable authorization
++  //res = tpm_verify_auth(auth1, tpmData.permanent.data.ownerAuth, TPM_KH_OWNER);
++  //if (res != TPM_SUCCESS) return res;
++  //if (dirIndex != 0) return TPM_BADINDEX;
+   memcpy(tpmData.permanent.data.nvData
+-         + tpmData.permanent.data.nvStorage[0].dataIndex,
++         + tpmData.permanent.data.nvStorage[0].dataIndex
++	 + (dirIndex * 20),
+          newContents, sizeof(TPM_DIRVALUE));
+   return TPM_SUCCESS;
+ }
+@@ -129,9 +131,10 @@
+ TPM_RESULT TPM_DirRead(TPM_DIRINDEX dirIndex, TPM_DIRVALUE *dirContents)
+ {
+   info("TPM_DirRead()");
+-  if (dirIndex != 0) return TPM_BADINDEX;
++  //if (dirIndex != 0) return TPM_BADINDEX;
+   memcpy(dirContents, tpmData.permanent.data.nvData
+-         + tpmData.permanent.data.nvStorage[0].dataIndex,
++         + tpmData.permanent.data.nvStorage[0].dataIndex
++	 + (dirIndex * 20),
+          sizeof(TPM_DIRVALUE));
+   return TPM_SUCCESS;
+ }
+diff -Nur tpm-emulator-orig/tpmd/nexus/tpmd.c tpm-emulator/tpmd/nexus/tpmd.c
+--- tpm-emulator-orig/tpmd/nexus/tpmd.c	1969-12-31 19:00:00.000000000 -0500
++++ tpm-emulator/tpmd/nexus/tpmd.c	2010-04-12 14:06:41.000000000 -0400
+@@ -0,0 +1,305 @@
++/** NexusOS: frontend for TPM emulator 
++    adapted from tpmd/unix/tpmd.c */
++
++#include <stdarg.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <unistd.h>
++#include <string.h>
++#include <errno.h>
++#include <fcntl.h>
++#include <sys/stat.h>
++#include <sys/time.h>
++
++#include <nexus/FS.interface.h>
++#include <nexus/IPC.interface.h>
++
++#include "config.h"
++#include "tpm/tpm_emulator.h"
++
++#define TPM_COMMAND_TIMEOUT 30
++#define TPM_RANDOM_DEVICE   "/dev/urandom"
++
++static int opt_debug;
++static const char *opt_storage_file = TPM_STORAGE_NAME;
++static int tpm_startup = 2;
++static int rand_fh;
++
++void *tpm_malloc(size_t size)
++{
++  return malloc(size);
++}
++
++void tpm_free(/*const*/ void *ptr)
++{
++  if (ptr != NULL) free((void*)ptr);
++}
++
++void tpm_log(int priority, const char *fmt, ...)
++{
++    va_list ap;
++
++    if (priority != TPM_LOG_DEBUG || opt_debug) {
++    	va_start(ap, fmt);
++        vprintf(fmt, ap);
++    	va_end(ap);
++    }
++}
++
++void tpm_get_extern_random_bytes(void *buf, size_t nbytes)
++{
++    uint8_t *p = (uint8_t*)buf;
++    ssize_t res;
++    while (nbytes > 0) {
++        res = read(rand_fh, p, nbytes);
++        if (res > 0) {
++            nbytes -= res; p += res;
++        }
++    }
++}
++
++uint64_t tpm_get_ticks(void)
++{
++    static uint64_t old_t = 0;
++    uint64_t new_t, res_t;
++    struct timeval tv;
++    gettimeofday(&tv, NULL);
++    new_t = (uint64_t)tv.tv_sec * 1000000 + (uint64_t)tv.tv_usec;
++    res_t = (old_t > 0) ? new_t - old_t : 0;
++    old_t = new_t;
++    return res_t;
++}
++
++int tpm_write_to_storage(uint8_t *data, size_t data_length)
++{
++    int fh;
++    ssize_t res;
++    fh = open(opt_storage_file, O_WRONLY | O_TRUNC | O_CREAT, S_IRUSR | S_IWUSR);
++    if (fh < 0) return -1;
++    while (data_length > 0) {
++        res = write(fh, data, data_length);
++        if (res < 0) {
++            close(fh);
++            return -1;
++        }
++        data_length -= res; 
++        data += res;
++    }
++    close(fh);
++    return 0;
++}
++
++int tpm_read_from_storage(uint8_t **data, size_t *data_length)
++{
++    int fh;
++    ssize_t res;
++    size_t total_length;
++    fh = open(opt_storage_file, O_RDONLY);
++    if (fh < 0) return -1;
++    total_length = lseek(fh, 0, SEEK_END);
++    lseek(fh, 0, SEEK_SET);
++    *data = tpm_malloc(total_length);
++    if (*data == NULL) {
++        close(fh);
++        return -1;
++    }
++    *data_length = 0;
++    while (total_length > 0) {
++        res = read(fh, &(*data)[*data_length], total_length);
++        if (res < 0) {
++            close(fh);
++            tpm_free(*data);
++            return -1;
++        }
++        if (res == 0) break;
++        *data_length += res;
++        total_length -= res;
++    }
++    close(fh);
++    return 0;
++}
++
++static void print_usage(char *name)
++{
++    printf("usage: %s [-d] [-s storage file] [-h] [startup mode]\n", name);
++    printf("  s : storage file to use (default: %s)\n", opt_storage_file);
++    printf("  h : print this help message\n");
++    printf("  startup mode : must be 'clear', "
++           "'save' (default) or 'deactivated\n");
++}
++
++static void parse_options(int argc, char **argv)
++{
++    char c;
++    info("parsing options");
++    while ((c = getopt (argc, argv, "ds:h")) != -1) {
++        debug("handling option '-%c'", c);
++        switch (c) {
++            case 'd':
++                opt_debug = 1;
++                debug("debug mode enabled");
++                break;
++            case 's':
++                opt_storage_file = optarg;
++                debug("using storage file '%s'", opt_storage_file);
++                break;
++            case '?':
++                error("unknown option '-%c'", optopt);
++                print_usage(argv[0]);
++                exit(EXIT_FAILURE);
++            case 'h':
++            default:
++                print_usage(argv[0]);
++                exit(EXIT_SUCCESS);
++        }
++    }
++    if (optind < argc) {
++        debug("startup mode = '%s'", argv[optind]);
++        if (!strcmp(argv[optind], "clear")) {
++            tpm_startup = 1;
++        } else if (!strcmp(argv[optind], "save")) {
++            tpm_startup = 2;
++        } else if (!strcmp(argv[optind], "deactivated")) {
++            tpm_startup = 3;
++        } else {
++            error("invalid startup mode '%s'; must be 'clear', "
++                  "'save' (default) or 'deactivated", argv[optind]);
++            print_usage(argv[0]);
++            exit(EXIT_SUCCESS);
++        }
++    } else {
++        /* if no startup mode is given assume save if a configuration
++           file is available, clear otherwise */
++        int fh = open(opt_storage_file, O_RDONLY);
++        if (fh < 0) {
++            tpm_startup = 1;
++            info("no startup mode was specified; asuming 'clear'");
++        } else {
++            tpm_startup = 2;
++            close(fh);
++        }
++    }
++}
++
++static void init_random(void)
++{
++    info("openening random device %s", TPM_RANDOM_DEVICE);
++    rand_fh = open(TPM_RANDOM_DEVICE, O_RDONLY);
++    if (rand_fh < 0) {
++        error("open(%s) failed: %s", TPM_RANDOM_DEVICE, strerror(errno));
++        exit(EXIT_FAILURE);
++    }
++}
++
++static int mkdirs(const char *path)
++{
++    char *copy = strdup(path);
++    char *p = strchr(copy + 1, '/');
++    while (p != NULL) {
++        *p = '\0';
++        if ((mkdir(copy, 0755) == -1) && (errno != EEXIST)) {
++            free(copy);
++            return errno;
++        }
++        *p = '/';
++        p = strchr(p + 1, '/');
++    }
++    free(copy);
++    return 0;
++}
++
++static int nexus_init(void)
++{
++    FSID parent;
++    int port;
++
++    port = IPC_CreatePort(0);
++    if (port == -1) {
++    	fprintf(stderr, "failed to acquire IPC port\n");
++	return -1;
++    }
++
++    parent = nexusfs_lookup(FSID_ROOT(KERNELFS_PORT), "dev");
++    if (!FSID_isDir(parent)) {
++    	fprintf(stderr, "failed to find /dev");
++	return -1;
++    }
++
++    nexusfs_mk_dev(parent, "tpm0", port);
++    return port;
++}
++
++static void main_loop(void)
++{
++    int res, tpmd_port;
++    int32_t in_len, len, port_len;
++    uint32_t out_len;
++    unsigned long reply_port;
++    uint8_t in[TPM_CMD_BUF_SIZE], *out;
++
++    info("starting main loop");
++
++    /* init tpm emulator */
++    mkdirs(opt_storage_file);
++    debug("initializing TPM emulator");
++    tpm_emulator_init(tpm_startup, 0);
++    
++    tpmd_port = nexus_init();
++    if (tpmd_port == -1)
++	    return;
++
++    /* wait for incomming connections. WARNING: RACE IN IPC CALLS WITH MULTIPLE CLIENTS */
++    /* receive and handle commands */
++    while (1) {
++
++	// retrieve request
++	in_len = IPC_Recv(tpmd_port, in, sizeof(in));
++	if (in_len <= 0) {
++		error("ipc recv error\n");
++		break;
++	}
++        
++	// retrieve reply port number
++	port_len = IPC_Recv(tpmd_port, &reply_port, sizeof(reply_port));
++	if (port_len != sizeof(reply_port)) {
++		error("ipc recv error #2\n");
++		break;
++	}
++
++	// execute command
++	out = NULL;
++	res = tpm_handle_command(in, in_len, &out, &out_len);
++	if (res < 0) {
++		error("tpm_handle_command() failed");
++		break;
++	} 
++	
++	// send back to device FS
++	len = IPC_Send(reply_port, out, out_len);
++	if (len) {
++        	error("ipc send error\n");
++        	break;
++	}
++
++    }
++
++    /* shutdown tpm emulator */
++    tpm_emulator_shutdown();
++    IPC_DestroyPort(tpmd_port);
++    info("main loop stopped");
++}
++
++int main(int argc, char **argv)
++{
++    info("starting TPM Emulator daemon (1.2.%d.%d-%d)",
++         VERSION_MAJOR, VERSION_MINOR, VERSION_BUILD);
++    parse_options(argc, argv);
++    /* open random device */
++    init_random();
++    /* start main processing loop */
++    main_loop();
++    info("stopping TPM Emulator daemon");
++    close(rand_fh);
++    return EXIT_SUCCESS;
++}
++

@@ -1,0 +1,321 @@
+service Resource_Disk {
+
+	__implements__ { "Resource.svc" }
+
+	decls {
+		void Resource_Disk_Init(unsigned long long total);
+	}
+
+	decls __callee__ {
+		
+		includefiles {
+			"<stdlib.h>", 
+			"<stdio.h>", 
+			"<string.h>", 
+			"<unistd.h>",
+			
+			"<nexus/sema.h>",
+			"<nexus/fs.h>",
+			"<nexus/hashtable.h>",
+			"<nexus/Thread.interface.h>",
+		}
+
+		Sema account_mutex = SEMA_MUTEX_INIT;
+		Sema file_mutex = SEMA_MUTEX_INIT;
+
+		unsigned long long free_space;
+		unsigned long long total_size;
+
+		// maximum number of pids that can be 
+		// associated with an account
+		int MAX_PIDS = 10;
+
+		struct HashTable *account_table;
+		struct HashTable *pid_table;
+		struct HashTable *file_access_table;
+
+		typedef struct Quota {
+			int pids[10];
+			int max_pid;
+			int used;
+			int limit;
+		} Quota;
+
+		/// start listening on default static IPC port
+		void Resource_Disk_Init(unsigned long long total)
+		{
+			int port;
+			
+			total_size = total;
+			free_space = total;
+
+			// account -> account info (quota/pid)
+			account_table = hash_new(1024, sizeof(int));
+			// pid -> account id fast lookup
+			pid_table = hash_new(1024, sizeof(int));
+			// FSID -> account
+			file_access_table = hash_new(1024, sizeof(FSID));
+
+			port = IPC_CreatePort(quota_ctrl_port);
+			assert(port == quota_ctrl_port);
+			Resource_Disk_port_handle = port;
+		}
+	}
+
+	/** Return a new account ID */
+	interface lf_generate { OID_NONE; } lf_check { 1; }
+	int Account_New(int limit) 
+	{
+		static int account_last = 0;
+		int account_new;
+		int allowed = 0;
+		
+		// ensure guarantee
+		P(&account_mutex);
+		if (free_space - limit >= 0) {
+			free_space -= limit;
+			allowed = 1;
+		}
+		V_nexus(&account_mutex);
+
+		if (!allowed)
+			return -1;
+
+		Quota *quota = (Quota *)malloc(sizeof(Quota));
+		if (!quota)
+			return -2;
+
+		// default values for now
+		quota->max_pid = 0;
+		quota->used = 0;
+		quota->limit = limit;
+
+		P(&account_mutex);
+		// no high limit for now
+		account_new = ++account_last; 
+		hash_insert(account_table, &account_new, quota); 
+		V_nexus(&account_mutex);
+
+		return account_new;
+	}
+
+	/** Attach a process ID to an account ID (irreversibly) */
+	interface lf_generate { 0; } lf_check { 1; }
+	int Account_AddProcess(int account, int pid) 
+	{
+		Quota *quota;
+		int ret = 0;
+
+		P(&account_mutex);
+		quota = (Quota *)hash_findItem(account_table, &account);
+		if (quota) {
+			if (quota->max_pid < MAX_PIDS) {
+				quota->pids[quota->max_pid++] = pid;
+				hash_insert(pid_table, &pid, (void *)account);
+			}
+			else
+				ret = -2;
+		} else
+			ret = -1;
+		V_nexus(&account_mutex);
+
+		return ret;
+	}
+
+	/** Attach info about files this account owns */
+	interface lf_generate { 0; } lf_check { 1; }
+	int Account_AddInfo(int account, __input__ struct VarLen fileinfo)
+	{
+		FSID *node;
+		Quota *quota;
+
+		P(&account_mutex);
+		quota = (Quota *)hash_findItem(account_table, &account);
+		V_nexus(&account_mutex);
+
+		if (!quota)
+			return -1;
+
+		node = (FSID *)ipctransfer_from(&fileinfo, fileinfo.len, sizeof(FSID));
+
+		P(&file_mutex);
+		// if already found, then its a delete operation
+		if ((int)hash_findItem(file_access_table, node))
+			hash_delete(file_access_table, node);
+		else
+			hash_insert(file_access_table, node, (void *)account);
+		V_nexus(&file_mutex);
+
+		nxcompat_free(node);
+		return 0;
+	}
+
+	/** Check if this account owns a file, primitive access control */
+	interface lf_generate { 0; } lf_check { 1; }
+	int Account_CheckInfo(int account, __input__ struct VarLen fileinfo)
+	{
+		FSID *node;
+		Quota *quota;
+		int ret = 0;
+
+		P(&account_mutex);
+		quota = (Quota *)hash_findItem(account_table, &account);
+		V_nexus(&account_mutex);
+
+		if (!quota)
+			return -1;
+
+		node = (FSID *)ipctransfer_from(&fileinfo, fileinfo.len, sizeof(FSID));
+
+		P(&file_mutex);
+		if (account == (int)hash_findItem(file_access_table, node))
+			ret = 1;
+		V_nexus(&file_mutex);
+
+		nxcompat_free(node);
+		return ret;
+	}
+
+	/** Lookup the account to which a process budgets */
+	interface lf_generate { 0; } lf_check { 1; }
+	int Account_ByProcess(int pid) 
+	{
+		int acc;
+
+		P(&account_mutex);
+		acc = (int)hash_findItem(pid_table, &pid);
+		V_nexus(&account_mutex);
+
+		if (acc)
+			return acc;
+		return -1;
+	}
+
+	/** Try to increase an account's resource reservation by quantity */
+	interface lf_generate { 0; } lf_check { 1; }
+	int Account_AddResource(int account, int quantity) 
+	{
+		Quota *quota;
+		int ret = 0;
+
+		P(&account_mutex);
+		quota = (Quota *)hash_findItem(account_table, &account);
+		if (quota) {
+			if (quota->used + quantity <= quota->limit)
+				quota->used += quantity;
+			else
+				ret = -2;
+		} else
+			ret = -1;
+		V_nexus(&account_mutex);
+
+		return ret;
+	}
+
+	/** Insert a label of the type 
+	    ``resource.x says 
+	      (resource.x.i owns at least N out of M items and 
+	       process.[a, .., k] speaksfor resource.x.i) ''
+	    into the system labelstore */
+	 
+	interface lf_generate { 0; } lf_check { 1; }
+	int Account_Attest(int account, __input__ struct VarLen filepath)
+	{
+		char *labels[2], *label, *__filepath;
+		char sublabel[100], processes[32], origpath[128];
+		int len, ret = 0, quantity, limit, i, off;
+		
+		Quota *quota;
+
+		P(&account_mutex);
+		quota = hash_findItem(account_table, &account);
+		V_nexus(&account_mutex);
+
+		if (!quota) {
+			fprintf(stderr, "[disk] unknown account id %d\n", account);
+			return -1;
+		}
+
+		// generate second half of label
+		P(&account_mutex);
+		quantity = quota->used;
+		limit = quota->limit;
+		if (quota->max_pid) {
+			// create list of processes
+			off = sprintf(processes, "%d", quota->pids[0]);
+			for (i = 1; i < quota->max_pid; i++)
+				off += sprintf(processes + off, ", %d", quota->pids[i]);
+			
+			// combine with speaksfor
+			len = snprintf(sublabel, 99, " and (process.[%s] speaksfor resource.cpu.%d)",
+				       processes, account);
+			if (len == 99)
+				goto overflow;
+		}
+		else
+			sublabel[0] = 0;
+		V_nexus(&account_mutex);
+
+		// generate complete label
+		label = malloc(512);
+		assert(label);
+		len = snprintf(label, 511, "resource.disk says "
+			       "((resource.disk = %d and resource.disk.%d >= %d)%s)",
+			       limit, account, quantity, sublabel); 
+
+		if (len == 511) {
+			free(label);
+			goto overflow;
+		}
+
+		labels[0] = label;
+		labels[1] = NULL;
+		ret = Thread_Sha1_Says(labels, origpath);
+		free(label);
+		
+		if (ret)
+			return -1;
+
+		// move file to final location
+		__filepath = ipctransfer_from(&filepath, filepath.len, 128);
+		assert(__filepath);
+		if (strcmp(origpath, __filepath))
+			ret = rename(origpath, __filepath);
+		nxcompat_free(__filepath);
+
+		return ret;
+
+overflow:
+		fprintf(stderr, "[disk] label exceeds maximum length\n");
+		return -1;
+	}
+
+        /** Return total number of resources */
+        interface lf_generate { (0); } lf_check { 1; }
+        int Info_SizeTotal(void)
+        {
+		/* down cast, size may be incorrect */
+                return total_size;
+        }
+
+        /** Return total number of resources used by account */
+        interface lf_generate { (0); } lf_check { 1; }
+        int Info_SizeAccount(int account)
+        {
+                int res;
+		Quota *quota; 
+
+                P(&account_mutex);
+		quota = (Quota *)hash_findItem(account_table, &account);
+		if (quota)
+			res = quota->used;
+		else
+			res = -1;
+                V_nexus(&account_mutex);
+
+                return res;
+        }
+}
+
+/* vim: set ts=8 sw=8: */
+

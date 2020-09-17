@@ -1,0 +1,86 @@
+## Nexus Memory Design
+
+WARNING : (July 2010) Do not use kernel heap memory. Everything looks fine, but
+          it causes instability for unknown reasons.
+
+
+I do NOT claim to understand this code completely yet.
+
+Nexus does not implement paging to disk.
+
+## Process Memory
+
+Each process has a memory map of type Map. This includes the special kernel
+process kernelMap. Virtual memory layout of each task is as follows:
+
+ |0       |USERHEAPBEGIN     |USERMMAPBEGIN     |PHYPAGEVADDR   |KERNELVADDR     |2^32
+ |--------|------------------|------------------|---------------|----------------|
+    ??     brk() allocation   mmap() allocation  ioremap()alloc  getKernelPages()
+
+The virtual region between PHYPAGEVADDR and KERNELVADDR is reserved for
+device memory regions. 
+
+## Process Communication through Memory
+
+Processes can communicate using three methods:
+
+- copying into and out of the kernel (ipc_send/ipc_recv)
+- page swapping, where a page is unmapped from one vmemmap and map 
+  into another (ipc_sendpage/ipc_recvpage)
+- page sharing, where a process shares a page with another process
+  (memmap_share_page). 
+
+#### Kernel Memory
+
+## Page accounting
+
+Nexus keeps a struct Page structure for each physical page of memory in the
+system. The array of pages 
+
+  Page * frameTable 
+
+linearly maps onto the physical pages in the system. Thus, the page backing
+physical address 0 is accounted in structure frameTable[0]. Most important
+task of this structure is to keep track of which pages have been allocated
+and which are free.
+
+Nexus only administers MAXPAGES number of pages in this way.
+
+## Kernel shared memory
+
+The kernel maps its own code and static data in the top region of all virtual 
+address spaces, so that it is accessible without a task switch from all tasks
+(to enable fast software system calling). This region starts at the virtual
+offset KERNELVADDR.
+
+Physically, the kernel code and data segments start at 0. These mappings cannot
+change, since Nexus has no paging to disk. As a result, the mapping between
+kernel virtual and physical address is simple to calculate:
+
+  kernel virtual = kernel physical + KERNELVADDR
+
+Nexus offers simple macros to compute this computation and the equally simple
+computation from physical to struct page and back.
+
+## Kernel task
+
+Additionally, the kernel has its own task, at pid 0. This has a Map similar
+to other tasks. Memory in this map below KERNELVADDR is dynamically allocated.
+The fast translation of virtual to physical memory fails for this region.
+
+## Segmentation
+
+Grub gives us a default global descriptor table with the common 
+maximal segments:
+
+user code   == (0, 4GB)
+user data   == (0, 4GB)
+kernel code == (0, 4GB) 
+kernel data == (0, 4GB)
+
+Nexus uses software multiprocessing and therefore only has a 
+single hardware task descriptor. We do not use local descriptor
+tables, but support them for Xen guests (in principle)
+
+
+

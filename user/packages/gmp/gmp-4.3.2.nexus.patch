@@ -1,0 +1,31 @@
+diff -Nur gmp-4.3.2-orig/printf/obprntffuns.c gmp-4.3.2/printf/obprntffuns.c
+--- gmp-4.3.2-orig/printf/obprntffuns.c	2010-01-07 15:09:03.000000000 -0500
++++ gmp-4.3.2/printf/obprntffuns.c	2010-02-25 19:18:27.544506028 -0500
+@@ -24,7 +24,7 @@
+ 
+ #include "config.h"
+ 
+-#if HAVE_OBSTACK_VPRINTF
++#if NONEXUS
+ 
+ #define _GNU_SOURCE   /* ask glibc <stdio.h> for obstack_vprintf */
+ 
+@@ -63,4 +63,4 @@
+   (doprnt_reps_t)   gmp_obstack_reps
+ };
+ 
+-#endif /* HAVE_OBSTACK_VPRINTF */
++#endif /* NONEXUS */
+diff -Nur gmp-4.3.2-orig/tests/Makefile.in gmp-4.3.2/tests/Makefile.in
+--- gmp-4.3.2-orig/tests/Makefile.in	2010-01-07 15:09:43.000000000 -0500
++++ gmp-4.3.2/tests/Makefile.in	2010-02-25 19:19:12.061502884 -0500
+@@ -615,6 +615,9 @@
+ distclean-tags:
+ 	-rm -f TAGS ID GTAGS GRTAGS GSYMS GPATH tags
+ 
++# Nexus: build the test applications, but do not run them here
++check-apps: $(TESTS)
++
+ check-TESTS: $(TESTS)
+ 	@failed=0; all=0; xfail=0; xpass=0; skip=0; \
+ 	srcdir=$(srcdir); export srcdir; \

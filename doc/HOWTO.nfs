@@ -1,0 +1,63 @@
+NFS support in Nexus
+
+A common difficulty with NFS server configurations is how to properly
+restrict access. For nexus sourcecode in directory $NEXUSSRC, do the following.
+
+#### Server
+
+The following will probably work on most Unix systems, but has only been tested
+on Ubuntu 9.10. It is NOT nexus specific, so shop around online for other
+examples.
+
+Install the server with
+
+	sudo apt-get install nfs-kernel-server
+
+## Export
+
+Export a mount point by adding it to /etc/exports. For instance
+
+$NEXUSSRC/build/boot	172.16.0.0/12(rw,insecure,no_subtree_check) 127.0.0.1/8(rw,insecure,no_subtree_check) 10.0.0.0/8(rw,insecure,no_subtree_check) 192.168.0.0/16(rw,insecure,no_subtree_check)
+
+## Directory Access Control
+
+ENSURE that exported files and directories are world readable and writable
+
+	chmod -R a+rw $NEXUSSRC/build/boot
+
+## Service Access Control
+
+NFS uses many services registered through the RPC portmapper. You need to get access
+control right using /etc/hosts.allow and /etc/hosts.deny. For me, it worked when I
+left hosts.deny empty and added the following line to hosts.allow:
+
+portmap mountd nfsd statd lockd rquotad: 172.16. 10. 127. 192.168.
+
+## Restart
+
+Restart the port mapper and NFS server. On Ubuntu 9.10, try
+
+sudo service portmap restart
+sudo service nfs-kernel-server restart
+
+## Test
+
+Make sure that the address ranges include the IP address that DHCP gives your Nexus
+host. Before importing in the Nexus client, try mounting on another Unix system. 
+For instance, on Linux, issue
+
+	mkdir /tmp/mnt
+	sudo mount 127.0.0.1:$NEXUSSRC/build/boot /tmp/mnt
+	rmdir /tmp/mnt
+
+#### Client
+
+In Nexus, once you have acquired a dhcp license, mount an NFS mount as follows:
+
+	exec bin/nfs.app <serverip>:<path> -mount <dest>
+
+where dest is the local mountpoint and path is the directory on the server.
+For instance, to mount the Nexus 'usr' filesystem from 10.0.0.1, do
+
+	exec bin/nfs.app 10.0.0.1:$NEXUSSRC/build/boot -mount /usr
+

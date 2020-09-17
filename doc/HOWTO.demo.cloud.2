@@ -1,0 +1,18 @@
+#### The Fauxbook cloud computing demo
+
+## Requirements
+
+- FatFS: use a vmware/qemu image with disk backend, not .iso + NFS
+
+## Preparations
+
+When using NFS
+
+    1. make sure that the server has set 0666 permissions on
+       exported files and directories.
+
+
+    2. make sure that NFS overwrites .pyc files for which .py 
+       files have been updated. Alternatively, remove .pyc and 
+       call with python -B (which means, do not generate .pyc)
+

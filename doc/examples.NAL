@@ -1,0 +1,45 @@
+## Examples of goal derivation in NAL 
+#
+# this list is not exhaustive.
+
+
+## Background
+#
+#  NAL is the logic used in labels and goals, 
+#  'hintcode' the language of proofs. 
+#
+#  Thus, 
+#    'willem says nexus = "awesome"' is a NAL statement
+#    'assume willem says nexus = "awesome"' is a rule in a proof
+#
+#  We always write proofs as sequents:
+#     first list all assumptions, then
+#     apply all derivations
+#
+#  In Nexus, for a NAL proof to grant access, all assumptions have
+#  to be backed by labels.
+
+
+## Universal Quantification
+#
+#  derive a specific statement from a statement about a group
+
+Label: "forall $postdoc : $postdoc says myage > 20
+
+Proof:	assume forall $postdoc : $postdoc says myage > 20
+	foralle willem
+
+Concl: willem says myage > 20
+
+#  quantification introduction is more prozaic:
+
+Label: willem says $anything > 20
+
+Proof: 	assume willem says $anything > 20
+	forall i $v
+
+Concl: forall $anything : willem says $anything > 20
+
+# in other words: never create labels with free variables!
+
+

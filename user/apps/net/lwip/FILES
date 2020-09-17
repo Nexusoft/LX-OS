@@ -1,0 +1,11 @@
+These files are taken from the lwIP contrib package.
+
+	http://cvs.savannah.gnu.org/viewvc/contrib/?root=lwip
+
+The initial import was from CVS on November 16th, 2009.
+Changes to the files are mostly limited to a main() loop
+
+WARNING: the lwIP interface is not as easy as uclibc:sockets, 
+	 especially not in combination with the nexus port. Unless
+	 you have a very good reason, you should not code your
+	 application in this way.

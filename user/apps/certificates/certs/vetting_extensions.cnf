@@ -1,0 +1,5 @@
+extensions = exts
+
+[exts]
+basicConstraints=critical,CA:TRUE
+

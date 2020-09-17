@@ -1,0 +1,36 @@
+Authority demo step by step guide
+	Last edited: January 21st, 2010
+
+The guard demo, bin/guard_demo_auth.app, will exercise four
+authorities: 
+	- bureaucrat
+	- file final
+	- remote log
+	- remote ask
+
+First, prepare the system. The bureaucrat needs the right time,
+so call NTP. From the userspace shell:
+
+	exec bin/lwip_sntp.app
+
+You will need to have netcat listening on a server on TCP port
+1234 for the remote logging authority and on port 1235 for the
+remote ask. Depending on which netcat you use, this may be it:
+
+	nc -l -p 1234
+	nc -l -p 1235
+
+Then start the authorities. Again, from the shell:
+
+	exec bin/guard_auth_ff.app
+	exec bin/guard_auth_bureaucrat.app
+	exec bin/guard_auth_remote.app log [SERVERIP]
+	exec bin/guard_auth_remote.app ask [SERVERIP]
+
+This will take a while, as each generates a new RSA key pair.
+When setup, start the demo:
+
+	exec bin/guard_demo_auth.app
+
+Thats all!
+

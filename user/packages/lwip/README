@@ -1,0 +1,22 @@
+#### Overview
+
+This port of lwIP 1.3.0 combines 
+- the lwIP base package v1.3.0
+- the unix port from lwIP's contrib package v1.3.0
+- our own bottom ('device driver') interface
+
+The last two are split between two patch files
+
+Sources and more information:
+http://savannah.nongnu.org/projects/lwip/
+http://www.sics.se/~adam/lwip/
+
+#### Variants
+
+We have the following variants of the lwip patches:
+- nexus	:		nexus specific locking + zerocopy transfer on rx
+- nexus.nofastdev:	nexus-specific locking, NO zerocopy transfer on rx 
+- nexus.nosys:		unix pthread locking + zerocopy ...
+
+UPDATE 2012-12-22: only nexus.nofastdev supports the new NXCONFIG_DEVICE_BLIND options
+

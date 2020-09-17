@@ -1,0 +1,121 @@
+service Guard {
+
+   /** NexusOS: Guard Interface:
+             
+       runtime interpositioning and 
+       goal/proof/credential control operations */
+
+  decls {
+
+    includefiles { "<nexus/guard.h>",
+   		   "<nexus/guard-impl.h>" }
+   
+    struct label {
+    	char data[200];
+    }; 
+  }
+
+  decls __callee__ {
+
+    includefiles { "<nexus/ipc.h>",
+	           "<nexus/defs.h>" }
+
+
+    int  nxrefmon_interposein(struct nxguard_tuple tuple);
+    void nxrefmon_interposeout(struct nxguard_tuple tuple);
+  }
+
+  interface lf_generate { 0; } lf_check { 1; }
+  int 
+  GetGoal(struct nxguard_tuple tuple, __output__ struct VarLen goal)
+  {
+	  return -1;
+  }
+
+  interface lf_generate { 0; } lf_check { 1; }
+  int 
+  SetGoal(struct nxguard_tuple tuple, __input__ struct VarLen goal)
+  {
+	  return -1;
+  }
+
+  /** Insert a proof */
+  interface lf_generate { 0; } lf_check { 1; }
+  int 
+  SetProof(struct nxguard_tuple tuple, __input__ struct VarLen proof)
+  {
+	  return -1;
+  }
+
+  /** Insert a credential backed by the kernel
+      e.g., ``process.$caller says S'' */
+  interface lf_generate { 0; } lf_check { 1; }
+  int 
+  AddCred(__input__ struct VarLen label)
+  {
+	  return -1;
+  }
+
+  /** Insert a credential backed by the kernel
+      e.g., ``process.$caller says S'' 
+      This version transfers the label inline, avoiding TransferFrom
+      But, as a result it is limited to a fixed label length */
+  interface lf_generate { 0; } lf_check { 1; }
+  int 
+  AddCredShort(struct label label)
+  {
+	 return -1;
+  }
+  /** Insert a credential backed by a key */
+  interface lf_generate { 0; } lf_check { 1; }
+  int 
+  AddCredKey(__input__ struct VarLen label, 
+	     __input__ struct VarLen pubkey,
+	     __input__ struct VarLen sdigest)
+  {
+	  return -1;
+  }
+
+  /** Claim an authority port, so that all credentials 
+      "name.$name says S" are directed to the given port. 
+   
+      XXX protect names against imposters (see old implementation) */
+  interface lf_generate { 0; } lf_check { 1; }
+  int
+  SetAuth(int port, __input__ struct VarLen name)
+  {
+	  return -1;
+  }
+  
+  interface lf_generate { 0; } lf_check { 1; }
+  int
+  TestAuth(void)
+  {
+	  return -1;
+  }
+
+  /** Interpose on a call (pre-call)
+      @return standardized guard decision, see guard-impl.h */
+  interface lf_generate { 0; } lf_check { 1; }
+  int 
+  InterposeIn(struct nxguard_tuple tuple)
+  {
+	  return nxrefmon_interposein(tuple);
+  }
+
+  /** Interpose on a call (post-call returnpath) 
+      @return nothing: cannot change control flow at this point
+  
+      NB: resultcode is unused, but MUST BE identical to InterposeIn:
+          kernel/security/refmon implements this server manually and
+          expects in both cases the same return structure.  */
+  interface lf_generate { 0; } lf_check { 1; }
+  int
+  InterposeOut(struct nxguard_tuple tuple)
+  {
+	  nxrefmon_interposeout(tuple);
+	  return 0;
+  }
+
+}
+

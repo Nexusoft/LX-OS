@@ -1,0 +1,104 @@
+#### HOWTO boot nexus remotelyusing gpxe
+
+Remote boot works as follows: you install a small bootloader
+on the host once, for instance a bzImage (linux-like) kernel
+that is called from Grub or lilo.
+
+Then, each time the host is booted, it will contact a server
+over TFTP for the nexus kernel. You therefore need to have
+a TFTP server running at a well known IP address that serves
+vmnexuz and initrd.tar files. Generally, this is your
+development host.
+
+This document explains how to compile the image and setup
+the server. You should be able to configure your host to
+boot to the created nexus-gpxe.bzimage independently.
+
+
+## Compile
+
+Using make menuconfig (or make oldconfig, ...),
+
+First enable "Boot Options"/"Boot Image (Bootable CD)" as booting
+from ISO is the only available network boot option.
+
+Enable the option "Boot Options"/"Network boot images". Note that
+this option depends on the previous "Bootable CD" selection.
+
+Make sure your hostname -i is set to the outward facing ip address,
+as GPXE will automatically resolve the host to connect to from this.
+
+Build as usual.
+
+
+## Check 
+
+In the file build/tools/gpxe/nexus-gpxe.boot, verify that next-server 
+is set to the host that will serve the files over TFTP. Iff your host 
+has multiple network interfaces, verify that dhcp is set to the correct
+host. I do not know the mapping, finding the right number is trial and
+error.
+
+## TFTP
+
+install a tftpdaemon. See HOWTO.tftpd for help. If you get atftpd, run
+	
+	sudo ./atftpd --daemon $(NEXUSSRC)/build/boot/isoroot
+
+
+## Boot
+
+To boot using the newly created nexus-gpxe.bzimage file, copy this
+file to a partition on the destination machine and add it to your
+bootloader.
+
+If the machine to boot is running Grub2, and the file is stored on
+partition hd(0,1), add this entry to the file:
+
+menuentry "Nexus GPXE" {
+	set root=hd(0,1)
+	echo "Loading Nexus over GPXE ..."
+	linux16 /boot/nexus-gpxe.bzimage
+}
+
+Alternatively, see the GPXE homepage for information on how to create 
+bootable cdroms or USB sticks using nexus-gpxe.iso and nexus-gpxe.usb.
+
+## Optional: DHCP
+
+Like me, you may want to install this on a private subnet. In
+that case you'll also need to run a DHCP server. For dhcp3-server,
+the following .conf will do
+
+	ddns-update-style interim;
+	ignore client-updates;
+	allow bootp;
+
+	subnet 10.0.0.0 netmask 255.255.255.0 {
+
+		range dynamic-bootp 10.0.0.100 10.0.0.200;
+	 
+		option routers 10.0.0.1;
+		option broadcast-address 10.0.0.255;
+		option subnet-mask 255.255.255.0;
+
+	}
+
+Then, make sure you disable any zeroconf network manager that may
+be hanging around and bring your server up on a hardcode address:
+
+	sudo ifconfig eth1 10.0.0.1 netmask 255.255.255.0 up
+
+The reason this cannot be randomly assigned using dhcpd, is that
+your gpxe depends on this address. Again, make sure this is the
+address in build/tools/gpxe/nexus-gpxe.boot
+	
+Optionally enable forwarding on your server
+
+	sudo sh -c "echo 1 > /proc/sys/net/ipv4/ip_forward"
+
+And finally bring up the daemon
+
+	sudo ./dhcpd -f -d -cf dhcpd-local.conf eth1
+
+

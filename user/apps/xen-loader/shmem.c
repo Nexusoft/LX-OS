@@ -1,0 +1,1 @@
+HYPERVISOR_shared_info

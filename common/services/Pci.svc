@@ -1,0 +1,101 @@
+service Pci {
+
+	/** PCI Driver interfaces: exposes privileged
+            PCI configspace and probe operations to
+            unprivileged device drivers. */
+
+  decls {
+  
+    includefiles { "u:<stdint.h>" }
+
+    struct pci_location {
+      unsigned char bus;
+      unsigned char dev;	///< XXX are 8 bits enough?
+      unsigned char fn;
+    };
+ 
+    // callbacks that application must implement to support this interface
+    struct pci_location	pci_probe(int *ids, int ilen /* in BYTES*/);
+    char *		pci_configspace(struct pci_location);
+
+    #define PCI_ADDRESS(bus, dev, fn, off) \
+                       (0x80000000 | (bus << 16) | (dev << 11) | (fn << 8) | (off))
+  }
+
+  decls __caller__ {
+    includefiles { "u:<string.h>",
+	           "<nexus/defs.h>" }
+  }
+  
+  /** Lookup a pci device by a list of pci vendor and device ids.
+      @return the bus.device.function id in a packed format */
+  interface lf_generate { (0); } lf_check { 1; }
+  struct pci_location 
+  Probe(__input__ struct VarLen ids[]) 
+  {
+    struct pci_location loc;
+    int * _ids;
+    int ret;
+
+    _ids = (void *) ipc_transferfrom(1, ids.len);
+    loc = pci_probe(_ids, ids.len);
+    free(_ids);
+
+    return loc;
+  }
+
+  /** Copy all 256B of a configuration space to the driver 
+      @return 0 on success, failure otherwise */
+  interface lf_generate { (0); } lf_check { 1; }
+  int
+  ConfigSpace(struct pci_location loc, 
+              __output__ struct VarLen configspace) 
+  {
+    char * _configspace;
+
+    _configspace = pci_configspace(loc);
+    if (!_configspace)
+      return 1;
+
+    IPC_TransferTo(0, 1, _configspace, 0, 256);
+    nxcompat_free(_configspace);
+		    	fprintf(stderr, "OK\n");
+    return 0;
+  }
+
+  /** Calculate the length of the address given by the Base Address Register. 
+      NB: does not prevent others from trying to access the BAR concurrently */
+  interface lf_generate { (0); } lf_check { 1; }
+  int
+  ConfigSpace_BarLength(struct pci_location loc, int bar)
+  {
+    unsigned long bar_address;
+    uint32_t bar_data, bar_length;
+
+    // save the original data
+    bar_address = PCI_ADDRESS(loc.bus, loc.dev, loc.fn, 16 + (4 * bar));
+    bar_data = Device_pciconfig_read(bar_address, 4);
+
+    // write all ones (as per PCI spec)
+    Device_pciconfig_write(bar_address, 4, 0xffffffff);
+    
+    // read length
+    bar_length = Device_pciconfig_read(bar_address, 4);
+    if (bar_length) {
+    	if (bar_data & 0x1) 	// ioport : 2 bits metadata
+		bar_length = (~bar_length) & 0xfffffff7;
+	else 			// memory : 4 bits metadata;
+		bar_length = (~bar_length) & 0xfffffff0;
+	
+	if (bar_length) {
+		bar_length |= 0xf;
+		bar_length += 1;	// from mask to length (e.g., 0xf -> 16)
+	}
+    }
+
+    // reset original data
+    Device_pciconfig_write(bar_address, 4, bar_data);
+    return bar_length;
+  }
+}
+

@@ -1,0 +1,10 @@
+Reference Monitors:
+
+applications that interpose on other applications' 
+RPC messages and system calls
+
+-- Interface
+
+Call IPC_Process_Interpose to start and stop intercepting a process's IO
+Call IPC_ExecInterposed to start a process with interception.
+

@@ -1,0 +1,6 @@
+#define UTS_VERSION "#27 Thu Sep 3 15:16:25 EDT 2009"
+#define LINUX_COMPILE_TIME "15:16:25"
+#define LINUX_COMPILE_BY "wdb"
+#define LINUX_COMPILE_HOST "dhcp98-83.cs.cornell.edu"
+#define LINUX_COMPILE_DOMAIN "cs.cornell.edu"
+#define LINUX_COMPILER "gcc version 3.4.6 (Ubuntu 3.4.6-8ubuntu2)"

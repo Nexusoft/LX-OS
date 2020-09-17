@@ -1,0 +1,26 @@
+## Directory layout
+
+net/			networked apps
+    lwip/		netapps that directly talk to lwip
+test/			unittests
+simple/			single sourcefile apps
+attic/			unsupported and deprecated files
+
+# simple
+Directory 'simple' holds all applications that consist of a single file and 
+have no dependencies besides the standard libs (libnexus ...). 
+
+The build system compiles these in a standard way. To add an application,
+create the file in simple and add its base name to the DEFAULT_APPS
+target in the Makefile.
+
+# test
+Directory 'test' holds a basic testset (U/C)
+
+# *
+All other directories hold applications that combine multiple source files,
+depend on external files or both. These have individual targets in the
+makefile, which are subsequently called from apps: (as are DEFAULT_APPS).
+
+# attic
+Anything here is stale. Bitrot has set in. 

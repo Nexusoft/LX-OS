@@ -1,0 +1,50 @@
+## HOWTO run the appserver test
+
+# Server Setup
+
+on the server machine, start
+
+	bin/nexirrus $CONFIG_ENC
+	bin/python $CONFIG_PY
+	bin/httpd.app
+
+along with the usual prerequisites: dhcp, nfs, ....
+
+
+# Configuration Parameters
+
+CONFIG_ENC switches between access control modes on files:
+- no parameter: no access control
+- 1: cachable access control (based on credential)
+- 2: noncachable access control (based on authority)
+
+CONFIG_PY chooses the application to run in python:
+- /usr/var/cgi-bin/py/file.py: returns static files
+- /usr/var/cgi-bin/py/size.py: dynamically generates files
+
+
+# Client Execution
+
+On the benchmarking host, run tools/bench/appserver.bench.sh
+Before running, configure the test to correspond to system setup.
+You can either run the file.py or the size.py test, but not both.
+You can combine either with the httpd test.
+
+
+## Server on Linux
+
+For a comparison on Linux, first run `make linux', then use
+
+	build/linux/bin/nexirrus
+	build/linux/bin/httpd.app
+
+as well as your own python interpreter, with the fcgi.py copied
+from build/boot/lib/python2.6/fcgi.py to your version's library
+dir.
+
+You have to make sure that frequency scaling and background tasks
+are all off. Automate all this with
+
+	tools/bench/appserver.linux.sh
+
+

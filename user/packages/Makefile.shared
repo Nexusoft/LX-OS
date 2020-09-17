@@ -1,0 +1,41 @@
+
+# symbols shared by most packages
+
+
+# directories relative to the CHILD directory 
+# (e.g., .../packages/sr5sieve/sr5sieve-1.8.10-src)
+NEXUS		:= ../../../../..
+NXBUILDDIR	:= $(NEXUS)/build
+NXLIBDIR	:= $(NXBUILDDIR)/user/lib
+
+GCC_MAJOR       := $(shell gcc -dumpversion | cut -d'.' -f1)
+GCC_MINOR       := $(shell gcc -dumpversion | cut -d'.' -f2)
+GCC_HOME	:= /usr/lib/gcc/$(shell gcc -dumpmachine)/$(shell gcc -dumpversion)
+
+NX_LIBS		:= -Wl,--start-group \
+		   $(NXLIBDIR)/liblwip.a \
+		   $(NXLIBDIR)/libcrypto.a \
+		   $(NXLIBDIR)/libssl.a \
+		   $(NXLIBDIR)/libnexus.a \
+		   $(NXLIBDIR)/libnexus-sec.a \
+		   $(NXLIBDIR)/libnexus-sys.a \
+		   $(NXLIBDIR)/libc.a \
+		   $(NXLIBDIR)/crti.o \
+		   $(NXLIBDIR)/crt1.o \
+		   $(NXLIBDIR)/crtn.o \
+		   $(GCC_HOME)/libgcc.a \
+		   -Wl,--end-group
+
+NX_CFLAGS	:= -fno-stack-protector \
+		   -I $(NXBUILDDIR)/user/include \
+		   -I $(NXBUILDDIR)/common/include \
+		   -I $(GCC_HOME)/include \
+		   -I $(GCC_HOME)/include-fixed \
+		   -nostdinc
+NX_LDFLAGS	:= -L $(NXLIBDIR) -L $(GCC_HOME) -nostdlib -Bstatic -e compatmain
+
+
+ifeq ($(BUILD_VERBOSE),)
+REDIR	:= >/dev/null
+endif
+

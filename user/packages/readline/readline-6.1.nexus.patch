@@ -1,0 +1,23 @@
+diff -Nur readline-6.1-orig/rlmbutil.h readline-6.1/rlmbutil.h
+--- readline-6.1-orig/rlmbutil.h	2010-02-11 03:45:42.000000000 +0000
++++ readline-6.1/rlmbutil.h	2010-02-11 03:46:41.000000000 +0000
+@@ -28,6 +28,10 @@
+ /* check multibyte capability for I18N code     */
+ /************************************************/
+ 
++// Even if you force disable multibyte, readline includes these headers.
++// that Nexus doesn't have.
++#ifdef NONEXUS
++
+ /* For platforms which support the ISO C amendement 1 functionality we
+    support user defined character classes.  */
+    /* Solaris 2.5 has a bug: <wchar.h> must be included before <wctype.h>.  */
+@@ -49,6 +53,8 @@
+ #  endif
+ #endif
+ 
++#endif
++
+ /* If we don't want multibyte chars even on a system that supports them, let
+    the configuring user turn multibyte support off. */
+ #if defined (NO_MULTIBYTE_SUPPORT)

@@ -1,0 +1,70 @@
+
+bin/kbd.drv &
+
+#### resource control
+#bin/guard_auth_quota.app &
+#sleep 4
+#bin/resctl_cpu.app &
+
+bin/pci.drv &
+sleep 1
+
+#### storage
+##
+bin/stor-ide.drv &
+sleep 2 
+bin/fat32.app &
+sleep 1
+
+#### networking
+## net: device drivers
+#bin/refmon_vlance.app &
+#bin/refmon_kernel.app 1 bin/net.drv &
+bin/net.drv &
+#knetdev
+sleep 4
+
+## net: essential services
+bin/dhcp.app &
+sleep 4
+#bin/lwip_sntp.app &
+#bin/nfs.app x.x.x.1:/opt/git/nexus/build/boot -mount /usr &
+#sleep 4
+
+#### trust services
+#bin/sign.app -c /tmp/nsk.priv.pem
+#sleep 1
+#bin/tpmd &
+#sleep 1
+#bin/lockbox.app p f &  		
+#sleep 1
+
+# benchmarking: setup webfiles with optional access control checks
+#bin/bench_setupfiles.app 1
+
+# cp fauxbook files
+#bin/busybox mkdir -p /var/cgi-bin/fauxbook
+#bin/busybox cp -r /usr/var/cgi-bin/fauxbook /var/cgi-bin
+#bin/busybox mkdir -p /var/www/fauxbook
+#bin/busybox cp -r /usr/var/www/fauxbook /var/www
+
+#bin/python -B usr/var/cgi-bin/py/size.py &
+#sleep 15
+#bin/python -B usr/var/cgi-bin/admin/nxserver.py &
+#sleep 15
+#bin/python -B usr/var/cgi-bin/protect/pserver.py usr/var/cgi-bin/fauxbook &
+#sleep 15
+
+## net: web frontend servers
+#bin/net_echo.app
+#bin/httpd.app &
+#bin/refmon_kernel.app 1 bin/httpd.app &
+#bin/refmon_lighty.app &
+#bin/lighttpd -D -f bin/lighttpd.conf &
+
+#### other examples
+#bin/busybox tftp -g -r hullo 172.16.40.1
+#bin/busybox ls -l /bin
+
+#echo [sh] ready
+

@@ -1,0 +1,40 @@
+HOWTO run the demo social networking application
+      using lighttpd and python
+
+
+# compilation
+      
+	make sure all required packages are compiled in:
+	- lighttpd
+	- libtpm
+	- python
+	- tpmemu
+
+
+# configuration
+
+	verify that the configuration file has the right IP address
+	in data/etc/lighttpd.conf, all fastcgi.server addresses must
+	point to the DHCP assigned address of the nexus system, 
+	NOT to its localhost (127.0.0.1)
+
+# server
+
+	start lighttpd
+
+		bin/lighttpd -D -f usr/etc/lighttpd.conf
+
+	the -D switch ensures we do not fork into background
+	(fork is not supported)
+
+
+# main python loop
+
+	start python for the non logged-in user
+
+		bin/python usr/var/www/fauxbook/server.py
+
+	NB: networking/nfs is incredibly slow right now. 
+	    have patience and wait until the server says it is running
+
+... to be continued

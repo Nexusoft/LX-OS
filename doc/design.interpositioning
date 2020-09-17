@@ -1,0 +1,72 @@
+#### Why and how to interpose
+
+Nexus supports trust construction through interpositioning, such as sandboxing.
+If a subject S is not allowed to perform an operation OP on object O because it
+is not trusted, it can be rendered trustworthy by imposing a trusted reference 
+monitor R on all its communication channels. Since the reference monitor IS 
+trusted to only forward safe I/O, so will the interposed process be. In 
+glorious ASCII art:
+
+Direct call:
+
+   ---                     -------
+  | S |  --(S, OP, O)-->  | Guard |
+  |   |  <----DENY------  |       |
+   ---                     -------
+
+
+Interposed IPC call:
+
+   ---                      ---                     -------
+  | S |  --(S, OP, O')-->  | R |  --(R, OP, O)-->  | Guard |
+  |   |  <----ALLOW------  |   |  <----ALLOW-----  |       |
+   ---                      ---                     -------
+
+
+## Object replacement
+For this implementation to work, all calls by S on any object O must be 
+replaced by calls for another object O' under control of R. Then, the
+kernel will call R, which can decide to inspect the tuple or S
+
+## Installation
+Interpositioning has to be transparent to the interposed application,
+so that it can secure any process. In other words, S should not replace
+operations on O with those on O' manually. Instead, A reference monitor
+interposes by calling 
+
+	IPC_Interpose(<process>, <port>)
+
+to redirect all calls from the process in parameter one to the ipc
+port of parameter two.
+
+## System calls and IPC calls
+System calls cannot be interposed in the above manner, since any system
+call carried out by R will be attributed to R -- including Exit(). 
+Instead, the interposed process is paused and the reference monitor
+can signal whether to block or allow the call. In the meantime, it can
+again inspect and modify call parameters. But a picture says more than
+a thousand of my incoherent utterances:
+
+Interposed system call:
+
+   ---                      --- 
+  | S |  --(S, OP, O)-->   | R |
+  |   |  <----ALLOW------  |   |
+  |   |                     ---   
+  |   |                                                -------
+  |   |  ------------------------------(S, OP, O)-->  | Guard |
+  |   |  <--------------------------------ALLOW-----  |       |
+   ---                                                 -------
+
+
+## Access Control
+A subject may wish to restrict the type of analysis that a reference
+monitor is allowed to perform. For instance, it can choose whether to
+grant access to its main memory, or not. Similarly, the kernel could
+guard access to parameters.
+
+Interposition access control is based on normal file AC. Process memory
+is accessed through a special file in procfs, /proc/<pid>/mem, to
+which standard access control policies are applied.
+
+

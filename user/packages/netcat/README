@@ -1,0 +1,7 @@
+This openbsd version of netcat was taken from the Debian sid tree, at:
+
+	http://packages.debian.org/sid/netcat-openbsd
+
+It is easier to port to incomplete posix implementations than both
+the GNU version and the original ('netcat-110') swiss army knife.
+

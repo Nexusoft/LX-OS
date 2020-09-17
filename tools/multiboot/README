@@ -1,0 +1,11 @@
+Sample kernel for illustrating grub2 + multiboot capabilities
+
+How-to:
+
+1. Install grub2 (1.98) using bin/grub-install compiled under tools/grub2
+2. make extracts mbkern/ and the following creates kernel image ``kernel'':
+2.1 ``make video'' makes a kernel that draws graphics (1024x768x24)
+2.2 ``make initrd'' makes a kernel that prints out init ramdisk contents
+3. Move mbkern/kernel and /nexus/build/boot/isoroot/initrd.tar under the boot partition (your-root) grub2 was installed under
+4. Use mbkern/grub.cfg for grub2, and change ``set root=(your-root)'' (put it under (your-root)/boot/grub)
+5. Boot grub2 and the sample kernel should run

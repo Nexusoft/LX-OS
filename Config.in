@@ -1,0 +1,68 @@
+#
+# For a description of the syntax of this configuration file,
+# see scripts/kbuild/config-language.txt.
+#
+
+mainmenu "Nexus Configuration"
+
+menu "Compiler Options"
+
+config QUIET
+	bool "Quiet compilation"
+	default y
+	help
+	  Redirect build output and errors to temporary files
+
+config RELEASE
+	bool "Enable compiler optimizations"
+	default n
+	help
+	  Generate release as opposed to debug binaries. Since
+	  we develop with debug setting, the result may be untested.
+	  When in doubt, say 'N'.
+
+endmenu
+
+menu "Applications"
+
+config XEN 
+	bool "Xen Host"
+	default y
+	help
+	  Compile in Xen VMM support. Disabling this may break
+	  the kernel.
+
+config BUSYBOX
+	bool "BusyBox"
+	default y
+	help
+	  Compile in the busybox user tools
+
+config MPLAYER
+	bool "Mplayer"
+	default y
+	help
+	  Compile in the MPlayer video player. This will take
+	  a long time to build.
+
+config NETCAT
+	bool "Netcat"
+	default n
+	help
+	  Compile in OpenBSD Netcat. Currently broken because it
+	  depends on unimplemented system calls.
+
+endmenu
+
+menu "Other"
+
+config GPXE
+	bool "Network boot images"
+	default n
+	help
+	  Compile GPXE (formerly Etherboot) network boot images.
+	  Unless you will boot over the network, you can safely
+	  leave this off.
+
+endmenu
+

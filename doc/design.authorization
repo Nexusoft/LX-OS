@@ -1,0 +1,42 @@
+Authorization is the core of the Nexus. 
+XXX explain it here once it stabilizes.
+
+For now, this is more of a todo list.
+
+#### Identification
+
+## Object IDs
+
+Access control applies to a tuple (subject, operation, object). 
+Nexus does not use a standard object identification mechanism
+across subsystems. The guard standardizes by extracting service
+or system call specific data in 
+
+	nxguard_kern_getobject_service
+and
+	nxguard_kern_getobject_syscall
+
+## Operations
+
+Similarly, there is no unique operation identification. Because
+objects are service-specific (FSIDs are the only objects so far),
+no overlap will occur of pairs (call, object) even though all
+services will reuse the same call numbers.
+
+#### Aliasing
+
+To avoid having to send incredibly long keys to and fro, aliasing
+allows definition of (locally) unique short names. The guard keeps
+the list of aliases, to ensure that no two names collide and because
+has to lookup all aliases of a key when searching for credentials.
+
+An alias is defined using
+nxguard_alias_add(principal, alias);
+
+Aliases can be set by anyone, not just the principal itself. For
+safety, principals should only rely on aliases that they themselves
+(or parties they trust) have set since boot. Aliases are guaranteed
+to be unique for as long as the system remains active, but they
+do not persist across boot. For safety, it is not possible to 
+delete an alias (which would enable rebinding to another principal).
+

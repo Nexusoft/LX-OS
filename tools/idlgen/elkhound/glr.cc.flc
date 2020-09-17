@@ -1,0 +1,58 @@
+
+(fast-lock-cache-data 2 (quote (16932 . 21320)) (quote (t (c-font-lock-complex-decl-prepare (0 font-lock-keyword-face)) ("\\(\\=\\|\\(\\=\\|[^\\]\\)[
+
+]\\)\\s *#\\s *\\(error\\|warning\\)\\>\\s *\\(.*\\)$" (4 font-lock-string-face)) ("\\(\\=\\|\\(\\=\\|[^\\]\\)[
+
+]\\)\\s *#\\s *\\(import\\|include\\)\\>[ 	
+
+]*\\(\\(/\\(/[^
+
+]*[
+
+]\\|\\*\\([^*
+
+]\\|\\*[^/
+
+]\\)*\\*/\\)\\|\\\\[
+
+]\\)[ 	
+
+]*\\)*\\(<[^>
+
+]*>?\\)" (8 font-lock-string-face) (#<compiled-function (limit) "...(50)" [c->-as-paren-syntax c-<-as-paren-syntax ext beg-pos end-pos pos 8 ?> c-put-char-property-fun syntax-table extent-at nil delete-extent] 5>)) (#<compiled-function (limit) "...(153)" [parse-sexp-lookup-properties limit -match-end-pos- face start end nil boundp re-search-forward "\\(\\=\\|\\(\\=\\|[^\\]\\)[
+
+]\\)\\s *#\\s *define\\>[ 	
+
+]*\\(\\(/\\(/[^
+
+]*[
+
+]\\|\\*\\([^*
+
+]\\|\\*[^/
+
+]\\)*\\*/\\)\\|\\\\[
+
+]\\)[ 	
+
+]*\\)*\\([a-zA-Z_][a-zA-Z0-9_$]*\\)\\(\\((\\)\\|\\([^(]\\|$\\)\\)" t 0 c-skip-comments-and-strings match-data ((store-match-data match-data)) 9 7 font-lock-function-name-face put-nonduplicable-text-property font-lock c-forward-sws looking-at font-lock-variable-name-face ?\, match-data c-symbol-key] 5> (0 nil)) (#<compiled-function (limit) "...(79)" [parse-sexp-lookup-properties face start end -match-end-pos- limit nil boundp re-search-forward "\\(\\=\\|\\(\\=\\|[^\\]\\)[
+
+]\\)\\s *#\\s *\\(if\\|elif\\)\\>\\(\\\\\\(.\\|[
+
+]\\)\\|[^
+
+]\\)*" t 0 c-skip-comments-and-strings 3 match-data ((store-match-data match-data)) "\\<\\(defined\\)\\>\\s *(?" move 1 put-nonduplicable-text-property font-lock match-data c-preprocessor-face-name] 5> (0 nil)) (#<compiled-function (limit) "...(62)" [parse-sexp-lookup-properties face limit start end -match-end-pos- nil boundp re-search-forward "\\(\\=\\|\\(\\=\\|[^\\]\\)[
+
+]\\)\\(\\s *#\\s *[a-zA-Z0-9_$]+\\)" t 0 c-skip-comments-and-strings match-data ((store-match-data match-data)) 3 put-nonduplicable-text-property font-lock match-data c-preprocessor-face-name] 5> (0 nil)) (" " (0 c-nonbreakable-space-face)) (#<compiled-function (limit) "...(41)" [match-data parse-sexp-lookup-properties limit -match-end-pos- nil boundp re-search-forward ".\\(\\s\"\\|\\s|\\)" t 0 c-skip-comments-and-strings match-data ((store-match-data match-data)) c-font-lock-invalid-string] 4> (0 font-lock-keyword-face)) ("\\<\\(NULL\\|false\\|true\\)\\>" (1 font-lock-constant-face)) ("\\<\\(__\\(?:a\\(?:sm__\\|ttribute__\\)\\|declspec\\)\\|a\\(?:nd\\(?:_eq\\)?\\|sm\\|uto\\)\\|b\\(?:it\\(?:and\\|or\\)\\|reak\\)\\|c\\(?:a\\(?:se\\|tch\\)\\|lass\\|o\\(?:mpl\\|n\\(?:st\\(?:_cast\\)?\\|tinue\\)\\)\\)\\|d\\(?:e\\(?:fault\\|lete\\)\\|o\\|ynamic_cast\\)\\|e\\(?:lse\\|num\\|x\\(?:plicit\\|tern\\)\\)\\|f\\(?:or\\|riend\\)\\|goto\\|i\\(?:f\\|nline\\)\\|mutable\\|n\\(?:amespace\\|ew\\|ot\\(?:_eq\\)?\\)\\|o\\(?:perator\\|r\\(?:_eq\\)?\\)\\|p\\(?:r\\(?:ivate\\|otected\\)\\|ublic\\)\\|re\\(?:gister\\|interpret_cast\\|turn\\)\\|s\\(?:izeof\\|t\\(?:atic\\(?:_cast\\)?\\|ruct\\)\\|witch\\)\\|t\\(?:emplate\\|h\\(?:is\\|row\\)\\|ry\\|ype\\(?:def\\|id\\|name\\)\\)\\|u\\(?:nion\\|sing\\)\\|v\\(?:irtual\\|olatile\\)\\|while\\|xor\\(?:_eq\\)?\\)\\([^a-zA-Z0-9_$]\\|$\\)" (1 font-lock-keyword-face)) (#<compiled-function (limit) "...(53)" [c-reference-face-name face limit start end re-search-forward "\\(\\<\\([a-zA-Z_][a-zA-Z0-9_$]*\\)[ 	
+
+]*::[ 	
+
+]*\\)\\([a-zA-Z_]\\|[~*]\\)" t 0 c-skip-comments-and-strings get-text-property 2 put-nonduplicable-text-property font-lock 1] 5> (0 nil)) (c-font-lock-<>-arglists (0 font-lock-keyword-face)) (#<compiled-function (limit) "...(46)" [match-data parse-sexp-lookup-properties limit -match-end-pos- nil boundp re-search-forward "\\(p\\(?:r\\(?:ivate\\|otected\\)\\|ublic\\)\\)[ 	
+
+]*:" t 0 c-skip-comments-and-strings match-data ((store-match-data match-data)) c-put-char-property-fun c-type c-decl-end] 4> (0 font-lock-keyword-face)) (c-font-lock-declarations (0 font-lock-keyword-face)) ("\\<\\(bool\\|char\\|double\\|float\\|int\\|long\\|s\\(?:hort\\|igned\\)\\|unsigned\\|void\\|wchar_t\\)\\>" (1 (quote font-lock-type-face))) (#<compiled-function (limit) "...(65)" [c-specifier-key c-record-type-identifiers c-record-ref-identifiers c-promote-possible-types parse-sexp-lookup-properties limit t nil boundp re-search-forward "\\<\\(class\\|enum\\|struct\\|typename\\|union\\)\\>" c-skip-comments-and-strings c-forward-sws looking-at c-forward-keyword-clause c-forward-type ?= c-fontify-recorded-types-and-refs] 5> (0 nil)) (#<compiled-function (limit) "...(59)" [match-data parse-sexp-lookup-properties limit -match-end-pos- nil boundp re-search-forward "}[ 	]*\\(/\\*\\([^*
+
+]\\|\\*[^/
+
+]\\)*\\*/[ 	]*\\)*\\(\\([*(&]\\|\\([a-zA-Z_]\\|::\\|[~*][ 	
+
+]*[a-zA-Z_]\\)\\|\\(const\\|throw\\|volatile\\)\\>\\)\\([^=]\\|$\\)\\|[a-zA-Z_][a-zA-Z0-9_$]*\\)" t 0 c-skip-comments-and-strings c-put-char-property-fun c-type c-decl-id-start 3 match-data ((store-match-data match-data)) c-font-lock-declarators] 4> (0 nil)) ("\\<new\\>" (c-font-lock-c++-new)) (#<compiled-function (limit) "...(68)" [match-data match-data parse-sexp-lookup-properties limit -match-end-pos- nil boundp re-search-forward "\\<\\(enum\\)\\>[^][{}();,/#=]*{" t 0 c-skip-comments-and-strings match-data ((store-match-data match-data)) c-put-char-property-fun c-type c-decl-id-start c-forward-sws ((store-match-data match-data)) c-font-lock-declarators] 4> (0 nil)) ("\\<\\(goto\\)\\>\\s *\\([a-zA-Z_][a-zA-Z0-9_$]*\\)" (2 font-lock-constant-face nil t)) (c-font-lock-labels (0 font-lock-keyword-face)) (#<compiled-function (limit) "...(59)" [c-record-ref-identifiers c-promote-possible-types match-data parse-sexp-lookup-properties -match-end-pos- limit nil boundp re-search-forward "\\<\\(class\\|namespace\\|operator\\|struct\\|throw\\)\\>" t 0 c-skip-comments-and-strings match-data ((store-match-data match-data)) c-forward-keyword-clause c-fontify-recorded-types-and-refs c-record-type-identifiers] 4> (0 nil)))) (quote ((font-lock-string-face 42699 42710 42631 42655 42585 42591 41616 41630 41288 41291 41180 41182 40129 40142 40076 40087 40035 40041 39975 39997 39928 39934 35838 35839 33916 33917 32263 32269) (font-lock-reference-face 31571 31582) (font-lock-constant-face 42338 42354 41985 41990 39379 39383 38871 38887 38071 38075 34722 34738 34521 34525 31033 31038) (font-lock-preprocessor-face 42006 42022 41314 41327 39385 39401 39351 39366 39198 39211 38889 38903 38784 38795 34754 34770 33004 33017 31068 31080 30914 30923) (font-lock-keyword-face 42386 42388 42381 42385 42333 42337 41978 41984 41409 41411 36377 36379 35161 35164 34717 34721 34660 34664 34099 34101 33744 33748 33634 33640 32172 32174 31689 31691 31593 31598 31416 31418 31026 31032 30955 30957 30743 30745) (font-lock-variable-name-face 42794 42806 42514 42522 41497 41504 40327 40334 39753 39761 39191 39195 35330 35333 35170 35171 33783 33786 32963 32967 32510 32518 31940 31952 31655 31661 31600 31608 31506 31515 31100 31106 30796 30802 30680 30682) (font-lock-function-name-face 40477 40489 39323 39335 32140 32154 30576 30580 30408 30410) (font-lock-type-face 42783 42792 42506 42513 41490 41496 40471 40475 40316 40325 39745 39752 39272 39278 39177 39190 35317 35328 35166 35169 33770 33781 33643 33651 32952 32961 32500 32509 32133 32139 31936 31939 31651 31654 31502 31505 31088 31099 30785 30794 30677 30679 30568 30575 30403 30407) (font-lock-comment-face 43281 43313 43167 43273 43050 43117 42997 43041 42471 42498 42261 42323 42186 42251 42119 42176 42046 42109 42023 42035 41935 41964 41870 41921 41349 41397 41133 41159 41089 41122 40905 40966 40782 40834 40663 40758 40642 40653 40570 40632 40515 40559 40288 40306 40169 40229 39895 39908 39698 39735 39628 39688 39570 39617 39487 39560 39413 39477 39279 39294 39120 39167 38991 39062 38914 38981 38819 38863 38753 38783 38722 38741 38614 38653 38558 38600 38490 38544 38428 38475 38361 38414 38297 38347 38226 38283 38152 38212 38093 38138 37972 38016 37953 37957 37896 37939 37845 37882 37789 37831 37710 37775 37669 37696 37598 37655 37522 37584 37420 37462 37377 37405 37335 37363 37263 37321 37189 37249 37087 37161 37012 37026 36930 36958 36819 36917 36714 36807 36632 36702 36478 36519 36294 36340 36244 36281 36170 36232 36095 36158 36011 36083 35981 35999 35722 35774 35637 35675 35572 35625 35506 35560 35434 35494 35367 35422 35259 35305 35211 35247 35103 35151 35034 35093 34963 35024 34929 34953 34858 34919 34805 34848 34771 34794 34684 34701 34598 34629 33665 33730 33605 33622 33529 33593 33458 33517 33386 33446 33371 33374 33313 33359 33248 33301 33179 33236 33111 33167 33050 33099 32895 32942 32838 32885 32774 32828 32705 32764 32638 32695 32545 32584 32414 32479 32376 32404 32309 32366 32205 32231 32061 32102 31993 32051 31848 31911 31777 31838 31738 31766 31353 31410 31288 31347 31235 31282 31183 31229 31043 31058 30872 30907 30695 30739 88 1153 1 87))))

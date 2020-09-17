@@ -1,0 +1,15 @@
+
+Python on Nexus hints 
+
+## stdin
+
+Python does not recognize our interpreter. Start the interpreter with -i 
+parameter to force interactive mode.
+
+## lighttpd + fcgi
+
+Start lighty as follows
+
+bin/lighttpd -D -f <configfile>
+
+

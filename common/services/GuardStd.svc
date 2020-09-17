@@ -1,0 +1,178 @@
+service GuardStd {
+  __implements__ { "Guard.svc" }
+
+  /** Default Authorization Guard Implementation */
+
+  decls {
+    includefiles { "<nexus/guard.h>" }
+
+    void GuardStd_InitMain(void);
+  }
+
+  decls __callee__ {
+    includefiles { "<nexus/defs.h>",
+                   "<nexus/IPC.interface.h>" }
+
+    /** Acquire the default port and thereby run as standard system guard */
+    void
+    GuardStd_InitMain(void)
+    {
+ 	// override dynamically assigned port
+    	GuardStd_port_handle = IPC_CreatePort(default_guard_port);
+
+        // Only one guard can claim the sytem port 
+	if (GuardStd_port_handle != default_guard_port)
+		abort();
+    }
+
+  }
+
+  interface lf_generate { 0; } lf_check { 1; }
+  int 
+  GetGoal(struct nxguard_tuple tuple, __output__ struct VarLen goal)
+  {
+	  char *_goal;
+	  int len;
+
+	  len = nxguardsvc_goal_get(&tuple, &_goal);
+	  if (len <= 0)
+		  return -1;
+
+	  if (IPC_TransferTo(0, 1, _goal, 0, len)) {
+		  nxcompat_fprintf(stderr, "goal tx failed\n");
+		  return -1;
+	  }
+
+	  return len;
+  }
+
+  interface lf_generate { 0; } lf_check { 1; }
+  int 
+  SetGoal(struct nxguard_tuple tuple, __input__ struct VarLen goal)
+  {
+	  char *_goal;
+
+	  // XXX verify caller speaksfor object owner (set policy on SetGoal)
+	
+	  if (goal.len) {
+		  _goal = ipc_transferfrom(1, goal.len);
+		  nxguardsvc_goal_set2(&tuple, _goal);
+		  free(_goal);
+	  }
+	  else
+		  nxguardsvc_goal_set2(&tuple, NULL);
+
+	  return 0;
+  }
+
+  /** Insert a proof */
+  interface lf_generate { 0; } lf_check { 1; }
+  int 
+  SetProof(struct nxguard_tuple tuple, __input__ struct VarLen proof)
+  {
+	  char *_proof;
+
+	  // XXX verify caller speaksfor object owner (set policy on SetGoal)
+		
+	  if (proof.len) {
+		  _proof = ipc_transferfrom(1, proof.len);
+		  nxguardsvc_proof_set2(&tuple, _proof);
+		  free(_proof);
+	  }
+	  else
+		  nxguardsvc_proof_set2(&tuple, NULL);
+
+	  return 0;
+  }
+
+  interface lf_generate { 0; } lf_check { 1; }
+  int 
+  AddCred(__input__ struct VarLen label)
+  {
+	  char * _label;
+	  int ret;
+
+	  _label = ipc_transferfrom(1, label.len);
+	  ret = nxguardsvc_cred_add(_label, ipd_id);
+	  free(_label);
+
+	  return ret;
+  }
+
+  interface lf_generate { 0; } lf_check { 1; }
+  int 
+  AddCredShort(struct label label)
+  {
+	  return nxguardsvc_cred_add(label.data, ipd_id);
+  }
+
+  /** Insert a credential backed by a key */
+  interface lf_generate { 0; } lf_check { 1; }
+  int 
+  AddCredKey(__input__ struct VarLen label, 
+	     __input__ struct VarLen pubkey,
+	     __input__ struct VarLen sdigest)
+  {
+	  char * _label, *_pubkey, *_sdigest;
+	  int ret;
+
+	  _label = ipc_transferfrom(1, label.len);
+	  _pubkey = ipc_transferfrom(2, pubkey.len);
+	  _sdigest = ipc_transferfrom(3, sdigest.len);
+
+	  ret = nxguardsvc_cred_addkey(_label, _pubkey, 
+	 		               _sdigest, sdigest.len, 
+	 			       ipd_id);
+	 
+	  free(_sdigest);
+	  free(_pubkey);
+	  free(_label);
+	  return ret;
+  }
+
+  /** Claim an authority port, so that all credentials 
+      "name.$name says S" are directed to the given port. 
+      @returns 0 if the name is claimed successfully, or 1 otherwise */
+  interface lf_generate { 0; } lf_check { 1; }
+  int
+  SetAuth(int port, __input__ struct VarLen name)
+  {
+	  char * _name;
+          int ret;
+
+	  _name = ipc_transferfrom(1, name.len);
+	  ret = nxguardsvc_name_add(_name, port);
+	  free(_name);
+
+	  return ret;
+  }
+
+  /** Selftest in combination with guard_auth.test */
+  interface lf_generate { 0; } lf_check { 1; }
+  int
+  TestAuth(void)
+  {
+	  return nxguardsvc_test();
+  }
+
+  /** Interpose on a call (pre-call)
+      @return standardized guard decision, see guard.h */
+  interface lf_generate { 0; } lf_check { 1; }
+  int 
+  InterposeIn(struct nxguard_tuple tuple)
+  {
+	  return nxguardsvc_chk(&tuple);
+  }
+
+  /** Interpose on a call (post-call returnpath) 
+      @return nothing: cannot change control flow at this point */
+  interface lf_generate { 0; } lf_check { 1; }
+  int 
+  InterposeOut(char *msg, char *results, int rlen)
+  {
+	  nxcompat_fprintf(stderr, "NXDEBUG %s.%d\n", __FUNCTION__, __LINE__);
+	  return -1;
+  }
+
+}
+

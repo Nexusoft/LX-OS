@@ -1,0 +1,231 @@
+diff -Nur trousers-0.3.4-orig/Makefile.in trousers-0.3.4/Makefile.in
+--- trousers-0.3.4-orig/Makefile.in	2010-01-28 16:56:48.000000000 -0500
++++ trousers-0.3.4/Makefile.in	2010-02-24 19:58:59.484650536 -0500
+@@ -224,7 +224,7 @@
+ top_build_prefix = @top_build_prefix@
+ top_builddir = @top_builddir@
+ top_srcdir = @top_srcdir@
+-SUBDIRS = src man dist tools
++SUBDIRS = src man dist 
+ EXTRA_DIST = AUTHORS LICENSE NEWS NICETOHAVES README \
+ 	README.selinux TODO ChangeLog \
+ 	doc/LTC-TSS_LLD_08_r2.pdf \
+diff -Nur trousers-0.3.4-orig/src/tcsd/svrside.c trousers-0.3.4/src/tcsd/svrside.c
+--- trousers-0.3.4-orig/src/tcsd/svrside.c	2010-01-26 10:40:05.000000000 -0500
++++ trousers-0.3.4/src/tcsd/svrside.c	2010-02-24 19:58:22.080650468 -0500
+@@ -57,6 +57,7 @@
+ 	EVENT_LOG_final();
+ }
+ 
++#ifdef NONEXUS
+ static void
+ tcsd_signal_term(int signal)
+ {
+@@ -107,6 +108,7 @@
+ 
+ 	return TSS_SUCCESS;
+ }
++#endif
+ 
+ static TSS_RESULT
+ tcsd_startup(void)
+@@ -118,9 +120,11 @@
+ 	setvbuf(stdout, (char *)NULL, _IONBF, 0);
+ #endif
+ 
++#ifdef NONEXUS
+ 	if ((result = signals_init()))
+ 		return result;
+ 
++#endif
+ 	if ((result = conf_file_init(&tcsd_options)))
+ 		return result;
+ 
+@@ -134,6 +138,7 @@
+ 		return result;
+ 	}
+ 
++#ifdef NONEXUS
+ 	if ((result = ps_dirs_init())) {
+ 		conf_file_final(&tcsd_options);
+ 		(void)req_mgr_final();
+@@ -146,10 +151,15 @@
+ 		(void)req_mgr_final();
+ 		return result;
+ 	}
++#else
++	LogInfo("Nexus: 'persistent' storage is disabled\n");
++#endif
+ 
+ 	if ((result = get_tpm_metrics(&tpm_metrics))) {
+ 		conf_file_final(&tcsd_options);
++#ifdef NONEXUS
+ 		PS_close_disk_cache();
++#endif
+ 		(void)req_mgr_final();
+ 		return result;
+ 	}
+@@ -157,7 +167,9 @@
+ 	/* must happen after get_tpm_metrics() */
+ 	if ((result = auth_mgr_init())) {
+ 		conf_file_final(&tcsd_options);
++#ifdef NONEXUS
+ 		PS_close_disk_cache();
++#endif
+ 		(void)req_mgr_final();
+ 		return result;
+ 	}
+@@ -166,7 +178,9 @@
+ 	if (result != TSS_SUCCESS) {
+ 		auth_mgr_final();
+ 		conf_file_final(&tcsd_options);
++#ifdef NONEXUS
+ 		PS_close_disk_cache();
++#endif
+ 		(void)req_mgr_final();
+ 		return result;
+ 	}
+@@ -175,7 +189,9 @@
+ 	if (result != TSS_SUCCESS) {
+ 		auth_mgr_final();
+ 		conf_file_final(&tcsd_options);
++#ifdef NONEXUS
+ 		PS_close_disk_cache();
++#endif
+ 		(void)req_mgr_final();
+ 		return result;
+ 	}
+@@ -236,11 +252,16 @@
+ 				break;
+ 		}
+ 	}
++// always in the foreground
++#ifndef NONEXUS
++	printf("Nexus: running in the foreground\n");
++	setenv("TCSD_FOREGROUND", "1", 1);
++#endif
+ 
+ 	if ((result = tcsd_startup()))
+ 		return (int)result;
+ 
+-	sd = socket(AF_INET, SOCK_STREAM, 0);
++	sd = socket(PF_INET, SOCK_STREAM, 0);
+ 	if (sd < 0) {
+ 		LogError("Failed socket: %s", strerror(errno));
+ 		return -1;
+diff -Nur trousers-0.3.4-orig/src/tcsd/tcsd_conf.c trousers-0.3.4/src/tcsd/tcsd_conf.c
+--- trousers-0.3.4-orig/src/tcsd/tcsd_conf.c	2009-09-08 10:39:30.000000000 -0400
++++ trousers-0.3.4/src/tcsd/tcsd_conf.c	2010-02-24 19:58:46.244649861 -0500
+@@ -707,9 +707,11 @@
+ 	FILE *f = NULL;
+ 	struct stat stat_buf;
+ #ifndef SOLARIS
++#ifdef NONEXUS
+ 	struct group *grp;
+ 	struct passwd *pw;
+ 	mode_t mode = (S_IRUSR|S_IWUSR);
++#endif
+ #endif /* SOLARIS */
+ 	TSS_RESULT result;
+ 
+@@ -737,6 +739,7 @@
+ 	}
+ 
+ #ifndef SOLARIS
++#ifdef NONEXUS
+ 	/* find the gid that owns the conf file */
+ 	errno = 0;
+ 	grp = getgrnam(TSS_GROUP_NAME);
+@@ -774,17 +777,27 @@
+ 		LogError("TCSD config file (%s) must be mode 0600", TCSD_CONFIG_FILE);
+ 		return TCSERR(TSS_E_INTERNAL_ERROR);
+ 	}
++#endif
+ #endif /* SOLARIS */
+ 
+ 	if ((f = fopen(TCSD_CONFIG_FILE, "r")) == NULL) {
++#ifdef NONEXUS
+ 		LogError("fopen(%s): %s", TCSD_CONFIG_FILE, strerror(errno));
+ 		return TCSERR(TSS_E_INTERNAL_ERROR);
++#else
++		LogInfo("Config file %s not found, using defaults.", TCSD_CONFIG_FILE);
++		result = TSS_SUCCESS;
++ 		goto defaults;
++#endif
+ 	}
+ 
+ 	result = read_conf_file(f, conf);
+ 	fclose(f);
+ 
+ 	/* fill out any uninitialized options */
++#ifndef NONEXUS
++defaults:
++#endif
+ 	config_set_defaults(conf);
+ 
+ #ifdef SOLARIS
+diff -Nur trousers-0.3.4-orig/src/trspi/trousers.c trousers-0.3.4/src/trspi/trousers.c
+--- trousers-0.3.4-orig/src/trspi/trousers.c	2009-09-08 10:39:30.000000000 -0400
++++ trousers-0.3.4/src/trspi/trousers.c	2010-02-24 19:58:59.484650536 -0500
+@@ -16,8 +16,8 @@
+ #include <sys/types.h>
+ #include <sys/mman.h>
+ #include <langinfo.h>
+-#include <iconv.h>
+-#include <wchar.h>
++//#include <iconv.h>
++//#include <wchar.h>
+ #include <errno.h>
+ 
+ #include "trousers/tss.h"
+@@ -1468,6 +1468,7 @@
+ 	return TSS_ERROR_CODE(r);
+ }
+ 
++#if 0
+ static int
+ hacky_strlen(char *codeset, BYTE *string)
+ {
+@@ -1494,6 +1495,7 @@
+ 
+ 	return len;
+ }
++#endif
+ 
+ static inline int
+ char_width(char *codeset)
+@@ -1512,6 +1514,7 @@
+ BYTE *
+ Trspi_Native_To_UNICODE(BYTE *string, unsigned *size)
+ {
++#if 0
+ 	char *ret, *outbuf, tmpbuf[MAX_BUF_SIZE] = { 0, };
+ 	BSD_CONST char *ptr;
+ 	unsigned len = 0, tmplen;
+@@ -1565,12 +1568,15 @@
+ 		iconv_close(cd);
+ 
+ 	return (BYTE *)ret;
+-
++#else
++	return NULL;
++#endif
+ }
+ 
+ BYTE *
+ Trspi_UNICODE_To_Native(BYTE *string, unsigned *size)
+ {
++#if 0
+ 	char *ret, *outbuf, tmpbuf[MAX_BUF_SIZE] = { 0, };
+ 	BSD_CONST char *ptr;
+ 	unsigned len = 0, tmplen;
+@@ -1624,6 +1630,9 @@
+ 	iconv_close(cd);
+ 
+ 	return (BYTE *)ret;
++#else
++	return NULL;
++#endif
+ }
+ 
+ /* Functions to support incremental hashing */

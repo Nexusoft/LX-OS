@@ -1,0 +1,27 @@
+syscall TCPMgr {
+	includefiles { "\"a.h\"" }
+
+	// constructors
+	callee {
+		a;
+	}
+	caller {
+		b;
+	}
+
+
+	// destructors
+	~callee {
+		c;
+	}
+	~caller {
+		d;
+	}
+
+  interface lf_generate { }
+  	int foo2(VarLen v, int *py, enum Etest ez, struct Stest * ea, Itest * ia) {
+	char *str = "in foo1";
+  }
+  includefiles { "<b.h>" }
+}
+

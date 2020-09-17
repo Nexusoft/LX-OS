@@ -1,0 +1,17 @@
+The tg3 driver is version 3.105h, the latest available in April of 2010. 
+All changes to the original are clearly marked 
+
+	#ifdef NONEXUS
+	..
+	#endif
+
+The previous tg3 driver was version 3.71b. This is not in any mainline kernel
+and I could no longer find the sources anywhere on the web. It falls 
+between the 2.6.19 and 2.6.20 releases
+
+## Userspace Porting Info
+
+This newer driver does NOT pass a struct net_device pointer to its interrupt
+handler, contrary to older ones. When porting to userspace, update the nexus
+device registration handler accordingly
+

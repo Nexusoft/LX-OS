@@ -1,0 +1,257 @@
+service Resource_CPU {
+
+	__implements__ { "Resource.svc" }
+
+	decls {
+		void Resource_CPU_Init(void);
+	}
+
+	decls __callee__ {
+		
+		includefiles {
+			"<stdlib.h>", 
+			"<stdio.h>", 
+			"<string.h>", 
+			"<unistd.h>",
+			
+			"<nexus/sema.h>",
+			"<nexus/Thread.interface.h>",
+		}
+
+		/// Number of discrete resource shards to allocate
+	       	//  MUST correspond to kernel:core/sched.c
+		const int res_count = 10;
+
+		/// Maximum number of processes that share an account
+		//  XXX implementation artifact: should be unlimited
+		const int pid_count = 5;
+
+		/// No reason to have more accounts than shards
+		//  MUST correspond to kernel:core/sched.c
+		const int account_highest = 10 /* res_count */ - 1;  
+
+		/// Account number for default 'best effort' account
+		const int account_besteffort = 0;
+
+		/// allocation of resource to account
+		static int resources[10 /* res_count */];
+
+		/// attachment of process to resource
+		static int resource_pids[10 /* res_count */][5 /* pid_count, but IDL cannot generate that */];
+		static int res_pidcount[10 /* res_count */];
+		static Sema mutex = SEMA_MUTEX_INIT;
+
+		/// start listening on default static IPC port
+		void Resource_CPU_Init(void)
+		{
+			int port;
+			
+			port = IPC_CreatePort(resctl_cpu_port);
+			assert(port == resctl_cpu_port);
+			Resource_CPU_port_handle = port; // override the port set in serverInit()
+		}
+	}
+
+	/** Return a new account ID */
+	interface lf_generate { OID_NONE; } lf_check { 1; }
+	int Account_New(int limit) 
+	{
+		static int account_last;
+		int account_new;
+
+		P(&mutex);
+
+		if (account_last < account_highest)
+			account_new = ++account_last;
+		else
+			account_new = -1;
+		
+		V_nexus(&mutex);
+		
+		return account_new;
+	}
+
+	/** Attach a process ID to an account ID (irreversibly) */
+	interface lf_generate { 0; } lf_check { 1; }
+	int Account_AddProcess(int account, int pid) 
+	{
+		int ret, idx;
+
+		// sanity check input
+		if (account < 0 || account > account_highest || pid < 1)
+			return -1;
+
+		P(&mutex);
+		
+		// can only change from best effort to another account
+  		if (Thread_Sched_GetProcessAccount(pid) != 0) {
+			ret = -1;
+			goto done;
+		}
+		
+		// add to map:account->pid
+		if (res_pidcount[account] == pid_count) {
+			fprintf(stderr, "[cpu] process overflow: increase\n");
+			ret = -1;
+			goto done;
+		}
+		idx = res_pidcount[account]++;
+		resource_pids[account][idx] = pid;	
+
+		// add to kernel map
+		ret = Thread_Sched_SetProcessAccount(pid, account);
+		
+done:
+		V_nexus(&mutex);
+
+		return ret;
+	}
+
+	/** Lookup the account to which a process budgets */
+	interface lf_generate { 0; } lf_check { 1; }
+	int Account_ByProcess(int pid) 
+	{
+		return Thread_Sched_GetProcessAccount(pid);
+	}
+
+	/** Try to increase an account's resource reservation by quantity */
+	interface lf_generate { 0; } lf_check { 1; }
+	int Account_AddResource(int account, int quantity) 
+	{
+		int avail, i, ret;
+
+		// sanity check input
+		if (account < 0 || account > account_highest || quantity < 1)
+			return -1;
+
+		P(&mutex);
+
+		// try (stateless) if enough shards are available
+		avail = 0;
+		for (i = 0, avail = 0; 
+		     i < res_count && avail < quantity; 
+		     i++) {
+			if (!resources[i])
+				avail++;
+		}
+
+		if (avail == quantity) {
+			// acquire shards (stateful)
+			for (i = 0, avail = 0; 
+			     i < res_count && avail < quantity; 
+			     i++) {
+				if (!resources[i]) {
+					resources[i] = account;
+nxcompat_fprintf(stderr, "NXDEBUG: set quantum %d -> %d\n", i, account);
+//					if (Thread_Sched_SetQuantumAccount(i, account)) {
+//						nxcompat_fprintf(stderr, "Error at SetQuantum\n");
+//						ret = -1;
+//						break;
+//					}
+					avail++;
+				}
+			}
+			ret = 0;
+		}
+		else 
+			ret = -1;
+
+		V_nexus(&mutex);
+
+		return ret;
+	}
+
+	interface lf_generate { 0; } lf_check { 1; }
+	int Account_Attest(int account, __input__ struct VarLen filepath)
+	{
+		char *labels[2], *label, *__filepath;
+		char sublabel[100], processes[32], origpath[128];
+		int len, ret, quantity, i, off;
+
+		// sanity check input
+		if (account < 0 || account > account_highest)
+			return -1;
+
+		// calculate account quantity
+		for (i = 0; i < res_count; i++) {
+			if (resources[i] == account) 
+				quantity++;
+		}
+
+		// generate second half of label
+		if (res_pidcount[account]) {
+			// create list of processes
+			off = sprintf(processes, "%d", resource_pids[account][0]);
+			for (i = 1; i < res_pidcount[account]; i++)
+				off += sprintf(processes + off, ", %d", resource_pids[account][i]);
+fprintf(stderr, "NXDEBUG processlist [%s]\n", processes);
+			
+			// combine with speaksfor
+			len = snprintf(sublabel, 99, " and (process.[%s] speaksfor resource.cpu.%d)",
+				       processes, account);
+			if (len == 99)
+				goto overflow;
+fprintf(stderr, "NXDEBUG sublabel [%s]\n", sublabel);
+		}
+		else
+			sublabel[0] = 0;
+
+		// generate complete label
+		label = malloc(512);
+		len = snprintf(label, 511, "resource.cpu says "
+			       "((resource.cpu = %d and resource.cpu.%d >= %d)%s)",
+			       res_count, account, quantity, sublabel); 
+fprintf(stderr, "NXDEBUG label [%s]\n", label);
+
+		if (len == 511)
+			goto overflow; // (minor memleak: label)
+
+		labels[0] = label;
+		labels[1] = NULL;
+		ret = Thread_Sha1_Says(labels, origpath);
+		free(label);
+		
+		if (ret)
+			return -1;
+
+		// move file to final location
+		__filepath = ipctransfer_from(&filepath, filepath.len, 128);
+		assert(__filepath);
+		if (strcmp(origpath, __filepath))
+			ret = rename(origpath, __filepath);
+		nxcompat_free(__filepath);
+
+		return ret;
+
+overflow:
+		fprintf(stderr, "[cpu] label exceeds maximum length");
+		return -1;
+	}
+
+        /** Return total number of resources */
+        interface lf_generate { (0); } lf_check { 1; }
+        int Info_SizeTotal(void)
+        {
+                return 10;
+        }
+
+        /** Return total number of resources */
+        interface lf_generate { (0); } lf_check { 1; }
+        int Info_SizeAccount(int account)
+        {
+                int i, used;
+
+                P(&mutex);
+                used = 0;
+		for (i = 0; i < res_count; i++) {
+			if (resources[i] == account)
+				used++;
+		}
+                V_nexus(&mutex);
+
+                return used;
+        }
+}
+
+/* vim: set ts=8 sw=8: */
+

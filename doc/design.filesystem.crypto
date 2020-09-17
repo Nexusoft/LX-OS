@@ -1,0 +1,79 @@
+## Cryptographic services for files: confidentiality and integrity protection
+
+Nexus integrates offline secure storage with the virtual filesystem layer.
+All encryption, decryption, signing and verification takes place in 
+
+	src/libs/syscall/fs_crypto.c
+
+which is called from generic_file.c. As a result, all operations are supported
+on all objects backed by file descriptors. In practice, some operations, such 
+as full file signing, have no purpose in stream oriented objects such as
+/dev/random.
+
+
+## Confidentiality
+Data is transparently encrypted in each write() call and decrypted in each 
+read() call, when the user sets the file mode accordingly using fcntl().
+The filesystem layer defers actual cryptographic operations to a lockbox.
+
+Encryption is enabled with fcntl(fd, F_SETENC, arg), where arg
+is a 32bit unsigned number, where the high 16 bits encode an IPC port and
+the low 16 bits a key. The IPC port must be the portnumber of a lockbox
+and the low bits a valid key in the lockbox table. Note that this 
+implementation does not prescribe the cryptographic algorithm. Data and
+initialization vector size, on the other hand, are fixed at 512 and 16
+Byte. By default, Nexus uses a counter-mode AES block cipher. The
+filesystem layer calculates the correct counter value (which need NOT
+be confidential) from the block offset in the file.
+
+To disable encryption and decryption, the user calls fcntl with a zero
+argument.
+
+
+## Integrity Protection
+Integrity protection has two phases: signature generation and signature
+verification. These are two separate options to the filesystem, both
+to be passed with fcntl.
+
+The filesystem will generate a signature on file CLOSE, after a successful
+call to fcntl(fd, F_SIGN, arg), where arg works identical to the encryption
+case, above. Note that only one lockbox can be active at one time, so the
+upper 16 bits of all encryption and signature calls must be identical.
+This call does not generate a signature immediately, but instead starts
+tracking dirty blocks (in a hashtree implementation, see Todo, below) and
+updates the saved hash on file close.
+
+To verify a stored signature against current file contents, a user calls
+fcntl(fd, F_SIGNED, arg). The result is a binary outcome similar to memcpy.
+
+Both calls require the user to select a key index in the lockbox. It is
+imperative that a malicious user cannot change application control flow to
+have it check another key (possibly even in another lockbox). We have
+designed the system to use a unique object id as key, for instance the
+file inode. Note that the current default lockbox does not support 
+arbitrarily large keys yet (but should).
+
+## Tips
+
+# Calling from high-level interpreters
+These operations require fcntl() calls with flags that are unique to
+nexus. From within Python and similar high-level environments, use the
+numerical values (0x2000, ...: see nexuscalls.h) directly. Python
+supports low-level access to fcntl() through the fcntl module:
+
+	http://docs.python.org/library/fcntl.html
+
+
+## Todo
+At the time of writing, the following loose ends need to be fixed.
+
+# confidentiality: ivec storage
+The subsystem does not yet save and retrieve per-file initialization
+vectors. All files have an empty ivec. This is a security HAZARD, as it
+facilitates key discovery.
+
+# integrity: hash tree
+For efficient hash recalculation, we should use hash trees instead of
+linear XORs of block hashes.
+
+

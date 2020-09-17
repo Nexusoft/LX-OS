@@ -1,0 +1,49 @@
+Nexus Filesystem Design
+last edit: 2009-10-12
+
+## Design
+
+	Nexus can construct private filesystem trees for independent (sets of) processes, 
+	similar to Plan9 and recent Linux, but unlike Unix practice. Each process has
+	its own filesystem root, why is either private or the filesystem exported from
+	a known location by the kernel (KERNELFS_PORT).
+
+## Interface
+
+	Filesystems are services and as such they listen on IPC Ports. Each FS is
+	uniquely bound to a single port (but not every port implements a filesystem,
+	of course). The Nexus equivalent of an inode is an FSID. This structure contains
+	three fields, one of which resolves the file server by port number.
+
+ 	The most appropriate userspace interface is the Posix IO interface given
+	by libc. Alternatively, you can directly access the underlying Nexus
+	interface defined in FS.svc. See that file for more information.
+
+## Implementations
+
+- RamFS
+	Implements a simple read-only filesystem, but its real
+	purpose is to hand-off calls to specific filesystem implementations.
+	In this sense it is similar in idea to Linux's VFS layer.
+
+- NFS
+
+- FatFS
+
+## Users
+
+- KernelFS
+	creates system information nodes (like /proc) on a RamFS
+
+## Various
+
+- Creation
+
+	The serverInit() in .svc is useless. Each filesystem unfortunately has
+	its own local constructor, such as RamFS_new();
+
+## Path handling
+
+In fs_path. TODO: explain
+
+
