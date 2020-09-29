@@ -1,0 +1,24 @@
+#
+# Automatically generated make config: don't edit
+# Busybox version: 
+# Thu Sep 17 17:03:56 2020
+#
+
+#
+# Compiler Options
+#
+CONFIG_QUIET=y
+# CONFIG_RELEASE is not set
+
+#
+# Applications
+#
+# CONFIG_XEN is not set
+CONFIG_BUSYBOX=y
+# CONFIG_MPLAYER is not set
+# CONFIG_NETCAT is not set
+
+#
+# Other
+#
+# CONFIG_GPXE is not set
