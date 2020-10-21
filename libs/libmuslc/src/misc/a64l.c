@@ -9,12 +9,9 @@ long a64l(const char *s)
 {
 	int e;
 	uint32_t x = 0;
-	for (e=0; e<36 && *s; e+=6, s++) {
-		const char *d = strchr(digits, *s);
-		if (!d) break;
-		x |= (uint32_t)(d-digits)<<e;
-	}
-	return (int32_t)x;
+	for (e=0; e<36 && *s; e+=6, s++)
+		x |= (strchr(digits, *s)-digits)<<e;
+	return x;
 }
 
 char *l64a(long x0)

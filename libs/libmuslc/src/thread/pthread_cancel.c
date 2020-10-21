@@ -1,19 +1,12 @@
-#define _GNU_SOURCE
-#include <string.h>
 #include "pthread_impl.h"
 #include "syscall.h"
-#include "libc.h"
 
-__attribute__((__visibility__("hidden")))
-long __cancel(), __syscall_cp_asm(), __syscall_cp_c();
-
-long __cancel()
+void __cancel()
 {
 	pthread_t self = __pthread_self();
-	if (self->canceldisable == PTHREAD_CANCEL_ENABLE || self->cancelasync)
-		pthread_exit(PTHREAD_CANCELED);
-	self->canceldisable = PTHREAD_CANCEL_DISABLE;
-	return -ECANCELED;
+	self->canceldisable = 1;
+	self->cancelasync = 0;
+	pthread_exit(PTHREAD_CANCELED);
 }
 
 long __syscall_cp_asm(volatile void *, syscall_arg_t,
@@ -26,16 +19,13 @@ long __syscall_cp_c(syscall_arg_t nr,
 {
 	pthread_t self;
 	long r;
-	int st;
 
-	if ((st=(self=__pthread_self())->canceldisable)
-	    && (st==PTHREAD_CANCEL_DISABLE || nr==SYS_close))
+	if (!libc.has_thread_pointer || (self = __pthread_self())->canceldisable)
 		return __syscall(nr, u, v, w, x, y, z);
 
 	r = __syscall_cp_asm(&self->cancel, nr, u, v, w, x, y, z);
-	if (r==-EINTR && nr!=SYS_close && self->cancel &&
-	    self->canceldisable != PTHREAD_CANCEL_DISABLE)
-		r = __cancel();
+	if (r==-EINTR && nr!=SYS_close && self->cancel && !self->canceldisable)
+		__cancel();
 	return r;
 }
 
@@ -45,23 +35,21 @@ static void _sigaddset(sigset_t *set, int sig)
 	set->__bits[s/8/sizeof *set->__bits] |= 1UL<<(s&8*sizeof *set->__bits-1);
 }
 
-__attribute__((__visibility__("hidden")))
-extern const char __cp_begin[1], __cp_end[1], __cp_cancel[1];
-
 static void cancel_handler(int sig, siginfo_t *si, void *ctx)
 {
 	pthread_t self = __pthread_self();
 	ucontext_t *uc = ctx;
-	uintptr_t pc = uc->uc_mcontext.MC_PC;
+	const char *ip = ((char **)&uc->uc_mcontext)[CANCEL_REG_IP];
+	extern const char __cp_begin[1], __cp_end[1];
 
-	a_barrier();
-	if (!self->cancel || self->canceldisable == PTHREAD_CANCEL_DISABLE) return;
+	if (!self->cancel || self->canceldisable) return;
 
 	_sigaddset(&uc->uc_sigmask, SIGCANCEL);
 
-	if (self->cancelasync || pc >= (uintptr_t)__cp_begin && pc < (uintptr_t)__cp_end) {
-		uc->uc_mcontext.MC_PC = (uintptr_t)__cp_cancel;
-		return;
+	if (self->cancelasync || ip >= __cp_begin && ip < __cp_end) {
+		self->canceldisable = 1;
+		pthread_sigmask(SIG_SETMASK, &uc->uc_sigmask, 0);
+		__cancel();
 	}
 
 	__syscall(SYS_tkill, self->tid, SIGCANCEL);
@@ -69,6 +57,7 @@ static void cancel_handler(int sig, siginfo_t *si, void *ctx)
 
 void __testcancel()
 {
+	if (!libc.has_thread_pointer) return;
 	pthread_t self = __pthread_self();
 	if (self->cancel && !self->canceldisable)
 		__cancel();
@@ -80,7 +69,7 @@ static void init_cancellation()
 		.sa_flags = SA_SIGINFO | SA_RESTART,
 		.sa_sigaction = cancel_handler
 	};
-	memset(&sa.sa_mask, -1, _NSIG/8);
+	sigfillset(&sa.sa_mask);
 	__libc_sigaction(SIGCANCEL, &sa, 0);
 }
 
@@ -92,6 +81,5 @@ int pthread_cancel(pthread_t t)
 		init = 1;
 	}
 	a_store(&t->cancel, 1);
-	if (t == pthread_self() && !t->cancelasync) return 0;
 	return pthread_kill(t, SIGCANCEL);
 }

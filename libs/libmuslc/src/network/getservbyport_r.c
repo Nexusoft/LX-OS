@@ -20,7 +20,6 @@ int getservbyport_r(int port, const char *prots,
 		if (r) r = getservbyport_r(port, "udp", se, buf, buflen, res);
 		return r;
 	}
-	*res = 0;
 
 	/* Align buffer */
 	i = (uintptr_t)buf & sizeof(char *)-1;

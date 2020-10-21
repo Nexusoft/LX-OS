@@ -35,7 +35,8 @@ extern "C" {
 #define __tm_zone tm_zone
 #endif
 
-struct tm {
+struct tm
+{
 	int tm_sec;
 	int tm_min;
 	int tm_hour;
@@ -77,7 +78,8 @@ char *ctime_r (const time_t *, char *);
 
 void tzset (void);
 
-struct itimerspec {
+struct itimerspec
+{
 	struct timespec it_interval;
 	struct timespec it_value;
 };
@@ -111,15 +113,14 @@ int timer_settime (timer_t, int, const struct itimerspec *__restrict, struct iti
 int timer_gettime (timer_t, struct itimerspec *);
 int timer_getoverrun (timer_t);
 
-extern char *tzname[2];
-
 #endif
 
 
-#if defined(_XOPEN_SOURCE) || defined(_BSD_SOURCE) || defined(_GNU_SOURCE)
+#if defined(_XOPEN_SOURCE) || defined(_GNU_SOURCE)
 char *strptime (const char *__restrict, const char *__restrict, struct tm *__restrict);
 extern int daylight;
 extern long timezone;
+extern char *tzname[2];
 extern int getdate_err;
 struct tm *getdate (const char *);
 #endif

@@ -6,9 +6,11 @@ long double floorl(long double x)
 	return floor(x);
 }
 #elif (LDBL_MANT_DIG == 64 || LDBL_MANT_DIG == 113) && LDBL_MAX_EXP == 16384
-
-static const long double toint = 1/LDBL_EPSILON;
-
+#if LDBL_MANT_DIG == 64
+#define TOINT 0x1p63
+#elif LDBL_MANT_DIG == 113
+#define TOINT 0x1p112
+#endif
 long double floorl(long double x)
 {
 	union ldshape u = {x};
@@ -19,9 +21,9 @@ long double floorl(long double x)
 		return x;
 	/* y = int(x) - x, where int(x) is an integer neighbor of x */
 	if (u.i.se >> 15)
-		y = x - toint + toint - x;
+		y = x - TOINT + TOINT - x;
 	else
-		y = x + toint - toint - x;
+		y = x + TOINT - TOINT - x;
 	/* special case because of non-nearest rounding modes */
 	if (e <= 0x3fff-1) {
 		FORCE_EVAL(y);

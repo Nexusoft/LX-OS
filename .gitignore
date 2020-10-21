@@ -1,1 +1,3 @@
 .config*
+stage/
+build/

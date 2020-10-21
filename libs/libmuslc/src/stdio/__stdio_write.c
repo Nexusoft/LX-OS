@@ -1,5 +1,12 @@
 #include "stdio_impl.h"
 #include <sys/uio.h>
+#include <pthread.h>
+
+static void cleanup(void *p)
+{
+	FILE *f = p;
+	if (!f->lockcount) __unlockfile(f);
+}
 
 size_t __stdio_write(FILE *f, const unsigned char *buf, size_t len)
 {
@@ -12,7 +19,9 @@ size_t __stdio_write(FILE *f, const unsigned char *buf, size_t len)
 	int iovcnt = 2;
 	ssize_t cnt;
 	for (;;) {
-		cnt = syscall(SYS_writev, f->fd, iov, iovcnt);
+		pthread_cleanup_push(cleanup, f);
+		cnt = syscall_cp(SYS_writev, f->fd, iov, iovcnt);
+		pthread_cleanup_pop(0);
 		if (cnt == rem) {
 			f->wend = f->buf + f->buf_size;
 			f->wpos = f->wbase = f->buf;
@@ -25,8 +34,11 @@ size_t __stdio_write(FILE *f, const unsigned char *buf, size_t len)
 		}
 		rem -= cnt;
 		if (cnt > iov[0].iov_len) {
+			f->wpos = f->wbase = f->buf;
 			cnt -= iov[0].iov_len;
 			iov++; iovcnt--;
+		} else if (iovcnt == 2) {
+			f->wbase += cnt;
 		}
 		iov[0].iov_base = (char *)iov[0].iov_base + cnt;
 		iov[0].iov_len -= cnt;

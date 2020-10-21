@@ -32,16 +32,16 @@ struct ctx {
 static void do_setrlimit(void *p)
 {
 	struct ctx *c = p;
-	if (c->err>0) return;
+	if (c->err) return;
 	c->err = -__setrlimit(c->res, c->rlim);
 }
 
 int setrlimit(int resource, const struct rlimit *rlim)
 {
-	struct ctx c = { .res = resource, .rlim = rlim, .err = -1 };
+	struct ctx c = { .res = resource, .rlim = rlim };
 	__synccall(do_setrlimit, &c);
 	if (c.err) {
-		if (c.err>0) errno = c.err;
+		errno = c.err;
 		return -1;
 	}
 	return 0;

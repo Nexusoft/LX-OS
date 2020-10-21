@@ -10,11 +10,15 @@ extern "C" {
 
 int gettimeofday (struct timeval *__restrict, void *__restrict);
 
+#if defined(_XOPEN_SOURCE) || defined(_GNU_SOURCE) \
+ || defined(_BSD_SOURCE)
+
 #define ITIMER_REAL    0
 #define ITIMER_VIRTUAL 1
 #define ITIMER_PROF    2
 
-struct itimerval {
+struct itimerval
+{
 	struct timeval it_interval;
 	struct timeval it_value;
 };
@@ -22,6 +26,8 @@ struct itimerval {
 int getitimer (int, struct itimerval *);
 int setitimer (int, const struct itimerval *__restrict, struct itimerval *__restrict);
 int utimes (const char *, const struct timeval [2]);
+
+#endif
 
 #if defined(_GNU_SOURCE) || defined(_BSD_SOURCE)
 struct timezone {

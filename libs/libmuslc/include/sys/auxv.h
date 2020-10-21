@@ -6,7 +6,6 @@ extern "C" {
 #endif
 
 #include <elf.h>
-#include <bits/hwcap.h>
 
 unsigned long getauxval(unsigned long);
 

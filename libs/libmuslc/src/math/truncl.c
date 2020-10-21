@@ -6,9 +6,11 @@ long double truncl(long double x)
 	return trunc(x);
 }
 #elif (LDBL_MANT_DIG == 64 || LDBL_MANT_DIG == 113) && LDBL_MAX_EXP == 16384
-
-static const long double toint = 1/LDBL_EPSILON;
-
+#if LDBL_MANT_DIG == 64
+#define TOINT 0x1p63
+#elif LDBL_MANT_DIG == 113
+#define TOINT 0x1p112
+#endif
 long double truncl(long double x)
 {
 	union ldshape u = {x};
@@ -25,7 +27,7 @@ long double truncl(long double x)
 	/* y = int(|x|) - |x|, where int(|x|) is an integer neighbor of |x| */
 	if (s)
 		x = -x;
-	y = x + toint - toint - x;
+	y = x + TOINT - TOINT - x;
 	if (y > 0)
 		y -= 1;
 	x += y;

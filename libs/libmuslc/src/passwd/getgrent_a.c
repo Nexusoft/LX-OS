@@ -8,17 +8,15 @@ static unsigned atou(char **s)
 	return x;
 }
 
-int __getgrent_a(FILE *f, struct group *gr, char **line, size_t *size, char ***mem, size_t *nmem, struct group **res)
+struct group *__getgrent_a(FILE *f, struct group *gr, char **line, size_t *size, char ***mem, size_t *nmem)
 {
 	ssize_t l;
 	char *s, *mems;
 	size_t i;
-	int rv = 0;
 	int cs;
 	pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &cs);
 	for (;;) {
 		if ((l=getline(line, size, f)) < 0) {
-			rv = ferror(f) ? errno : 0;
 			free(*line);
 			*line = 0;
 			gr = 0;
@@ -45,11 +43,9 @@ int __getgrent_a(FILE *f, struct group *gr, char **line, size_t *size, char ***m
 	free(*mem);
 	*mem = calloc(sizeof(char *), *nmem+1);
 	if (!*mem) {
-		rv = errno;
 		free(*line);
 		*line = 0;
-		gr = 0;
-		goto end;
+		return 0;
 	}
 	if (*mems) {
 		mem[0][0] = mems;
@@ -62,7 +58,5 @@ int __getgrent_a(FILE *f, struct group *gr, char **line, size_t *size, char ***m
 	gr->gr_mem = *mem;
 end:
 	pthread_setcancelstate(cs, 0);
-	*res = gr;
-	if(rv) errno = rv;
-	return rv;
+	return gr;
 }

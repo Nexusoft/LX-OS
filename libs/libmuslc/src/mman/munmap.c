@@ -2,13 +2,18 @@
 #include "syscall.h"
 #include "libc.h"
 
-static void dummy(void) { }
-weak_alias(dummy, __vm_wait);
+static void dummy1(int x) { }
+static void dummy0(void) { }
+weak_alias(dummy1, __vm_lock);
+weak_alias(dummy0, __vm_unlock);
 
 int __munmap(void *start, size_t len)
 {
-	__vm_wait();
-	return syscall(SYS_munmap, start, len);
+	int ret;
+	__vm_lock(-1);
+	__vm_unlock();
+	ret = syscall(SYS_munmap, start, len);
+	return ret;
 }
 
 weak_alias(__munmap, munmap);

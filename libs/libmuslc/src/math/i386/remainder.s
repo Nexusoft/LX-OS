@@ -7,7 +7,7 @@ drem:
 	fldl 12(%esp)
 	fldl 4(%esp)
 1:	fprem1
-	fnstsw %ax
+	fstsw %ax
 	sahf
 	jp 1b
 	fstp %st(1)

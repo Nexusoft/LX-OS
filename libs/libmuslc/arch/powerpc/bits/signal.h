@@ -1,11 +1,6 @@
 #if defined(_POSIX_SOURCE) || defined(_POSIX_C_SOURCE) \
  || defined(_XOPEN_SOURCE) || defined(_GNU_SOURCE) || defined(_BSD_SOURCE)
 
-#if defined(_XOPEN_SOURCE) || defined(_GNU_SOURCE) || defined(_BSD_SOURCE)
-#define MINSIGSTKSZ 4096
-#define SIGSTKSZ 10240
-#endif
-
 #if defined(_GNU_SOURCE) || defined(_BSD_SOURCE)
 
 typedef unsigned long greg_t, gregset_t[48];
@@ -23,7 +18,8 @@ typedef struct {
 	unsigned vscr;
 } vrregset_t;
 
-struct sigcontext {
+struct sigcontext
+{
 	unsigned long _unused[4];
 	int signal;
 	unsigned long handler;

@@ -1,1 +1,0 @@
-../arm/atomic_arch.h

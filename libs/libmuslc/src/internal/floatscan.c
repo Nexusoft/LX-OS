@@ -15,20 +15,12 @@
 #define LD_B1B_MAX 9007199, 254740991
 #define KMAX 128
 
-#elif LDBL_MANT_DIG == 64 && LDBL_MAX_EXP == 16384
+#else /* LDBL_MANT_DIG == 64 && LDBL_MAX_EXP == 16384 */
 
 #define LD_B1B_DIG 3
 #define LD_B1B_MAX 18, 446744073, 709551615
 #define KMAX 2048
 
-#elif LDBL_MANT_DIG == 113 && LDBL_MAX_EXP == 16384
-
-#define LD_B1B_DIG 4
-#define LD_B1B_MAX 10384593, 717069655, 257060992, 658440191
-#define KMAX 2048
-
-#else
-#error Unsupported long double representation
 #endif
 
 #define MASK (KMAX-1)
@@ -110,10 +102,7 @@ static long double decfloat(FILE *f, int c, int bits, int emin, int sign, int po
 			gotdig=1;
 		} else {
 			dc++;
-			if (c!='0') {
-				lnz = (KMAX-4)*9;
-				x[KMAX-4] |= 1;
-			}
+			if (c!='0') x[KMAX-4] |= 1;
 		}
 	}
 	if (!gotrad) lrp=dc;
@@ -174,9 +163,6 @@ static long double decfloat(FILE *f, int c, int bits, int emin, int sign, int po
 		if (bitlim>30 || x[0]>>bitlim==0)
 			return sign * (long double)x[0] * p10s[rp-10];
 	}
-
-	/* Drop trailing zeros */
-	for (; !x[z-1]; z--);
 
 	/* Align radix point to B1B digit boundary */
 	if (rp % 9) {

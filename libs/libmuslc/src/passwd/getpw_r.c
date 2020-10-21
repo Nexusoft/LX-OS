@@ -5,6 +5,7 @@
 
 static int getpw_r(const char *name, uid_t uid, struct passwd *pw, char *buf, size_t size, struct passwd **res)
 {
+	FILE *f;
 	char *line = 0;
 	size_t len = 0;
 	int rv = 0;
@@ -12,20 +13,33 @@ static int getpw_r(const char *name, uid_t uid, struct passwd *pw, char *buf, si
 
 	pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &cs);
 
-	rv = __getpw_a(name, uid, pw, &line, &len, res);
-	if (*res && size < len) {
-		*res = 0;
-		rv = ERANGE;
+	f = fopen("/etc/passwd", "rbe");
+	if (!f) {
+		rv = errno;
+		goto done;
 	}
-	if (*res) {
-		memcpy(buf, line, len);
-		FIX(name);
-		FIX(passwd);
-		FIX(gecos);
-		FIX(dir);
-		FIX(shell);
+
+	*res = 0;
+	while (__getpwent_a(f, pw, &line, &len)) {
+		if (name && !strcmp(name, pw->pw_name)
+		|| !name && pw->pw_uid == uid) {
+			if (size < len) {
+				rv = ERANGE;
+				break;
+			}
+			*res = pw;
+			memcpy(buf, line, len);
+			FIX(name);
+			FIX(passwd);
+			FIX(gecos);
+			FIX(dir);
+			FIX(shell);
+			break;
+		}
 	}
  	free(line);
+	fclose(f);
+done:
 	pthread_setcancelstate(cs, 0);
 	return rv;
 }

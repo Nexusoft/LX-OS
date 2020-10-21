@@ -1,4 +1,9 @@
-#include <stdlib.h>
+/* 
+ * This code was written by Rich Felker in 2010; no copyright is claimed.
+ * This code is in the public domain. Attribution is appreciated but
+ * unnecessary.
+ */
+
 #include <wchar.h>
 #include <errno.h>
 #include "internal.h"
@@ -22,7 +27,6 @@ size_t mbrtowc(wchar_t *restrict wc, const char *restrict src, size_t n, mbstate
 	if (!n) return -2;
 	if (!c) {
 		if (*s < 0x80) return !!(*wc = *s);
-		if (MB_CUR_MAX==1) return (*wc = CODEUNIT(*s)), 1;
 		if (*s-SA > SB-SA) goto ilseq;
 		c = bittab[*s++-SA]; n--;
 	}

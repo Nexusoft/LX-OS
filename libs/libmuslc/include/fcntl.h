@@ -21,7 +21,8 @@ extern "C" {
 
 #include <bits/fcntl.h>
 
-struct flock {
+struct flock
+{
 	short l_type;
 	short l_whence;
 	off_t l_start;
@@ -36,8 +37,9 @@ int openat(int, const char *, int, ...);
 int posix_fadvise(int, off_t, off_t, int);
 int posix_fallocate(int, off_t, off_t);
 
-#define O_SEARCH  O_PATH
-#define O_EXEC    O_PATH
+#define O_SEARCH  010000000
+#define O_EXEC    010000000
+#define O_PATH    010000000
 
 #define O_ACCMODE (03|O_SEARCH)
 #define O_RDONLY  00
@@ -99,7 +101,7 @@ int posix_fallocate(int, off_t, off_t);
 #define AT_EMPTY_PATH 0x1000
 
 #define FAPPEND O_APPEND
-#define FFSYNC O_SYNC
+#define FFSYNC O_FSYNC
 #define FASYNC O_ASYNC
 #define FNONBLOCK O_NONBLOCK
 #define FNDELAY O_NDELAY
@@ -119,13 +121,6 @@ int posix_fallocate(int, off_t, off_t);
 #define F_CANCELLK	1029
 #define F_SETPIPE_SZ	1031
 #define F_GETPIPE_SZ	1032
-#define F_ADD_SEALS	1033
-#define F_GET_SEALS	1034
-
-#define F_SEAL_SEAL	0x0001
-#define F_SEAL_SHRINK	0x0002
-#define F_SEAL_GROW	0x0004
-#define F_SEAL_WRITE	0x0008
 
 #define DN_ACCESS	0x00000001
 #define DN_MODIFY	0x00000002

@@ -1,5 +1,4 @@
 #include <elf.h>
-#include <link.h>
 #include <limits.h>
 #include <stdint.h>
 #include <string.h>
@@ -45,7 +44,6 @@ void *__vdsosym(const char *vername, const char *name)
 	size_t i;
 	for (i=0; libc.auxv[i] != AT_SYSINFO_EHDR; i+=2)
 		if (!libc.auxv[i]) return 0;
-	if (!libc.auxv[i+1]) return 0;
 	Ehdr *eh = (void *)libc.auxv[i+1];
 	Phdr *ph = (void *)((char *)eh + eh->e_phoff);
 	size_t *dynv=0, base=-1;
@@ -59,7 +57,7 @@ void *__vdsosym(const char *vername, const char *name)
 
 	char *strings = 0;
 	Sym *syms = 0;
-	Elf_Symndx *hashtab = 0;
+	uint32_t *hashtab = 0;
 	uint16_t *versym = 0;
 	Verdef *verdef = 0;
 	

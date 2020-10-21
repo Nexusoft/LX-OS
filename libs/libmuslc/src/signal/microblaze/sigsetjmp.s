@@ -4,19 +4,18 @@
 .type __sigsetjmp,@function
 sigsetjmp:
 __sigsetjmp:
-.hidden ___setjmp
-	beqi r6, ___setjmp
+	swi     r6, r5, 72
+	beqi    r6, setjmp@PLT
 
-	swi r15,r5,72
-	swi r19,r5,72+4+8
+	addi    r1, r1, -32
+	swi     r15, r1, 28
+	swi     r5, r1, 24
+	addi    r7, r5, 76
+	add     r6, r0, r0
+	brlid   r15, sigprocmask@PLT
+	ori     r5, r0, 2
 
-	brlid r15,___setjmp
-	 ori r19,r5,0
-
-	ori r6,r3,0
-	ori r5,r19,0
-	lwi r15,r5,72
-	lwi r19,r5,72+4+8
-
-.hidden __sigsetjmp_tail
-	bri __sigsetjmp_tail
+	lwi     r15, r1, 28
+	lwi     r5, r1, 24
+	brid    setjmp@PLT
+	addi    r1, r1, 32

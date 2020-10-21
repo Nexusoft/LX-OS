@@ -33,27 +33,27 @@ char *__nl_langinfo_l(nl_item item, locale_t loc)
 	int idx = item & 65535;
 	const char *str;
 
-	if (item == CODESET) return MB_CUR_MAX==1 ? "ASCII" : "UTF-8";
+	if (item == CODESET) return "UTF-8";
 	
 	switch (cat) {
 	case LC_NUMERIC:
-		if (idx > 1) return "";
+		if (idx > 1) return NULL;
 		str = c_numeric;
 		break;
 	case LC_TIME:
-		if (idx > 0x31) return "";
+		if (idx > 0x31) return NULL;
 		str = c_time;
 		break;
 	case LC_MONETARY:
-		if (idx > 0) return "";
+		if (idx > 0) return NULL;
 		str = "";
 		break;
 	case LC_MESSAGES:
-		if (idx > 3) return "";
+		if (idx > 3) return NULL;
 		str = c_messages;
 		break;
 	default:
-		return "";
+		return NULL;
 	}
 
 	for (; idx; idx--, str++) for (; *str; str++);

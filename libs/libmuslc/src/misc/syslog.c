@@ -10,8 +10,9 @@
 #include <errno.h>
 #include <fcntl.h>
 #include "libc.h"
+#include "atomic.h"
 
-static volatile int lock[2];
+static int lock[2];
 static char log_ident[32];
 static int log_opt;
 static int log_facility = LOG_USER;
@@ -20,11 +21,8 @@ static int log_fd = -1;
 
 int setlogmask(int maskpri)
 {
-	LOCK(lock);
-	int ret = log_mask;
-	if (maskpri) log_mask = maskpri;
-	UNLOCK(lock);
-	return ret;
+	if (maskpri) return a_swap(&log_mask, maskpri);
+	else return log_mask;
 }
 
 static const struct {
@@ -74,17 +72,12 @@ void openlog(const char *ident, int opt, int facility)
 	pthread_setcancelstate(cs, 0);
 }
 
-static int is_lost_conn(int e)
-{
-	return e==ECONNREFUSED || e==ECONNRESET || e==ENOTCONN || e==EPIPE;
-}
-
 static void _vsyslog(int priority, const char *message, va_list ap)
 {
 	char timebuf[16];
 	time_t now;
 	struct tm tm;
-	char buf[1024];
+	char buf[256];
 	int errno_save = errno;
 	int pid;
 	int l, l2;
@@ -108,10 +101,7 @@ static void _vsyslog(int priority, const char *message, va_list ap)
 		if (l2 >= sizeof buf - l) l = sizeof buf - 1;
 		else l += l2;
 		if (buf[l-1] != '\n') buf[l++] = '\n';
-		if (send(log_fd, buf, l, 0) < 0 && (!is_lost_conn(errno)
-		    || connect(log_fd, (void *)&log_addr, sizeof log_addr) < 0
-		    || send(log_fd, buf, l, 0) < 0)
-		    && (log_opt & LOG_CONS)) {
+		if (send(log_fd, buf, l, 0) < 0 && (log_opt & LOG_CONS)) {
 			fd = open("/dev/console", O_WRONLY|O_NOCTTY|O_CLOEXEC);
 			if (fd >= 0) {
 				dprintf(fd, "%.*s", l-hlen, buf+hlen);

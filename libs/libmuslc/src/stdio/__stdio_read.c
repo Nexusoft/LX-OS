@@ -1,5 +1,12 @@
 #include "stdio_impl.h"
 #include <sys/uio.h>
+#include <pthread.h>
+
+static void cleanup(void *p)
+{
+	FILE *f = p;
+	if (!f->lockcount) __unlockfile(f);
+}
 
 size_t __stdio_read(FILE *f, unsigned char *buf, size_t len)
 {
@@ -9,9 +16,12 @@ size_t __stdio_read(FILE *f, unsigned char *buf, size_t len)
 	};
 	ssize_t cnt;
 
-	cnt = syscall(SYS_readv, f->fd, iov, 2);
+	pthread_cleanup_push(cleanup, f);
+	cnt = syscall_cp(SYS_readv, f->fd, iov, 2);
+	pthread_cleanup_pop(0);
 	if (cnt <= 0) {
 		f->flags |= F_EOF ^ ((F_ERR^F_EOF) & cnt);
+		f->rpos = f->rend = 0;
 		return cnt;
 	}
 	if (cnt <= iov[0].iov_len) return cnt;

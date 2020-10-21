@@ -2,7 +2,6 @@
 #include <limits.h>
 #include <sys/mman.h>
 #include <string.h>
-#include <stddef.h>
 #include "pthread_impl.h"
 #include "libc.h"
 #include "atomic.h"
@@ -15,79 +14,43 @@ int __init_tp(void *p)
 	int r = __set_thread_area(TP_ADJ(p));
 	if (r < 0) return -1;
 	if (!r) libc.can_do_threads = 1;
+	libc.has_thread_pointer = 1;
 	td->tid = __syscall(SYS_set_tid_address, &td->tid);
 	td->locale = &libc.global_locale;
-	td->robust_list.head = &td->robust_list.head;
 	return 0;
 }
 
-static struct builtin_tls {
-	char c;
-	struct pthread pt;
-	void *space[16];
-} builtin_tls[1];
-#define MIN_TLS_ALIGN offsetof(struct builtin_tls, pt)
+#ifndef SHARED
 
-static struct tls_module main_tls;
+static long long builtin_tls[(sizeof(struct pthread) + 64)/sizeof(long long)];
 
-size_t libc_get_tls_size()
-{
-    return libc.tls_size;
-}
+struct tls_image {
+	void *image;
+	size_t len, size, align;
+} __static_tls ATTR_LIBC_VISIBILITY;
 
-void libc_set_threaded(void) {
-	/// Once set, does not get unset.
-	a_store(&libc.threaded, 1);
-}
-
-int libc_get_threads_minus_1(void) {
-	return libc.threads_minus_1;
-}
-
-int libc_inc_threads_minus_1(void) {
-	return a_fetch_add(&libc.threads_minus_1, 1);
-}
-
-int libc_dec_threads_minus_1(void) {
-	return a_fetch_add(&libc.threads_minus_1, -1);
-}
-
-uintptr_t libc_tp_adj(uintptr_t ptr) {
-    return (uintptr_t)TP_ADJ(ptr);
-}
+#define T __static_tls
 
 void *__copy_tls(unsigned char *mem)
 {
 	pthread_t td;
-	struct tls_module *p;
-	size_t i;
-	void **dtv;
-
+	if (!T.image) return mem;
+	void **dtv = (void *)mem;
+	dtv[0] = (void *)1;
 #ifdef TLS_ABOVE_TP
-	dtv = (void **)(mem + libc.tls_size) - (libc.tls_cnt + 1);
-
-	mem += -((uintptr_t)mem + sizeof(struct pthread)) & (libc.tls_align-1);
+	mem += sizeof(void *) * 2;
+	mem += -((uintptr_t)mem + sizeof(struct pthread)) & (T.align-1);
 	td = (pthread_t)mem;
 	mem += sizeof(struct pthread);
-
-	for (i=1, p=libc.tls_head; p; i++, p=p->next) {
-		dtv[i] = mem + p->offset;
-		memcpy(dtv[i], p->image, p->len);
-	}
 #else
-	dtv = (void **)mem;
-
 	mem += libc.tls_size - sizeof(struct pthread);
-	mem -= (uintptr_t)mem & (libc.tls_align-1);
+	mem -= (uintptr_t)mem & (T.align-1);
 	td = (pthread_t)mem;
-
-	for (i=1, p=libc.tls_head; p; i++, p=p->next) {
-		dtv[i] = mem - p->offset;
-		memcpy(dtv[i], p->image, p->len);
-	}
+	mem -= T.size;
 #endif
-	dtv[0] = (void *)libc.tls_cnt;
-	td->dtv = td->dtv_copy = dtv;
+	td->dtv = dtv;
+	dtv[1] = mem;
+	memcpy(mem, T.image, T.len);
 	return td;
 }
 
@@ -97,10 +60,7 @@ typedef Elf32_Phdr Phdr;
 typedef Elf64_Phdr Phdr;
 #endif
 
-__attribute__((__weak__, __visibility__("hidden")))
-extern const size_t _DYNAMIC[];
-
-static void static_init_tls(size_t *aux)
+void __init_tls(size_t *aux)
 {
 	unsigned char *p;
 	size_t n;
@@ -108,36 +68,27 @@ static void static_init_tls(size_t *aux)
 	size_t base = 0;
 	void *mem;
 
+	libc.tls_size = sizeof(struct pthread);
+
 	for (p=(void *)aux[AT_PHDR],n=aux[AT_PHNUM]; n; n--,p+=aux[AT_PHENT]) {
 		phdr = (void *)p;
 		if (phdr->p_type == PT_PHDR)
 			base = aux[AT_PHDR] - phdr->p_vaddr;
-		if (phdr->p_type == PT_DYNAMIC && _DYNAMIC)
-			base = (size_t)_DYNAMIC - phdr->p_vaddr;
 		if (phdr->p_type == PT_TLS)
 			tls_phdr = phdr;
 	}
 
 	if (tls_phdr) {
-		main_tls.image = (void *)(base + tls_phdr->p_vaddr);
-		main_tls.len = tls_phdr->p_filesz;
-		main_tls.size = tls_phdr->p_memsz;
-		main_tls.align = tls_phdr->p_align;
-		libc.tls_cnt = 1;
-		libc.tls_head = &main_tls;
+		T.image = (void *)(base + tls_phdr->p_vaddr);
+		T.len = tls_phdr->p_filesz;
+		T.size = tls_phdr->p_memsz;
+		T.align = tls_phdr->p_align;
 	}
 
-	main_tls.size += (-main_tls.size - (uintptr_t)main_tls.image)
-		& (main_tls.align-1);
-	if (main_tls.align < MIN_TLS_ALIGN) main_tls.align = MIN_TLS_ALIGN;
-#ifndef TLS_ABOVE_TP
-	main_tls.offset = main_tls.size;
-#endif
+	T.size += (-T.size - (uintptr_t)T.image) & (T.align-1);
+	if (T.align < 4*sizeof(size_t)) T.align = 4*sizeof(size_t);
 
-	libc.tls_align = main_tls.align;
-	libc.tls_size = 2*sizeof(void *) + sizeof(struct pthread)
-		+ main_tls.size + main_tls.align
-		+ MIN_TLS_ALIGN-1 & -MIN_TLS_ALIGN;
+	libc.tls_size = 2*sizeof(void *)+T.size+T.align+sizeof(struct pthread);
 
 	if (libc.tls_size > sizeof builtin_tls) {
 #ifndef SYS_mmap2
@@ -154,9 +105,10 @@ static void static_init_tls(size_t *aux)
 		mem = builtin_tls;
 	}
 
-	/* Failure to initialize thread pointer is always fatal. */
-	if (__init_tp(__copy_tls(mem)) < 0)
+	/* Failure to initialize thread pointer is fatal if TLS is used. */
+	if (__init_tp(__copy_tls(mem)) < 0 && tls_phdr)
 		a_crash();
 }
-
-weak_alias(static_init_tls, __init_tls);
+#else
+void __init_tls(size_t *auxv) { }
+#endif

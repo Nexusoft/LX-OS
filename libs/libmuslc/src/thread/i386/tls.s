@@ -10,8 +10,6 @@ ___tls_get_addr:
 	add (%edx,%ecx,4),%eax
 	ret
 1:	push %eax
-.weak __tls_get_new
-.hidden __tls_get_new
-	call __tls_get_new
+	call __tls_get_addr
 	pop %edx
 	ret

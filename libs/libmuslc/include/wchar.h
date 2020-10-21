@@ -12,7 +12,6 @@ extern "C" {
 #define __NEED_size_t
 #define __NEED_wchar_t
 #define __NEED_wint_t
-#define __NEED_mbstate_t
 
 #if defined(_POSIX_SOURCE) || defined(_POSIX_C_SOURCE) \
  || defined(_XOPEN_SOURCE) || defined(_GNU_SOURCE) || defined(_BSD_SOURCE)
@@ -43,6 +42,11 @@ extern "C" {
 #undef WEOF
 #define WEOF 0xffffffffU
 
+typedef struct __mbstate_t
+{
+	unsigned __opaque1, __opaque2;
+} mbstate_t;
+
 wchar_t *wcscpy (wchar_t *__restrict, const wchar_t *__restrict);
 wchar_t *wcsncpy (wchar_t *__restrict, const wchar_t *__restrict, size_t);
 
@@ -53,7 +57,7 @@ int wcscmp (const wchar_t *, const wchar_t *);
 int wcsncmp (const wchar_t *, const wchar_t *, size_t);
 
 int wcscoll(const wchar_t *, const wchar_t *);
-size_t wcsxfrm (wchar_t *__restrict, const wchar_t *__restrict, size_t);
+size_t wcsxfrm (wchar_t *__restrict, const wchar_t *__restrict, size_t n);
 
 wchar_t *wcschr (const wchar_t *, wchar_t);
 wchar_t *wcsrchr (const wchar_t *, wchar_t);
@@ -136,21 +140,6 @@ size_t wcsftime (wchar_t *__restrict, size_t, const wchar_t *__restrict, const s
 
 #undef iswdigit
 
-#if defined(_GNU_SOURCE)
-wint_t fgetwc_unlocked (FILE *);
-wint_t getwc_unlocked (FILE *);
-wint_t getwchar_unlocked (void);
-wint_t fputwc_unlocked (wchar_t, FILE *);
-wint_t putwc_unlocked (wchar_t, FILE *);
-wint_t putwchar_unlocked (wchar_t);
-wchar_t *fgetws_unlocked (wchar_t *__restrict, int, FILE *__restrict);
-int fputws_unlocked (const wchar_t *__restrict, FILE *__restrict);
-#endif
-
-#if defined(_GNU_SOURCE) || defined(_BSD_SOURCE)
-size_t wcsftime_l (wchar_t *__restrict, size_t, const wchar_t *__restrict, const struct tm *__restrict, locale_t);
-#endif
-
 #if defined(_POSIX_SOURCE) || defined(_POSIX_C_SOURCE) \
  || defined(_XOPEN_SOURCE) || defined(_GNU_SOURCE)  || defined(_BSD_SOURCE)
 FILE *open_wmemstream(wchar_t **, size_t *);
@@ -165,7 +154,7 @@ int wcscasecmp_l(const wchar_t *, const wchar_t *, locale_t);
 int wcsncasecmp(const wchar_t *, const wchar_t *, size_t);
 int wcsncasecmp_l(const wchar_t *, const wchar_t *, size_t, locale_t);
 int wcscoll_l(const wchar_t *, const wchar_t *, locale_t);
-size_t wcsxfrm_l(wchar_t *__restrict, const wchar_t *__restrict, size_t, locale_t);
+size_t wcsxfrm_l(wchar_t *__restrict, const wchar_t *__restrict, size_t n, locale_t);
 #endif
 
 #if defined(_XOPEN_SOURCE) || defined(_GNU_SOURCE) || defined(_BSD_SOURCE)
@@ -187,11 +176,8 @@ int       iswctype(wint_t, wctype_t);
 wint_t    towlower(wint_t);
 wint_t    towupper(wint_t);
 wctype_t  wctype(const char *);
-
-#ifndef __cplusplus
 #undef iswdigit
-#define iswdigit(a) (0 ? iswdigit(a) : ((unsigned)(a)-'0') < 10)
-#endif
+#define iswdigit(a) ((unsigned)(a)-'0' < 10)
 #endif
 
 #ifdef __cplusplus

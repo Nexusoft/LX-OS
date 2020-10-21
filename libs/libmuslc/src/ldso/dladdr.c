@@ -1,10 +1,9 @@
 #define _GNU_SOURCE
 #include <dlfcn.h>
-#include "libc.h"
 
-static int stub_dladdr(const void *addr, Dl_info *info)
+int __dladdr(const void *, Dl_info *);
+
+int dladdr(const void *addr, Dl_info *info)
 {
-	return 0;
+	return __dladdr(addr, info);
 }
-
-weak_alias(stub_dladdr, dladdr);

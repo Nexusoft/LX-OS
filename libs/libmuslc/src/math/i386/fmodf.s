@@ -4,7 +4,7 @@ fmodf:
 	flds 8(%esp)
 	flds 4(%esp)
 1:	fprem
-	fnstsw %ax
+	fstsw %ax
 	sahf
 	jp 1b
 	fstp %st(1)

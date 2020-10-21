@@ -1,4 +1,5 @@
-struct msqid_ds {
+struct msqid_ds
+{
 	struct ipc_perm msg_perm;
 #if _MIPSEL || __MIPSEL || __MIPSEL__
 	time_t msg_stime;

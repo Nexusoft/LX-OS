@@ -43,10 +43,8 @@ wint_t    towupper(wint_t);
 wctrans_t wctrans(const char *);
 wctype_t  wctype(const char *);
 
-#ifndef __cplusplus
 #undef iswdigit
-#define iswdigit(a) (0 ? iswdigit(a) : ((unsigned)(a)-'0') < 10)
-#endif
+#define iswdigit(a) (((unsigned)(a)-L'0') < 10)
 
 #if defined(_POSIX_SOURCE) || defined(_POSIX_C_SOURCE) \
  || defined(_XOPEN_SOURCE) || defined(_GNU_SOURCE) || defined(_BSD_SOURCE)

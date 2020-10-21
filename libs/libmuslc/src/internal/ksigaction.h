@@ -7,5 +7,3 @@ struct k_sigaction {
 	void (*restorer)(void);
 	unsigned mask[2];
 };
-
-void __restore(), __restore_rt();

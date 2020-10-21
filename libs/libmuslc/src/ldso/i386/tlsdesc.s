@@ -1,15 +1,11 @@
 .text
 .global __tlsdesc_static
-.hidden __tlsdesc_static
 .type __tlsdesc_static,@function
 __tlsdesc_static:
 	mov 4(%eax),%eax
 	ret
 
-.hidden __tls_get_new
-
 .global __tlsdesc_dynamic
-.hidden __tlsdesc_dynamic
 .type __tlsdesc_dynamic,@function
 __tlsdesc_dynamic:
 	mov 4(%eax),%eax
@@ -26,6 +22,6 @@ __tlsdesc_dynamic:
 	pop %edx
 	ret
 1:	push %eax
-	call __tls_get_new
+	call __tls_get_addr
 	pop %ecx
 	jmp 2b

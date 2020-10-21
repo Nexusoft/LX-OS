@@ -1,8 +1,8 @@
 #include "pthread_impl.h"
 
-_Thread_local int errno;
-
 int *__errno_location(void)
 {
-	return &errno;
+	static int e;
+	if (libc.has_thread_pointer) return &__pthread_self()->errno_val;
+	return &e;
 }

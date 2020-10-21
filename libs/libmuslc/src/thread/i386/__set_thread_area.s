@@ -6,11 +6,7 @@ __set_thread_area:
 	push $0x51
 	push $0xfffff
 	push 16(%esp)
-	call 1f
-1:	addl $4f-1b,(%esp)
-	pop %ecx
-	mov (%ecx),%edx
-	push %edx
+	push $-1
 	mov %esp,%ebx
 	xor %eax,%eax
 	mov $243,%al
@@ -18,7 +14,6 @@ __set_thread_area:
 	testl %eax,%eax
 	jnz 2f
 	movl (%esp),%edx
-	movl %edx,(%ecx)
 	leal 3(,%edx,8),%edx
 3:	movw %dx,%gs
 1:
@@ -39,7 +34,3 @@ __set_thread_area:
 	mov $7,%dl
 	inc %al
 	jmp 3b
-
-.data
-	.align 4
-4:	.long -1

@@ -39,7 +39,7 @@ void *malloc (size_t);
 void *calloc (size_t, size_t);
 void *realloc (void *, size_t);
 void free (void *);
-void *aligned_alloc(size_t, size_t);
+void *aligned_alloc(size_t alignment, size_t size);
 
 _Noreturn void abort (void);
 int atexit (void (*) (void));
@@ -76,8 +76,7 @@ size_t wcstombs (char *__restrict, const wchar_t *__restrict, size_t);
 #define EXIT_FAILURE 1
 #define EXIT_SUCCESS 0
 
-size_t __ctype_get_mb_cur_max(void);
-#define MB_CUR_MAX (__ctype_get_mb_cur_max())
+#define MB_CUR_MAX ((size_t)+4)
 
 #define RAND_MAX (0x7fffffff)
 
@@ -115,6 +114,9 @@ long int random (void);
 void srandom (unsigned int);
 char *initstate (unsigned int, char *, size_t);
 char *setstate (char *);
+#endif
+
+#if defined(_XOPEN_SOURCE) || defined(_GNU_SOURCE)
 int putenv (char *);
 int posix_openpt (int);
 int grantpt (int);

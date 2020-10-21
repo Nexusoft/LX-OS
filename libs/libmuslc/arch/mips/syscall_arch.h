@@ -3,7 +3,6 @@
 ((union { long long ll; long l[2]; }){ .ll = x }).l[1]
 #define __SYSCALL_LL_O(x) 0, __SYSCALL_LL_E((x))
 
-__attribute__((visibility("hidden")))
 long (__syscall)(long, ...);
 
 #define SYSCALL_RLIM_INFINITY (-1UL/2)
@@ -61,9 +60,8 @@ static inline long __syscall2(long n, long a, long b)
 		: "$1", "$3", "$8", "$9", "$10", "$11", "$12", "$13",
 		  "$14", "$15", "$24", "$25", "hi", "lo", "memory");
 	if (r7) return -r2;
-	long ret = r2;
 	if (n == SYS_stat64 || n == SYS_fstat64 || n == SYS_lstat64) __stat_fix(b);
-	return ret;
+	return r2;
 }
 
 static inline long __syscall3(long n, long a, long b, long c)
@@ -80,9 +78,8 @@ static inline long __syscall3(long n, long a, long b, long c)
 		: "$1", "$3", "$8", "$9", "$10", "$11", "$12", "$13",
 		  "$14", "$15", "$24", "$25", "hi", "lo", "memory");
 	if (r7) return -r2;
-	long ret = r2;
 	if (n == SYS_stat64 || n == SYS_fstat64 || n == SYS_lstat64) __stat_fix(b);
-	return ret;
+	return r2;
 }
 
 static inline long __syscall4(long n, long a, long b, long c, long d)
@@ -99,10 +96,9 @@ static inline long __syscall4(long n, long a, long b, long c, long d)
 		: "$1", "$3", "$8", "$9", "$10", "$11", "$12", "$13",
 		  "$14", "$15", "$24", "$25", "hi", "lo", "memory");
 	if (r7) return -r2;
-	long ret = r2;
 	if (n == SYS_stat64 || n == SYS_fstat64 || n == SYS_lstat64) __stat_fix(b);
 	if (n == SYS_fstatat) __stat_fix(c);
-	return ret;
+	return r2;
 }
 
 #else
@@ -161,7 +157,3 @@ static inline long __syscall6(long n, long a, long b, long c, long d, long e, lo
 	if (n == SYS_fstatat) __stat_fix(c);
 	return r2;
 }
-
-#define VDSO_USEFUL
-#define VDSO_CGT_SYM "__vdso_clock_gettime"
-#define VDSO_CGT_VER "LINUX_2.6"

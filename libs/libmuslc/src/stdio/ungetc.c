@@ -6,8 +6,7 @@ int ungetc(int c, FILE *f)
 
 	FLOCK(f);
 
-	if (!f->rpos) __toread(f);
-	if (!f->rpos || f->rpos <= f->buf - UNGET) {
+	if ((!f->rend && __toread(f)) || f->rpos <= f->buf - UNGET) {
 		FUNLOCK(f);
 		return EOF;
 	}

@@ -1,5 +1,3 @@
-.syntax unified
-
 .global __restore
 .type __restore,%function
 __restore:

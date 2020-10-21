@@ -1,5 +1,4 @@
 .global __syscall
-.hidden __syscall
 .type   __syscall,@function
 __syscall:
 	l.ori	r11, r3, 0

@@ -1,5 +1,4 @@
 	.global __syscall
-	.hidden __syscall
 	.type   __syscall,@function
 __syscall:
 	mr      0, 3                  # Save the system call number

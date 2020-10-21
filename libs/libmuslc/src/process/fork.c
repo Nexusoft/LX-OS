@@ -22,11 +22,10 @@ pid_t fork(void)
 #else
 	ret = syscall(SYS_clone, SIGCHLD, 0);
 #endif
-	if (!ret) {
+	if (libc.has_thread_pointer && !ret) {
 		pthread_t self = __pthread_self();
 		self->tid = __syscall(SYS_gettid);
-		self->robust_list.off = 0;
-		self->robust_list.pending = 0;
+		memset(&self->robust_list, 0, sizeof self->robust_list);
 		libc.threads_minus_1 = 0;
 	}
 	__restore_sigs(&set);

@@ -1,5 +1,4 @@
 .global __syscall
-.hidden __syscall
 .type   __syscall,@function
 __syscall:
 	addi    r12, r5, 0              # Save the system call number

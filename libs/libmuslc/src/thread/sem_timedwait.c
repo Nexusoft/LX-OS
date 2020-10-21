@@ -19,10 +19,9 @@ int sem_timedwait(sem_t *restrict sem, const struct timespec *restrict at)
 		int r;
 		a_inc(sem->__val+1);
 		a_cas(sem->__val, 0, -1);
-		pthread_cleanup_push(cleanup, (void *)(sem->__val+1));
-		r = __timedwait_cp(sem->__val, -1, CLOCK_REALTIME, at, sem->__val[2]);
-		pthread_cleanup_pop(1);
-		if (r && r != EINTR) {
+		r = __timedwait(sem->__val, -1, CLOCK_REALTIME, at, cleanup, sem->__val+1, sem->__val[2]);
+		a_dec(sem->__val+1);
+		if (r) {
 			errno = r;
 			return -1;
 		}

@@ -77,45 +77,38 @@ static struct node *find(struct node *n, const void *k,
 		return find(n->right, k, cmp);
 }
 
-static struct node *insert(struct node *n, const void *k,
-	int (*cmp)(const void *, const void *), struct node **found)
+static struct node *insert(struct node **n, const void *k,
+	int (*cmp)(const void *, const void *), int *new)
 {
-	struct node *r;
+	struct node *r = *n;
 	int c;
 
-	if (!n) {
-		n = malloc(sizeof *n);
-		if (n) {
-			n->key = k;
-			n->left = n->right = 0;
-			n->height = 1;
+	if (!r) {
+		*n = r = malloc(sizeof **n);
+		if (r) {
+			r->key = k;
+			r->left = r->right = 0;
+			r->height = 1;
 		}
-		*found = n;
-		return n;
+		*new = 1;
+		return r;
 	}
-	c = cmp(k, n->key);
-	if (c == 0) {
-		*found = n;
-		return 0;
-	}
-	r = insert(c < 0 ? n->left : n->right, k, cmp, found);
-	if (r) {
-		if (c < 0)
-			n->left = r;
-		else
-			n->right = r;
-		r = balance(n);
-	}
+	c = cmp(k, r->key);
+	if (c == 0)
+		return r;
+	if (c < 0)
+		r = insert(&r->left, k, cmp, new);
+	else
+		r = insert(&r->right, k, cmp, new);
+	if (*new)
+		*n = balance(*n);
 	return r;
 }
 
-static struct node *remove_rightmost(struct node *n, struct node **rightmost)
-{
-	if (!n->right) {
-		*rightmost = n;
-		return n->left;
-	}
-	n->right = remove_rightmost(n->right, rightmost);
+static struct node *movr(struct node *n, struct node *r) {
+	if (!n)
+		return r;
+	n->right = movr(n->right, r);
 	return balance(n);
 }
 
@@ -129,13 +122,7 @@ static struct node *remove(struct node **n, const void *k,
 	c = cmp(k, (*n)->key);
 	if (c == 0) {
 		struct node *r = *n;
-		if (r->left) {
-			r->left = remove_rightmost(r->left, n);
-			(*n)->left = r->left;
-			(*n)->right = r->right;
-			*n = balance(*n);
-		} else
-			*n = r->right;
+		*n = movr(r->left, r->right);
 		free(r);
 		return parent;
 	}
@@ -151,8 +138,6 @@ static struct node *remove(struct node **n, const void *k,
 void *tdelete(const void *restrict key, void **restrict rootp,
 	int(*compar)(const void *, const void *))
 {
-	if (!rootp)
-		return 0;
 	struct node *n = *rootp;
 	struct node *ret;
 	/* last argument is arbitrary non-null pointer
@@ -165,21 +150,17 @@ void *tdelete(const void *restrict key, void **restrict rootp,
 void *tfind(const void *key, void *const *rootp,
 	int(*compar)(const void *, const void *))
 {
-	if (!rootp)
-		return 0;
 	return find(*rootp, key, compar);
 }
 
 void *tsearch(const void *key, void **rootp,
 	int (*compar)(const void *, const void *))
 {
-	struct node *update;
+	int new = 0;
+	struct node *n = *rootp;
 	struct node *ret;
-	if (!rootp)
-		return 0;
-	update = insert(*rootp, key, compar, &ret);
-	if (update)
-		*rootp = update;
+	ret = insert(&n, key, compar, &new);
+	*rootp = n;
 	return ret;
 }
 

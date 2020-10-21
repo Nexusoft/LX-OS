@@ -1,14 +1,13 @@
+#include <wchar.h>
 #include "stdio_impl.h"
-#include "locale_impl.h"
+
+#define SH (8*sizeof(int)-1)
+#define NORMALIZE(x) ((x)>>SH | -((-(x))>>SH))
 
 int fwide(FILE *f, int mode)
 {
 	FLOCK(f);
-	if (mode) {
-		if (!f->locale) f->locale = MB_CUR_MAX==1
-			? C_LOCALE : UTF8_LOCALE;
-		if (!f->mode) f->mode = mode>0 ? 1 : -1;
-	}
+	if (!f->mode) f->mode = NORMALIZE(mode);
 	mode = f->mode;
 	FUNLOCK(f);
 	return mode;

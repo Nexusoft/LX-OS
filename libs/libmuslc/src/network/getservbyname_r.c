@@ -15,8 +15,6 @@ int getservbyname_r(const char *name, const char *prots,
 	struct service servs[MAXSERVS];
 	int cnt, proto, align;
 
-	*res = 0;
-
 	/* Align buffer */
 	align = -(uintptr_t)buf & ALIGN-1;
 	if (buflen < 2*sizeof(char *)+align)
@@ -28,7 +26,7 @@ int getservbyname_r(const char *name, const char *prots,
 	else if (!strcmp(prots, "udp")) proto = IPPROTO_UDP;
 	else return EINVAL;
 
-	cnt = __lookup_serv(servs, name, proto, 0, 0);
+	cnt = __lookup_serv(servs, name, proto, 0);
 	if (cnt<0) switch (cnt) {
 	case EAI_MEMORY:
 	case EAI_SYSTEM:

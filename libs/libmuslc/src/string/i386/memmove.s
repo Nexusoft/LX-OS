@@ -4,8 +4,7 @@ memmove:
 	mov 4(%esp),%eax
 	sub 8(%esp),%eax
 	cmp 12(%esp),%eax
-.hidden __memcpy_fwd
-	jae __memcpy_fwd
+	jae memcpy
 	push %esi
 	push %edi
 	mov 12(%esp),%edi

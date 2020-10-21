@@ -7,6 +7,12 @@ int __pthread_mutex_trylock_owner(pthread_mutex_t *m)
 	pthread_t self = __pthread_self();
 	int tid = self->tid;
 
+	if (!self->robust_list.off) {
+		__syscall(SYS_set_robust_list, &self->robust_list, 3*sizeof(long));
+		self->robust_list.head = &self->robust_list.head;
+		self->robust_list.off = (char*)&m->_m_lock-(char *)&m->_m_next;
+	}
+
 	old = m->_m_lock;
 	own = old & 0x7fffffff;
 	if (own == tid && (type&3) == PTHREAD_MUTEX_RECURSIVE) {
@@ -14,13 +20,9 @@ int __pthread_mutex_trylock_owner(pthread_mutex_t *m)
 		m->_m_count++;
 		return 0;
 	}
-	if (own == 0x7fffffff) return ENOTRECOVERABLE;
+	if (own == 0x40000000) return ENOTRECOVERABLE;
 
 	if (m->_m_type & 128) {
-		if (!self->robust_list.off) {
-			self->robust_list.off = (char*)&m->_m_lock-(char *)&m->_m_next;
-			__syscall(SYS_set_robust_list, &self->robust_list, 3*sizeof(long));
-		}
 		if (m->_m_waiters) tid |= 0x80000000;
 		self->robust_list.pending = &m->_m_next;
 	}

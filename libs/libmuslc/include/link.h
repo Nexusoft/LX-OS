@@ -16,7 +16,8 @@ extern "C" {
 #define ElfW(type) Elf32_ ## type
 #endif
 
-#include <bits/link.h>
+/* this is the same everywhere except alpha and s390 */
+typedef uint32_t Elf_Symndx;
 
 struct dl_phdr_info {
 	ElfW(Addr) dlpi_addr;

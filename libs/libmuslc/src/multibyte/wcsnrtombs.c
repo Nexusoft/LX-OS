@@ -1,3 +1,9 @@
+/* 
+ * This code was written by Rich Felker in 2010; no copyright is claimed.
+ * This code is in the public domain. Attribution is appreciated but
+ * unnecessary.
+ */
+
 #include <wchar.h>
 
 size_t wcsnrtombs(char *restrict dst, const wchar_t **restrict wcs, size_t wn, size_t n, mbstate_t *restrict st)
@@ -34,7 +40,7 @@ size_t wcsnrtombs(char *restrict dst, const wchar_t **restrict wcs, size_t wn, s
 		ws++; wn--;
 		/* safe - this loop runs fewer than sizeof(buf) times */
 		s+=l; n-=l;
-		cnt += l;
+		cnt++;
 	}
 	if (dst) *wcs = ws;
 	return cnt;

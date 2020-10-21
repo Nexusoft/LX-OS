@@ -34,7 +34,6 @@
 #include <wchar.h>
 #include <wctype.h>
 #include <limits.h>
-#include <stdint.h>
 
 #include <regex.h>
 
@@ -44,7 +43,7 @@
 
 static void
 tre_fill_pmatch(size_t nmatch, regmatch_t pmatch[], int cflags,
-		const tre_tnfa_t *tnfa, regoff_t *tags, regoff_t match_eo);
+		const tre_tnfa_t *tnfa, int *tags, int match_eo);
 
 /***********************************************************************
  from tre-match-utils.h
@@ -97,7 +96,7 @@ tre_fill_pmatch(size_t nmatch, regmatch_t pmatch[], int cflags,
 /* Returns 1 if `t1' wins `t2', 0 otherwise. */
 static int
 tre_tag_order(int num_tags, tre_tag_direction_t *tag_directions,
-	      regoff_t *t1, regoff_t *t2)
+	      int *t1, int *t2)
 {
   int i;
   for (i = 0; i < num_tags; i++)
@@ -157,25 +156,25 @@ tre_neg_char_classes_match(tre_ctype_t *classes, tre_cint_t wc, int icase)
 
 typedef struct {
   tre_tnfa_transition_t *state;
-  regoff_t *tags;
+  int *tags;
 } tre_tnfa_reach_t;
 
 typedef struct {
-  regoff_t pos;
-  regoff_t **tags;
+  int pos;
+  int **tags;
 } tre_reach_pos_t;
 
 
 static reg_errcode_t
 tre_tnfa_run_parallel(const tre_tnfa_t *tnfa, const void *string,
-		      regoff_t *match_tags, int eflags,
-		      regoff_t *match_end_ofs)
+		      int *match_tags, int eflags,
+		      int *match_end_ofs)
 {
   /* State variables required by GET_NEXT_WCHAR. */
   tre_char_t prev_c = 0, next_c = 0;
   const char *str_byte = string;
-  regoff_t pos = -1;
-  regoff_t pos_add_next = 1;
+  int pos = -1;
+  int pos_add_next = 1;
 #ifdef TRE_MBSTATE
   mbstate_t mbstate;
 #endif /* TRE_MBSTATE */
@@ -191,10 +190,10 @@ tre_tnfa_run_parallel(const tre_tnfa_t *tnfa, const void *string,
   int *tag_i;
   int num_tags, i;
 
-  regoff_t match_eo = -1;	   /* end offset of match (-1 if no match found yet) */
+  int match_eo = -1;	   /* end offset of match (-1 if no match found yet) */
   int new_match = 0;
-  regoff_t *tmp_tags = NULL;
-  regoff_t *tmp_iptr;
+  int *tmp_tags = NULL;
+  int *tmp_iptr;
 
 #ifdef TRE_MBSTATE
   memset(&mbstate, '\0', sizeof(mbstate));
@@ -207,37 +206,25 @@ tre_tnfa_run_parallel(const tre_tnfa_t *tnfa, const void *string,
 
   /* Allocate memory for temporary data required for matching.	This needs to
      be done for every matching operation to be thread safe.  This allocates
-     everything in a single large block with calloc(). */
+     everything in a single large block from the stack frame using alloca()
+     or with malloc() if alloca is unavailable. */
   {
-    size_t tbytes, rbytes, pbytes, xbytes, total_bytes;
+    int tbytes, rbytes, pbytes, xbytes, total_bytes;
     char *tmp_buf;
-
-    /* Ensure that tbytes and xbytes*num_states cannot overflow, and that
-     * they don't contribute more than 1/8 of SIZE_MAX to total_bytes. */
-    if (num_tags > SIZE_MAX/(8 * sizeof(regoff_t) * tnfa->num_states))
-      goto error_exit;
-
-    /* Likewise check rbytes. */
-    if (tnfa->num_states+1 > SIZE_MAX/(8 * sizeof(*reach_next)))
-      goto error_exit;
-
-    /* Likewise check pbytes. */
-    if (tnfa->num_states > SIZE_MAX/(8 * sizeof(*reach_pos)))
-      goto error_exit;
-
     /* Compute the length of the block we need. */
     tbytes = sizeof(*tmp_tags) * num_tags;
     rbytes = sizeof(*reach_next) * (tnfa->num_states + 1);
     pbytes = sizeof(*reach_pos) * tnfa->num_states;
-    xbytes = sizeof(regoff_t) * num_tags;
+    xbytes = sizeof(int) * num_tags;
     total_bytes =
       (sizeof(long) - 1) * 4 /* for alignment paddings */
       + (rbytes + xbytes * tnfa->num_states) * 2 + tbytes + pbytes;
 
     /* Allocate the memory. */
-    buf = calloc(total_bytes, 1);
+    buf = xmalloc((unsigned)total_bytes);
     if (buf == NULL)
       return REG_ESPACE;
+    memset(buf, 0, (size_t)total_bytes);
 
     /* Get the various pointers within tmp_buf (properly aligned). */
     tmp_tags = (void *)buf;
@@ -490,12 +477,12 @@ error_exit:
 */
 
 typedef struct {
-  regoff_t pos;
+  int pos;
   const char *str_byte;
   tre_tnfa_transition_t *state;
   int state_id;
   int next_c;
-  regoff_t *tags;
+  int *tags;
 #ifdef TRE_MBSTATE
   mbstate_t mbstate;
 #endif /* TRE_MBSTATE */
@@ -591,13 +578,13 @@ typedef struct tre_backtrack_struct {
 
 static reg_errcode_t
 tre_tnfa_run_backtrack(const tre_tnfa_t *tnfa, const void *string,
-		       regoff_t *match_tags, int eflags, regoff_t *match_end_ofs)
+		       int *match_tags, int eflags, int *match_end_ofs)
 {
   /* State variables required by GET_NEXT_WCHAR. */
   tre_char_t prev_c = 0, next_c = 0;
   const char *str_byte = string;
-  regoff_t pos = 0;
-  regoff_t pos_add_next = 1;
+  int pos = 0;
+  int pos_add_next = 1;
 #ifdef TRE_MBSTATE
   mbstate_t mbstate;
 #endif /* TRE_MBSTATE */
@@ -610,16 +597,15 @@ tre_tnfa_run_backtrack(const tre_tnfa_t *tnfa, const void *string,
      started from. */
   int next_c_start;
   const char *str_byte_start;
-  regoff_t pos_start = -1;
+  int pos_start = -1;
 #ifdef TRE_MBSTATE
   mbstate_t mbstate_start;
 #endif /* TRE_MBSTATE */
 
   /* End offset of best match so far, or -1 if no match found yet. */
-  regoff_t match_eo = -1;
+  int match_eo = -1;
   /* Tag arrays. */
-  int *next_tags;
-  regoff_t *tags = NULL;
+  int *next_tags, *tags = NULL;
   /* Current TNFA state. */
   tre_tnfa_transition_t *state;
   int *states_seen = NULL;
@@ -769,9 +755,8 @@ tre_tnfa_run_backtrack(const tre_tnfa_t *tnfa, const void *string,
 	  /* This is a back reference state.  All transitions leaving from
 	     this state have the same back reference "assertion".  Instead
 	     of reading the next character, we match the back reference. */
-	  regoff_t so, eo;
-	  int bt = trans_i->u.backref;
-	  regoff_t bt_len;
+	  int so, eo, bt = trans_i->u.backref;
+	  int bt_len;
 	  int result;
 
 	  /* Get the substring we need to match against.  Remember to
@@ -928,7 +913,7 @@ tre_tnfa_run_backtrack(const tre_tnfa_t *tnfa, const void *string,
    endpoint values. */
 static void
 tre_fill_pmatch(size_t nmatch, regmatch_t pmatch[], int cflags,
-		const tre_tnfa_t *tnfa, regoff_t *tags, regoff_t match_eo)
+		const tre_tnfa_t *tnfa, int *tags, int match_eo)
 {
   tre_submatch_data_t *submatch_data;
   unsigned int i, j;
@@ -998,7 +983,7 @@ regexec(const regex_t *restrict preg, const char *restrict string,
 {
   tre_tnfa_t *tnfa = (void *)preg->TRE_REGEX_T_FIELD;
   reg_errcode_t status;
-  regoff_t *tags = NULL, eo;
+  int *tags = NULL, eo;
   if (tnfa->cflags & REG_NOSUB) nmatch = 0;
   if (tnfa->num_tags > 0 && nmatch > 0)
     {

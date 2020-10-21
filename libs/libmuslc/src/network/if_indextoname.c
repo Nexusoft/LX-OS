@@ -3,7 +3,6 @@
 #include <sys/socket.h>
 #include <sys/ioctl.h>
 #include <string.h>
-#include <errno.h>
 #include "syscall.h"
 
 char *if_indextoname(unsigned index, char *name)
@@ -15,9 +14,5 @@ char *if_indextoname(unsigned index, char *name)
 	ifr.ifr_ifindex = index;
 	r = ioctl(fd, SIOCGIFNAME, &ifr);
 	__syscall(SYS_close, fd);
-	if (r < 0) {
-		if (errno == ENODEV) errno = ENXIO;
-		return 0;
-	}
-	return strncpy(name, ifr.ifr_name, IF_NAMESIZE);
+	return r < 0 ? 0 : strncpy(name, ifr.ifr_name, IF_NAMESIZE);
 }

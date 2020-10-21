@@ -9,7 +9,8 @@ extern "C" {
 
 #define IF_NAMESIZE 16
 
-struct if_nameindex {
+struct if_nameindex
+{
 	unsigned int if_index;
 	char *if_name;
 };
@@ -89,7 +90,7 @@ struct ifreq {
 		struct ifmap ifru_map;
 		char ifru_slave[IFNAMSIZ];
 		char ifru_newname[IFNAMSIZ];
-		char *ifru_data;
+		void *ifru_data;
 	} ifr_ifru;
 };
 
@@ -116,7 +117,7 @@ struct ifreq {
 struct ifconf {
 	int ifc_len;		
 	union {
-		char *ifcu_buf;
+		void *ifcu_buf;
 		struct ifreq *ifcu_req;
 	} ifc_ifcu;
 };

@@ -12,10 +12,10 @@ static void sq(double_t *hi, double_t *lo, double x)
 {
 	double_t xh, xl, xc;
 
-	xc = (double_t)x*SPLIT;
+	xc = x*SPLIT;
 	xh = x - xc + xc;
 	xl = x - xh;
-	*hi = (double_t)x*x;
+	*hi = x*x;
 	*lo = xh*xh - *hi + 2*xh*xl + xl*xl;
 }
 

@@ -12,36 +12,24 @@
 #define SYSCALL_MMAP2_UNIT 4096ULL
 #endif
 
-#ifndef __SYSCALL_LL_PRW
-#define __SYSCALL_LL_PRW(x) __SYSCALL_LL_O(x)
-#endif
-
 #ifndef __scc
 #define __scc(X) ((long) (X))
 typedef long syscall_arg_t;
 #endif
 
+#if defined(__PIC__) && (100*__GNUC__+__GNUC_MINOR__ >= 303)
 __attribute__((visibility("hidden")))
+#endif
 long __syscall_ret(unsigned long), __syscall(syscall_arg_t, ...),
 	__syscall_cp(syscall_arg_t, syscall_arg_t, syscall_arg_t, syscall_arg_t,
 	             syscall_arg_t, syscall_arg_t, syscall_arg_t);
 
-#ifdef SYSCALL_NO_INLINE
-#define __syscall0(n) (__syscall)(n)
-#define __syscall1(n,a) (__syscall)(n,__scc(a))
-#define __syscall2(n,a,b) (__syscall)(n,__scc(a),__scc(b))
-#define __syscall3(n,a,b,c) (__syscall)(n,__scc(a),__scc(b),__scc(c))
-#define __syscall4(n,a,b,c,d) (__syscall)(n,__scc(a),__scc(b),__scc(c),__scc(d))
-#define __syscall5(n,a,b,c,d,e) (__syscall)(n,__scc(a),__scc(b),__scc(c),__scc(d),__scc(e))
-#define __syscall6(n,a,b,c,d,e,f) (__syscall)(n,__scc(a),__scc(b),__scc(c),__scc(d),__scc(e),__scc(f))
-#else
 #define __syscall1(n,a) __syscall1(n,__scc(a))
 #define __syscall2(n,a,b) __syscall2(n,__scc(a),__scc(b))
 #define __syscall3(n,a,b,c) __syscall3(n,__scc(a),__scc(b),__scc(c))
 #define __syscall4(n,a,b,c,d) __syscall4(n,__scc(a),__scc(b),__scc(c),__scc(d))
 #define __syscall5(n,a,b,c,d,e) __syscall5(n,__scc(a),__scc(b),__scc(c),__scc(d),__scc(e))
 #define __syscall6(n,a,b,c,d,e,f) __syscall6(n,__scc(a),__scc(b),__scc(c),__scc(d),__scc(e),__scc(f))
-#endif
 #define __syscall7(n,a,b,c,d,e,f,g) (__syscall)(n,__scc(a),__scc(b),__scc(c),__scc(d),__scc(e),__scc(f),__scc(g))
 
 #define __SYSCALL_NARGS_X(a,b,c,d,e,f,g,h,n,...) n
@@ -67,7 +55,7 @@ long __syscall_ret(unsigned long), __syscall(syscall_arg_t, ...),
 #define __syscall_cp(...) __SYSCALL_DISP(__syscall_cp,__VA_ARGS__)
 #define syscall_cp(...) __syscall_ret(__syscall_cp(__VA_ARGS__))
 
-#ifndef SYSCALL_USE_SOCKETCALL
+#ifdef SYS_socket
 #define __socketcall(nm,a,b,c,d,e,f) syscall(SYS_##nm, a, b, c, d, e, f)
 #define __socketcall_cp(nm,a,b,c,d,e,f) syscall_cp(SYS_##nm, a, b, c, d, e, f)
 #else
@@ -193,9 +181,6 @@ long __syscall_ret(unsigned long), __syscall(syscall_arg_t, ...),
 #ifdef SYS_fadvise64_64
 #undef SYS_fadvise
 #define SYS_fadvise SYS_fadvise64_64
-#elif defined(SYS_fadvise64)
-#undef SYS_fadvise
-#define SYS_fadvise SYS_fadvise64
 #endif
 
 #ifdef SYS_sendfile64

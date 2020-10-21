@@ -2,7 +2,7 @@
 .type sqrt,@function
 sqrt:	fldl 4(%esp)
 	fsqrt
-	fnstsw %ax
+	fstsw %ax
 	sub $12,%esp
 	fld %st(0)
 	fstpt (%esp)

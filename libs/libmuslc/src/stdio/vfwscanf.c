@@ -104,7 +104,7 @@ int vfwscanf(FILE *restrict f, const wchar_t *restrict fmt, va_list ap)
 
 	FLOCK(f);
 
-	fwide(f, 1);
+	f->mode |= f->mode+1;
 
 	for (p=fmt; *p; p++) {
 

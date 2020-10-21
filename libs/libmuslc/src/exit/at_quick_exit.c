@@ -5,7 +5,7 @@
 
 static void (*funcs[COUNT])(void);
 static int count;
-static volatile int lock[2];
+static int lock[2];
 
 void __funcs_on_quick_exit()
 {
