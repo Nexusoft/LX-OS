@@ -1,26 +1,29 @@
-<!--
-     Copyright 2016, Data61
-     Commonwealth Scientific and Industrial Research Organisation (CSIRO)
-     ABN 41 687 119 230.
+### Quick Start
 
-     This software may be distributed and modified according to the terms of
-     the BSD 2-Clause license. Note that NO WARRANTY is provided.
-     See "LICENSE_BSD2.txt" for details.
+#### Building RefOS
 
-     @TAG(D61_BSD)
-  -->
+In order to build RefOS's codebase:
 
-RefOS Repository
-================
+1. Read: https://wiki.sel4.systems/Getting_started#Setting_up_your_machine. Set up the environment
+   (repo tool, cross compilers and build dependencies) as per the instructions on the page.
 
-This is the git repository for RefOS.
-This repository is meant to be used as part of a Google repo setup. Instead of cloning it directly,
-please go to the following repository and follow the instructions there:
+2. Install the following packages (package named based on Ubuntu 14.04):
+   > sudo apt-get install python-tempita
 
-    https://github.com/seL4/refos-manifest
+3. make help (to list the default configurations)
 
-RefOS is currently supported on iMX3.1 KZM, iMX6 Sabre Lite and ia32 hardware platforms and
-on qemu-ARM kzm and qemu-i386 ia32.
+4. make \<config\>, where \<config\> is one of the configurations listed with the \<make help\> command:
+   eg. make kzm\_debug\_test\_defconfig
+
+5. make silentoldconfig
+
+6. make
+
+   You should now have a bootable system image (refos/images/refos-image).
+
+
+7. make simulate-kzm (or a different command depending on the configuration you chose, run \<make help\>
+   to list the different configurations and how to run them)
 
 Overview
 --------
@@ -56,19 +59,6 @@ The repository is organised as follows.
       userland applications and facilitate porting.
  * [`impl/docs`](impl/docs/): RefOS doxygen code documentation.
  * [`design`](design/): RefOS protocol design document.
-
-Suggested Future Work
----------------------
-
-The following is suggested future work that interested open-source developers could implement:
-
- * Future Work 1: modify how the process server creates and starts processes and threads (see 'Future Work 1' in code)
- * Future Work 2: fix issue where calls to assert_fail() result in infinite recursion on x86 architecture (see 'Future Work 2' in code)
- * Future Work 3: modify how the selfloader bootstraps user processes (see 'Future Work 3' in code)
- * Future Work 4: remove explicit reference to system call table in processes that the process server creates (see 'Future Work 4' in code)
- * Future Work 5: set up muslc's errno in RefOS (see 'Future Work 5' in code)
- * Future Work 6: get ia32_screen_debug_defconfig and ia32_screen_release_defconfig default configurations running with new seL4 API
- * Future Work 7: get Nethack running with new seL4 API
 
 License
 -------
