@@ -5,4 +5,3 @@ include/config/auto.conf
 include/config/auto.conf.cmd
 include/config/tristate.conf
 include/generated/autoconf.h
-
