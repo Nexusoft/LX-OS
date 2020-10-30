@@ -1,13 +1,11 @@
 /*
- * Copyright 2017, Data61
- * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
- * ABN 41 687 119 230.
+ * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
  * the BSD 2-Clause license. Note that NO WARRANTY is provided.
  * See "LICENSE_BSD2.txt" for details.
  *
- * @TAG(DATA61_BSD)
+ * @TAG(NICTA_BSD)
  */
 
 /*
@@ -18,6 +16,7 @@
 #include "../../chardev.h"
 #include "../../common.h"
 
+#include "serial.h"
 #include "ega.h"
 #include "keyboard_chardev.h"
 #include <utils/arith.h>
@@ -34,8 +33,9 @@ static const int ega_irqs[] = { -1};
     .paddr   = SERIAL_CONSOLE_COM##devid##_PORT, \
     .size    = 0,             \
     .irqs    = com##devid##_irqs,  \
-    .init_fn = &uart_init           \
+    .init_fn = &serial_init           \
 }
+
 
 #define PC99_TEXT_EGA_DEFN() {      \
         .id = PC99_TEXT_EGA,        \
@@ -44,6 +44,7 @@ static const int ega_irqs[] = { -1};
         .irqs = ega_irqs,           \
         .init_fn = text_ega_init    \
     }
+
 
 static const int keyboard_irqs[] = {KEYBOARD_PS2_IRQ, -1};
 

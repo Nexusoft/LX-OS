@@ -1,13 +1,11 @@
 /*
- * Copyright 2017, Data61
- * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
- * ABN 41 687 119 230.
+ * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
  * the BSD 2-Clause license. Note that NO WARRANTY is provided.
  * See "LICENSE_BSD2.txt" for details.
  *
- * @TAG(DATA61_BSD)
+ * @TAG(NICTA_BSD)
  */
 
 #include "../../common.h"
@@ -32,6 +30,7 @@
 #define CMU_CPU1_SIZE      0x1000
 #define CMU_CPU2_SIZE      0x1000
 #define CMU_ISP_SIZE       0x1000
+
 
 /* Root clock frequencies */
 #define XUSBXTI_FREQ 24000000UL
@@ -65,6 +64,8 @@
 #define CLKID_DIVCOPY      CLKID(CPU1, 1, 0)
 #define CLKID_SCLKHPM      CLKID(CPU1, 1, 1)
 #define CLKID_ACLK_CORES   CLKID(CPU1, 1, 2)
+
+
 
 /************************
  ****       PLL      ****
@@ -111,7 +112,7 @@ static struct mpsk_tbl _vpll_tbl[] = {
 /* PERIL CLK SEL */
 #define CLK_SEL_BITS        4
 #define CLK_SEL_SHIFT(x)    ((x)*CLK_SEL_BITS)
-#define CLK_SEL_MASK        ((BIT(CLK_SEL_SHIFT(1))) - 1)
+#define CLK_SEL_MASK        ((1 << CLK_SEL_SHIFT(1)) - 1)
 #define CLK_SEL_VPLL        0x8
 #define CLK_SEL_EPLL        0x7
 #define CLK_SEL_MPLL_USER_T 0x6
@@ -193,6 +194,7 @@ _div_init(clk_t* clk)
     return clk;
 }
 
+
 static struct clock sclkapll_clk  = { CLK_OPS(SCLKAPLL   , div, CLKID_SCLKAPLL)    };
 static struct clock divcore_clk   = { CLK_OPS(DIVCORE    , div, CLKID_DIVCORE)     };
 static struct clock arm_clk       = { CLK_OPS(DIVCORE2   , div, CLKID_DIVCORE2)    };
@@ -204,6 +206,8 @@ static struct clock atclk_clk     = { CLK_OPS(ATCLK      , div, CLKID_ATCLK)    
 static struct clock pclk_dbg_clk  = { CLK_OPS(PCLK_DBG   , div, CLKID_PCLK_DBG)    };
 static struct clock sclkhpm_clk   = { CLK_OPS(SCLKHPM    , div, CLKID_SCLKHPM)     };
 static struct clock divcopy_clk   = { CLK_OPS(DIVCOPY    , div, CLKID_DIVCOPY)     };
+
+
 
 /***************
  **** MUXes ****
@@ -273,42 +277,6 @@ static struct clock sclk_mpll_userc_clk = { CLK_OPS(SCLKMPLL_USERC, mux, NULL) }
 static struct clock muxcore_clk = { CLK_OPS(MUXCORE, mux, NULL) };
 static struct clock muxhpm_clk = { CLK_OPS(MUXHPM, mux, NULL) };
 
-/***************
- ****  SPI  ****
- ***************/
-static freq_t
-_spi_get_freq(clk_t* clk)
-{
-    return 0;
-}
-
-static freq_t
-_spi_set_freq(clk_t* clk, freq_t hz)
-{
-    (void)hz;
-    return clk_get_freq(clk);
-}
-
-static void
-_spi_recal(clk_t* clk)
-{
-    assert(0);
-}
-
-static clk_t*
-_spi_init(clk_t* clk)
-{
-    return clk;
-}
-
-static struct clock spi0_clk = { CLK_OPS(SPI0, spi, NULL) };
-static struct clock spi1_clk = { CLK_OPS(SPI1, spi, NULL) };
-static struct clock spi2_clk = { CLK_OPS(SPI2, spi, NULL) };
-static struct clock spi0_isp_clk = { CLK_OPS(SPI0_ISP, spi, NULL) };
-static struct clock spi1_isp_clk = { CLK_OPS(SPI1_ISP, spi, NULL) };
-
-/*******************************************/
-
 static int
 exynos4_gate_enable(clock_sys_t* sys, enum clock_gate gate, enum clock_gate_mode mode)
 {
@@ -341,6 +309,8 @@ clock_sys_init(ps_io_ops_t* o, clock_sys_t* clock_sys)
     return clock_sys_common_init(clock_sys);
 }
 
+
+
 void
 clk_print_clock_tree(clock_sys_t* sys UNUSED)
 {
@@ -371,13 +341,9 @@ clk_t* ps_clocks[] = {
     [CLK_UART0]          = &uart0_clk,
     [CLK_UART1]          = &uart1_clk,
     [CLK_UART2]          = &uart2_clk,
-    [CLK_UART3]          = &uart3_clk,
-    [CLK_SPI0]           = &spi0_clk,
-    [CLK_SPI1]           = &spi1_clk,
-    [CLK_SPI2]           = &spi2_clk,
-    [CLK_SPI0_ISP]       = &spi0_isp_clk,
-    [CLK_SPI1_ISP]       = &spi1_isp_clk,
+    [CLK_UART3]          = &uart3_clk
 };
+
 
 /* These frequencies are NOT the recommended
  * frequencies. They are to be used when we
@@ -407,10 +373,5 @@ freq_t ps_freq_default[] = {
     [CLK_SCLKEPLL]       =   96 * MHZ,
     [CLK_SCLKMPLL]       =  800 * MHZ,
     [CLK_SCLKMPLL_USERC] =  800 * MHZ,
-    /* Placeholders */
-    [CLK_SPI0]           =    0 * MHZ,
-    [CLK_SPI1]           =    0 * MHZ,
-    [CLK_SPI2]           =    0 * MHZ,
-    [CLK_SPI0_ISP]       =    0 * MHZ,
-    [CLK_SPI1_ISP]       =    0 * MHZ,
 };
+

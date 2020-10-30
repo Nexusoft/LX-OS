@@ -1,53 +1,31 @@
 /*
  * Copyright 2014, General Dynamics C4 Systems
  *
- * SPDX-License-Identifier: GPL-2.0-only
+ * This software may be distributed and modified according to the terms of
+ * the GNU General Public License version 2. Note that NO WARRANTY is provided.
+ * See "LICENSE_GPLv2.txt" for details.
+ *
+ * @TAG(GD_GPL)
  */
 
-#pragma once
+#ifndef ARCH_BENCHMARK_H
+#define ARCH_BENCHMARK_H
 
-#include <config.h>
-#ifdef CONFIG_ENABLE_BENCHMARKS
+#ifdef CONFIG_BENCHMARK
 
 #include <armv/benchmark.h>
-#include <mode/machine.h>
-#include <model/statedata.h>
 
-/* these values are consistent across all arm PMUs */
-#define PMCR_ENABLE 0
-#define PMCR_ECNT_RESET 1
-#define PMCR_CCNT_RESET 2
+/* We have 1MB of word sized entries */
+#define MAX_LOG_SIZE 262144
 
-#if defined(CONFIG_BENCHMARK_TRACK_UTILISATION) && defined(KERNEL_PMU_IRQ)
-#define CONFIG_ARM_ENABLE_PMU_OVERFLOW_INTERRUPT 1
-#endif
+extern word_t ksEntry;
+extern word_t ksExit;
+extern word_t ksLogIndex;
+extern word_t *ksLog;
 
-void arm_init_ccnt(void);
 
-static inline timestamp_t timestamp(void)
-{
-    timestamp_t ccnt;
-    SYSTEM_READ_WORD(CCNT, ccnt);
-    return ccnt;
-}
+void armv_init_ccnt(void);
 
-#ifdef CONFIG_ARM_ENABLE_PMU_OVERFLOW_INTERRUPT
-static inline void handleOverflowIRQ(void)
-{
-    if (likely(NODE_STATE(benchmark_log_utilisation_enabled))) {
-        NODE_STATE(ksCurThread)->benchmark.utilisation += UINT32_MAX - NODE_STATE(ksCurThread)->benchmark.schedule_start_time;
-        NODE_STATE(ksCurThread)->benchmark.schedule_start_time = 0;
-        NODE_STATE(ccnt_num_overflows)++;
-    }
-    armv_handleOverflowIRQ();
-}
-#endif /* CONFIG_ARM_ENABLE_PMU_OVERFLOW_INTERRUPT */
+#endif /* CONFIG_BENCHMARK */
 
-static inline void benchmark_arch_utilisation_reset(void)
-{
-#ifdef CONFIG_ARM_ENABLE_PMU_OVERFLOW_INTERRUPT
-    NODE_STATE(ccnt_num_overflows) = 0;
-#endif /* CONFIG_ARM_ENABLE_PMU_OVERFLOW_INTERRUPT */
-}
-#endif /* CONFIG_ENABLE_BENCHMARKS */
-
+#endif /* ARCH_BENCHMARK_H */

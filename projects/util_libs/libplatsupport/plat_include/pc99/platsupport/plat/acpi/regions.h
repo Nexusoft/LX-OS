@@ -1,16 +1,15 @@
 /*
- * Copyright 2017, Data61
- * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
- * ABN 41 687 119 230.
+ * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
  * the BSD 2-Clause license. Note that NO WARRANTY is provided.
  * See "LICENSE_BSD2.txt" for details.
  *
- * @TAG(DATA61_BSD)
+ * @TAG(NICTA_BSD)
  */
 
-#pragma once
+#ifndef __REGIONS_H__
+#define __REGIONS_H__
 
 /*
  * Table signitures
@@ -40,7 +39,9 @@
 #define ACPI_SIG_DMAR           "DMAR"      /* DMA remapping table */
 #define ACPI_SIG_ASF            "ASF!"      /* Alert Standard Format table */
 #define ACPI_SIG_HEST           "HEST"      /* Hardware Error Source Table */
+#define ACPI_SIG_ERST           "ERST"      /* Error Record Serialisation Table */
 #define ACPI_SIG_MCFG           "MCFG"      /* PCI Memory mapped ConFiGuration */
+
 
 #define ACPI_SIG_ASPT           "ASPT"      /* Unknown table? */
 
@@ -92,3 +93,4 @@ acpi_sig_str(region_type_t);
 region_type_t
 acpi_sig_id(const char* sig);
 
+#endif /* __REGIONS_H__ */

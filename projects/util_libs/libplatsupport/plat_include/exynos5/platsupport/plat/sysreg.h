@@ -1,16 +1,16 @@
 /*
- * Copyright 2017, Data61
- * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
- * ABN 41 687 119 230.
+ * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
  * the BSD 2-Clause license. Note that NO WARRANTY is provided.
  * See "LICENSE_BSD2.txt" for details.
  *
- * @TAG(DATA61_BSD)
+ * @TAG(NICTA_BSD)
  */
 
-#pragma once
+
+#ifndef _PLATSUPPORT_PLAT_SYSREG_H_
+#define _PLATSUPPORT_PLAT_SYSREG_H_
 
 #include <platsupport/io.h>
 
@@ -19,11 +19,13 @@
 #define EXYNOS5_SYSREG_PADDR   0x10050000
 #define EXYNOS5_SYSREG_SIZE    0x1000
 
+
 struct sysreg {
     void* sysreg_vaddr[1];
     void* pwrreg_vaddr[5];
 };
 typedef struct sysreg sysreg_t;
+
 
 /**
  * Initialise the system register subsystem
@@ -32,6 +34,7 @@ typedef struct sysreg sysreg_t;
  * @return             0 on success
  */
 int exynos5_sysreg_init(ps_io_ops_t* ops, sysreg_t* sysreg);
+
 
 enum usb_phy_id {
     USBPHY_USB2,
@@ -45,4 +48,7 @@ enum usb_phy_id {
  * @return            0 on success
  */
 int exynos5_sysreg_usbphy_enable(enum usb_phy_id phy_id, sysreg_t* sysreg);
+
+
+#endif /* _PLATSUPPORT_PLAT_SYSREG_H_ */
 

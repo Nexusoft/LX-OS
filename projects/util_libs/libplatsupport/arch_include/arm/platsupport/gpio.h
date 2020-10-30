@@ -1,49 +1,43 @@
 /*
- * Copyright 2019, Data61
- * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
- * ABN 41 687 119 230.
+ * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
  * the BSD 2-Clause license. Note that NO WARRANTY is provided.
  * See "LICENSE_BSD2.txt" for details.
  *
- * @TAG(DATA61_BSD)
+ * @TAG(NICTA_BSD)
  */
 
-#pragma once
+#ifndef _PLATSUPPORT_GPIO_H_
+#define _PLATSUPPORT_GPIO_H_
 
 struct gpio_sys;
 typedef struct gpio_sys gpio_sys_t;
 typedef int gpio_id_t;
 
-#include <stdbool.h>
-#include <utils/util.h>
 #include <platsupport/io.h>
+#include <platsupport/plat/gpio.h>
 
 #define GPIOID(port, pin)             ((port) * 32 + (pin))
 #define GPIOID_PORT(gpio)             ((gpio) / 32)
 #define GPIOID_PIN(gpio)              ((gpio) % 32)
 
-typedef struct gpio gpio_t;
-struct gpio {
+
+typedef struct gpio {
 /// GPIO port identifier
     gpio_id_t id;
 /// GPIO subsystem handle
-    gpio_sys_t *gpio_sys;
-};
+    gpio_sys_t* gpio_sys;
+/// Chain GPIO's to enable bulk reads/writes
+    struct gpio* next;
+} gpio_t;
 
-typedef enum gpio_dir {
+
+enum gpio_dir {
+/// Output direction
+    GPIO_DIR_OUT,
 /// Input direction
     GPIO_DIR_IN,
-    /* Output direction:
-     * DEFAULT_LOW will ensure that the pin stays low even while the driver is
-     * initializing the pin.
-     * DEFAULT_HIGH will ensure that the pin stays high even while the driver is
-     * initializing the pin.
-     */
-    GPIO_DIR_OUT_DEFAULT_LOW,
-    GPIO_DIR_OUT = GPIO_DIR_OUT_DEFAULT_LOW,
-    GPIO_DIR_OUT_DEFAULT_HIGH,
 
 /// Input direction with IRQ on low logic level
     GPIO_DIR_IRQ_LOW,
@@ -55,222 +49,105 @@ typedef enum gpio_dir {
     GPIO_DIR_IRQ_RISE,
 /// Input direction with IRQ on both rising and falling edges
     GPIO_DIR_IRQ_EDGE
-} gpio_dir_t;
-
-typedef enum gpio_level {
-    /* GPIO input/output levels */
-    GPIO_LEVEL_LOW,
-    GPIO_LEVEL_HIGH
-} gpio_level_t;
-
-struct gpio_sys {
-    /** Initialize a GPIO pin.
-     * @param   gpio_sys        Initialized gpio driver instance.
-     * @param   id              ID of the pin to initialize a handle to.
-     * @param   gpio_dir        Configure the pin for input/output/IRQ.
-     *                          Use GPIO_DIR_OUT_DEFAULT_HIGH and
-     *                          GPIO_DIR_OUT_DEFAULT_LOW to set the pin's
-     *                          default logic level. Can be useful for things
-     *                          like GPIO pins used as SPI chipselects where
-     *                          you want to ensure that a pin stays in a certain
-     *                          logic level even while this initialization
-     *                          function is running.
-     * @param   gpio[out]       Pointer to a gpio_t structure to be initialised.
-     * @return 0 on success. Non-zero on error.
-     */
-    int (*init)(gpio_sys_t *gpio_sys, gpio_id_t id, enum gpio_dir dir, gpio_t *gpio);
-
-    /**
-     * Set a GPIO's output level. The pin must be configured for output
-     * for this to work.
-     * @param   gpio    Initialised GPIO pin instance.
-     * @param   level   The output level to set for the pin.
-     * @return 0 on success. Non-zero on error.
-     */
-    int (*set_level)(gpio_t *gpio, enum gpio_level level);
-
-    /**
-     * Read a pin's input level. The pin must be configured for input for
-     * this to work.
-     * @param   gpio    Initialised GPIO pin instance.
-     * @return GPIO_LEVEL_LOW or GPIO_LEVEL_HIGH depending on the input level.
-     *         Negative integer on error.
-     */
-    int (*read_level)(gpio_t *gpio);
-
-    /**
-     * Read and manipulate the status of a pending IRQ.
-     * @param   gpio    Initialised GPIO pin instance.
-     * @param   clear   Flag indicating whether or not the pending IRQ
-     *                  should be cleared.
-     * @return 0 (none) or 1 (pending) depending on the status of the IRQ.
-     *         Negative integer on error.
-     */
-    int (*pending_status)(gpio_t *gpio, bool clear);
-
-    /**
-     * Enable or disable the IRQ signal from the pin.
-     * @param   gpio    Initialised GPIO pin instance.
-     * @param   enable  Flag indicating whether or not the IRQ signal
-     *                  should be enabled.
-     * @return 0 on success. Non-zero on error.
-     */
-    int (*irq_enable_disable)(gpio_t *gpio, bool enable);
-
-/// platform specific private data
-    void *priv;
 };
 
-static inline bool gpio_sys_valid(const gpio_sys_t *gpio_sys)
-{
-    return gpio_sys != NULL && gpio_sys->priv != NULL;
-}
-
-static inline bool gpio_instance_valid(const gpio_t *gpio)
-{
-    if (!gpio) {
-        ZF_LOGE("Handle to GPIO not supplied!");
-        return false;
-    }
-    if (!gpio->gpio_sys) {
-        ZF_LOGE("GPIO pin's parent controller handle invalid!");
-        return false;
-    }
-    return true;
-}
+struct gpio_sys {
+/// Initialise a GPIO pin
+    int (*init)(gpio_sys_t* gpio_sys, gpio_id_t id, enum gpio_dir dir, gpio_t* gpio);
+/// Write to a GPIO
+    int (*write)(gpio_t* gpio, const char* data, int len);
+/// Read from a GPIO
+    int (*read)(gpio_t* gpio, char* data, int len);
+/// Manipulate the status of a pending IRQ
+    int (*pending_status)(gpio_t *gpio, int clear);
+/// platform specific private data
+    void* priv;
+};
 
 /**
  * Initialise the GPIO subsystem and provide a handle for access
  * @param[in]  io_ops   io operations for device initialisation
  * @param[out] gpio_sys A gpio handle structure to initialise
- * @return              0 on success, errno value otherwise
+ * @return              0 on success
  */
-int gpio_sys_init(ps_io_ops_t *io_ops, gpio_sys_t *gpio_sys);
+int gpio_sys_init(ps_io_ops_t* io_ops, gpio_sys_t* gpio_sys);
 
 /**
  * Clear a GPIO pin
  * @param[in] a handle to a GPIO
- * @return    0 on success, otherwise errno value
+ * @return    0 on success
  */
-static inline int gpio_clr(gpio_t *gpio)
+static inline int gpio_clr(gpio_t* gpio)
 {
-    if (!gpio_instance_valid(gpio)) {
-        return -EINVAL;
-    }
-    if (!gpio->gpio_sys->set_level) {
-        ZF_LOGE("Unimplemented");
-        return -ENOSYS;
-    }
-    return gpio->gpio_sys->set_level(gpio, GPIO_LEVEL_LOW);
+    char data;
+    assert(gpio);
+    assert(gpio->gpio_sys);
+    data = 0;
+    return (gpio->gpio_sys->write(gpio, &data, 1) != 1);
 }
+
 
 /**
  * Return the state of a GPIO pin
  * @param[in] a handle to a GPIO
- * @return    the value of the pin, otherwise errno value
+ * @return    the value of the pin, -1 on failure
  */
-static inline int gpio_get(gpio_t *gpio)
+static inline int gpio_get(gpio_t* gpio)
 {
-    if (!gpio_instance_valid(gpio)) {
-        return -EINVAL;
+    char data;
+    int ret;
+    assert(gpio);
+    assert(gpio->gpio_sys);
+    ret = gpio->gpio_sys->read(gpio, &data, 1);
+    if (ret == 1) {
+        return data;
+    } else {
+        return -1;
     }
-    if (!gpio->gpio_sys->read_level) {
-        ZF_LOGE("Unimplemented");
-        return -ENOSYS;
-    }
-    return gpio->gpio_sys->read_level(gpio);
 }
+
 
 /**
  * Set a GPIO pin
  * @param[in] a handle to a GPIO
- * @return    0 on success, otherwise errno value
+ * @return    0 on success
  */
-static inline int gpio_set(gpio_t *gpio)
+static inline int gpio_set(gpio_t* gpio)
 {
-    if (!gpio_instance_valid(gpio)) {
-        return -EINVAL;
-    }
-    if (!gpio->gpio_sys->set_level) {
-        ZF_LOGE("Unimplemented");
-        return -ENOSYS;
-    }
-    return gpio->gpio_sys->set_level(gpio, GPIO_LEVEL_HIGH);
+    char data;
+    assert(gpio);
+    assert(gpio->gpio_sys);
+    data = 0xff;
+    return (gpio->gpio_sys->write(gpio, &data, 1) != 1);
 }
+
 
 /**
  * Check if an IRQ is pending for this GPIO
- * @param[in]  a handle to a GPIO
- * @return     errno value on error
+ * @param[in] a handle to a GPIO
+ * @return    -1 if the GPIO does not support IRQs
  *             0 if an IRQ is not pending
  *             1 if an IRQ is pending
  */
-static inline int gpio_is_pending(gpio_t *gpio)
+static inline int gpio_is_pending(gpio_t* gpio)
 {
-    if (!gpio_instance_valid(gpio)) {
-        return -EINVAL;
-    }
-    if (!gpio->gpio_sys->pending_status) {
-        ZF_LOGE("Unimplemented");
-        return -ENOSYS;
-    }
-    return gpio->gpio_sys->pending_status(gpio, false);
+    assert(gpio);
+    assert(gpio->gpio_sys);
+    return gpio->gpio_sys->pending_status(gpio, 0);
 }
 
 /**
  * Clear pending IRQs for this GPIO
  * @param[in] a handle to a GPIO
- * @return    0 on success, errno value on error
  */
-static inline int gpio_pending_clear(gpio_t *gpio)
+static inline void gpio_pending_clear(gpio_t* gpio)
 {
-    if (!gpio_instance_valid(gpio)) {
-        return -EINVAL;
-    }
-    if (!gpio->gpio_sys->pending_status) {
-        ZF_LOGE("Unimplemented");
-        return -ENOSYS;
-    }
-    int ret = gpio->gpio_sys->pending_status(gpio, true);
-    if (ret < 0) {
-        return ret;
-    }
-    return 0;
+    assert(gpio);
+    assert(gpio->gpio_sys);
+    gpio->gpio_sys->pending_status(gpio, 1);
 }
 
-/**
- * Enable the IRQ signal from the pin.
- * @param[in] gpio Handle to the pin to manipulate
- * @return 0 for success, errno value on error.
- */
-static inline int gpio_irq_enable(gpio_t *gpio)
-{
-    if (!gpio_instance_valid(gpio)) {
-        return -EINVAL;
-    }
-    if (!gpio->gpio_sys->irq_enable_disable) {
-        ZF_LOGE("Unimplemented");
-        return -ENOSYS;
-    }
-    return gpio->gpio_sys->irq_enable_disable(gpio, true);
-}
 
-/**
- * Disable the IRQ signal from the pin.
- * @param[in] gpio Handle to the pin to manipulate
- * @return 0 for success, errno value on error.
- */
-static inline int gpio_irq_disable(gpio_t *gpio)
-{
-    if (!gpio_instance_valid(gpio)) {
-        return -EINVAL;
-    }
-    if (!gpio->gpio_sys->irq_enable_disable) {
-        ZF_LOGE("Unimplemented");
-        return -ENOSYS;
-    }
-    return gpio->gpio_sys->irq_enable_disable(gpio, false);
-}
 
 /**
  * Acquire a handle to a GPIO pin
@@ -281,22 +158,11 @@ static inline int gpio_irq_disable(gpio_t *gpio)
  * @param[out] gpio      a GPIO handle to initialise
  * @return               0 on success
  */
-static inline int gpio_new(gpio_sys_t *gpio_sys, gpio_id_t id, enum gpio_dir dir, gpio_t *gpio)
+
+static inline int gpio_new(gpio_sys_t* gpio_sys, gpio_id_t id, enum gpio_dir dir, gpio_t* gpio)
 {
-    if (!gpio_sys) {
-        ZF_LOGE("Handle to GPIO controller not supplied!");
-        return -EINVAL;
-    }
-
-    if (!gpio_sys->init) {
-        ZF_LOGE("Unimplemented");
-        return -ENOSYS;
-    }
-
-    if (!gpio) {
-        ZF_LOGE("Handle to output pin structure not supplied!");
-        return -EINVAL;
-    }
-
+    assert(gpio);
     return gpio_sys->init(gpio_sys, id, dir, gpio);
 }
+#endif /* _PLATSUPPORT_GPIO_H_ */
+

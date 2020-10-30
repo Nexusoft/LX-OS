@@ -1,16 +1,15 @@
 /*
- * Copyright 2017, Data61
- * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
- * ABN 41 687 119 230.
+ * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
  * the BSD 2-Clause license. Note that NO WARRANTY is provided.
  * See "LICENSE_BSD2.txt" for details.
  *
- * @TAG(DATA61_BSD)
+ * @TAG(NICTA_BSD)
  */
 
-#pragma once
+#ifndef __MACHSUPPORT_MACH_PMIC_RTC__
+#define __MACHSUPPORT_MACH_PMIC_RTC__
 
 #include <stdint.h>
 #include <platsupport/i2c.h>
@@ -28,9 +27,10 @@ struct rtc_time {
     uint8_t date;
 };
 
+
+
 typedef struct pmic_rtc {
     i2c_slave_t i2c_slave;
-    i2c_kvslave_t kvslave;
 } pmic_rtc_t;
 
 /**
@@ -82,3 +82,4 @@ int pmic_rtc_get_alarm(pmic_rtc_t* pmic_rtc, int id, struct rtc_time* alarm);
  */
 int pmic_rtc_set_alarm(pmic_rtc_t* pmic_rtc, int id, const struct rtc_time* alarm);
 
+#endif /* __MACHSUPPORT_MACH_RTC__ */

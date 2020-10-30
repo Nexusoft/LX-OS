@@ -1,13 +1,11 @@
 /*
- * Copyright 2017, Data61
- * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
- * ABN 41 687 119 230.
+ * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
  * the BSD 2-Clause license. Note that NO WARRANTY is provided.
  * See "LICENSE_BSD2.txt" for details.
  *
- * @TAG(DATA61_BSD)
+ * @TAG(NICTA_BSD)
  */
 /*
  * Implementation of an 80x25 EGA text mode. All the functions are named with 'serial' since
@@ -20,7 +18,6 @@
  */
 
 #include <autoconf.h>
-#include <platsupport/gen_config.h>
 #include <assert.h>
 #include <string.h>
 #include <platsupport/plat/serial.h>
@@ -94,6 +91,7 @@ text_ega_putchar(ps_chardevice_t* d, int c)
     return 0;
 }
 
+
 static ssize_t
 text_ega_write(ps_chardevice_t* d, const void* vdata, size_t count, chardev_callback_t rcb UNUSED, void* token UNUSED)
 {
@@ -125,11 +123,15 @@ text_ega_read(ps_chardevice_t* d, void* vdata, size_t count, chardev_callback_t 
     return count;
 }
 
+
+
 static void
 text_ega_handle_irq(ps_chardevice_t* d)
 {
     /* TODO */
 }
+
+
 
 int
 text_ega_init(const struct dev_defn* defn, const ps_io_ops_t* ops, ps_chardevice_t* dev)
@@ -158,3 +160,5 @@ text_ega_init(const struct dev_defn* defn, const ps_io_ops_t* ops, ps_chardevice
 
     return 0;
 }
+
+

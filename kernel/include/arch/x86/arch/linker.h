@@ -1,10 +1,15 @@
 /*
- * Copyright 2020, Data61, CSIRO (ABN 41 687 119 230)
+ * Copyright 2014, General Dynamics C4 Systems
  *
- * SPDX-License-Identifier: BSD-2-Clause
+ * This software may be distributed and modified according to the terms of
+ * the GNU General Public License version 2. Note that NO WARRANTY is provided.
+ * See "LICENSE_GPLv2.txt" for details.
+ *
+ * @TAG(GD_GPL)
  */
 
-#pragma once
+#ifndef __ARCH_LINKER_H
+#define __ARCH_LINKER_H
 
 #include <util.h>
 
@@ -14,6 +19,16 @@
 /* data that is linked to physical addresses */
 #define PHYS_DATA SECTION(".phys.data")
 
-/* bss data that is linked to physical addresses */
-#define PHYS_BSS SECTION(".phys.bss")
+/* code that is only used during kernel bootstrapping */
+#define BOOT_CODE SECTION(".boot.text")
 
+/* node-local data that is only used during kernel bootstrapping */
+#define BOOT_DATA SECTION(".boot.node")
+
+/* global data (shared by all nodes) but only used during kernel bootstrapping */
+#define BOOT_DATA_GLOB SECTION(".boot.glob")
+
+/* global data (shared by all nodes) */
+#define DATA_GLOB SECTION(".glob")
+
+#endif

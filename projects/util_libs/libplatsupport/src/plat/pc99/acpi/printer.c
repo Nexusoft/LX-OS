@@ -1,13 +1,11 @@
 /*
- * Copyright 2017, Data61
- * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
- * ABN 41 687 119 230.
+ * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
  * the BSD 2-Clause license. Note that NO WARRANTY is provided.
  * See "LICENSE_BSD2.txt" for details.
  *
- * @TAG(DATA61_BSD)
+ * @TAG(NICTA_BSD)
  */
 
 #include "printer.h"
@@ -34,6 +32,7 @@ pprint(char c)
     }
     return '.';
 }
+
 
 void
 colour_bf(int i, const char* ptr)
@@ -159,6 +158,7 @@ print_dscope(acpi_dmar_remap_hdr_t* head, acpi_dmar_dscope_t* dscope)
     }
 }
 
+
 static void
 print_dmar(acpi_dmar_hdr_t* dmar)
 {
@@ -216,6 +216,7 @@ print_dmar(acpi_dmar_hdr_t* dmar)
     }
 }
 
+
 static void
 print_mcfg_desc(acpi_mcfg_desc_t* mcfg_desc)
 {
@@ -262,7 +263,7 @@ print_xsdt(acpi_xsdt_t* xsdt)
     int i = 0;
     while (next != NULL) {
         printf("%d/%d -> %p\n", i++, entries,
-               (void*)(uintptr_t)*next);
+               (void*)(uint32_t)*next);
         next = acpi_xsdt_next(xsdt, next);
     }
     printf("\n");
@@ -273,7 +274,7 @@ print_rsdp(acpi_rsdp_t* rsdp)
 {
     acpi_print_table_raw(rsdp, rsdp->length);
     printf("RSDT->%p\n", (void*)rsdp->rsdt_address);
-    printf("XSDT->%p\n", (void*)(uintptr_t)rsdp->xsdt_address);
+    printf("XSDT->%p\n", (void*)(uint32_t)rsdp->xsdt_address);
     printf("\n");
 }
 
@@ -359,6 +360,7 @@ acpi_print_table(const void* start)
     }
 }
 
+
 void
 acpi_print_regions(const RegionList_t* rl)
 {
@@ -388,5 +390,6 @@ acpi_print_regions(const RegionList_t* rl)
         printf("%3d\n", r->parent);
     }
 }
+
 
 #endif

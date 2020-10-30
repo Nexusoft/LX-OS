@@ -1,16 +1,27 @@
 /*
- * Copyright 2017, Data61
- * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
- * ABN 41 687 119 230.
+ * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
  * the BSD 2-Clause license. Note that NO WARRANTY is provided.
  * See "LICENSE_BSD2.txt" for details.
  *
- * @TAG(DATA61_BSD)
+ * @TAG(NICTA_BSD)
  */
 
+
+
 #include "clock.h"
+
+#define DIV_SEP_BITS 4
+#define DIV_VAL_BITS 4
+
+/* CON 0 */
+#define PLL_MPS_MASK    PLL_MPS(0x1ff, 0x3f, 0x7)
+#define PLL_ENABLE      BIT(31)
+#define PLL_LOCKED      BIT(29)
+/* CON 1*/
+#define PLL_K_MASK      MASK(16)
+
 
 /***********
  *** DIV ***
@@ -71,14 +82,29 @@ _div_recal(clk_t* clk)
 freq_t
 _pll_get_freq(clk_t* clk)
 {
+    clk_regs_io_t** clk_regs;
+    volatile struct pll_regs* pll_regs;
     const struct pll_priv* pll_priv;
-    int clkid, pll_idx;
-
+    int clkid, c, r, o, pll_idx;
+    uint32_t muxstat;
+    clk_regs = clk_get_clk_regs(clk);
     pll_priv = exynos_clk_get_priv_pll(clk);
     clkid = pll_priv->clkid;
     pll_idx = pll_priv->pll_offset;
-
-    return exynos_pll_get_freq(clk, clkid, pll_idx);
+    clkid_decode(clkid, &c, &r, &o);
+    pll_regs = (volatile struct pll_regs*)&clk_regs[c]->pll_lock[pll_idx];
+    muxstat = exynos_cmu_get_srcstat(clk_regs, clkid);
+    if (muxstat & 0x1) {
+        /* Muxed or bypassed to FINPLL */
+        return clk_get_freq(clk->parent);
+    } else {
+        uint32_t v, p, m, s;
+        v = pll_regs->con0 & PLL_MPS_MASK;
+        m = (v >> 16) & 0x1ff;
+        p = (v >>  8) &  0x3f;
+        s = (v >>  0) &   0x7;
+        return ((uint64_t)clk_get_freq(clk->parent) * m / p) >> s;
+    }
 }
 
 freq_t
@@ -145,3 +171,4 @@ _pll_init(clk_t* clk)
     clk_register_child(parent, clk);
     return clk;
 }
+

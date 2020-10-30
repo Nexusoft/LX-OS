@@ -1,16 +1,15 @@
 /*
- * Copyright 2017, Data61
- * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
- * ABN 41 687 119 230.
+ * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
  * the BSD 2-Clause license. Note that NO WARRANTY is provided.
  * See "LICENSE_BSD2.txt" for details.
  *
- * @TAG(DATA61_BSD)
+ * @TAG(NICTA_BSD)
  */
 
-#pragma once
+#ifndef _PLATSUPPORT_PLAT_VIRTUAL_KEYCODE_PS2_H
+#define _PLATSUPPORT_PLAT_VIRTUAL_KEYCODE_PS2_H
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -350,6 +349,7 @@ int16_t keycode_info_char(keycode_state_t *s, keycode_info_t *info);
 
 int16_t keycode_ps2_to_vkey(int32_t ps2_keycode);
 
+
 keycode_info_t *keycode_process_vkey_event(keycode_state_t *s, int32_t vkey, bool pressed,
                                            void* cookie);
 
@@ -358,3 +358,5 @@ int16_t keycode_process_vkey_event_to_char(keycode_state_t *s, int32_t vkey, boo
 
 bool keycode_get_async_vkey_state(keycode_state_t *s, int32_t vkey);
 
+
+#endif /* _PLATSUPPORT_PLAT_VIRTUAL_KEYCODE_PS2_H */

@@ -1,13 +1,11 @@
 /*
- * Copyright 2017, Data61
- * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
- * ABN 41 687 119 230.
+ * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
  * the BSD 2-Clause license. Note that NO WARRANTY is provided.
  * See "LICENSE_BSD2.txt" for details.
  *
- * @TAG(DATA61_BSD)
+ * @TAG(NICTA_BSD)
  */
 
 /*
@@ -20,7 +18,8 @@
  *       can be used to create tables
  */
 
-#pragma once
+#ifndef __ACPI_INTERNAL_H__
+#define __ACPI_INTERNAL_H__
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -53,6 +52,7 @@
     ACPI_TABLE_TEST(table, MCFG) || \
     ACPI_TABLE_TEST(table, DSDT) )
 
+
 /***************
  *** Helpers ***
  ***************/
@@ -63,11 +63,13 @@
 uint8_t
 acpi_calc_checksum(const char* start, int length);
 
+
+
 /*
  * return the length of any table
  * returns -1 if the table is not recognised
  */
-size_t
+uint32_t
 acpi_table_length(const void* tbl);
 
 /*
@@ -91,3 +93,4 @@ acpi_table_length(const void* tbl);
 int
 acpi_copy_tables(const RegionList_t* src, RegionList_t* dst);
 
+#endif /* __ACPI_INTERNAL_H__ */

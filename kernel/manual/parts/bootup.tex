@@ -1,64 +1,60 @@
 %
 % Copyright 2014, General Dynamics C4 Systems
 %
-% SPDX-License-Identifier: GPL-2.0-only
+% This software may be distributed and modified according to the terms of
+% the GNU General Public License version 2. Note that NO WARRANTY is provided.
+% See "LICENSE_GPLv2.txt" for details.
+%
+% @TAG(GD_GPL)
 %
 
 \chapter{\label{ch:bootup}System Bootstrapping}
 
 \section{Initial Thread's Environment}
 
-The seL4 kernel creates a minimal boot environment for the initial thread, which
- is started at priority \texttt{seL4\_MaxPrio} and maximum control priority \texttt{seL4\_MaxPrio}.
+The seL4 kernel creates a minimal boot environment for the initial thread.
 This environment consists of the initial thread's TCB, CSpace and VSpace,
 consisting of frames that contain the userland image (code/data of the initial
 thread) and the IPC buffer.
-
-On the MCS kernel, the initial thread is configured with a round-robin scheduling context
-with \texttt{CONFIG\_BOOT\_THREAD\_TIME\_SLICE} milliseconds timeslice.
-Without MCS, all threads including the initial thread are scheduled round-robin with
-\texttt{CONFIG\_TIMER\_TICK\_MS} $*$ \texttt{CONFIG\_TIME\_SLICE} timeslices.
-
 The initial thread's CSpace consists of exactly one CNode
 which contains capabilities to the initial
-thread's own resources as well as to all available global resources.
+thread's own resources was well as to all available global resources.
 The CNode size can be configured at compile time (default is $2^{12}$
 slots), but the guard is always chosen so that the CNode resolves exactly
-the number of bits in the architecture (32 bits or 64 bits). This means, the
-first slot of the CNode has CPTR 0x0, the second slot has CPTR 0x1 etc.
+32 bits. This means, the first slot of the CNode has CPTR 0x0, the
+second slot has CPTR 0x1 etc.
 
 The first 12 slots contain specific capabilities as listed in
 \autoref{tab:cnode_content}.
 
 \begin{table}[htb]
   \begin{center}
-    \caption{Initial thread's CNode content.}
+    \caption{Initial Thread's CNode Content}
     \label{tab:cnode_content}
-    \begin{tabularx}{\textwidth}{lX}
+    \begin{tabularx}{\textwidth}{llX}
       \toprule
-      Enum Constant & Capability \\
+      CPTR & Enum Constant & Capability \\
       \midrule
-      \texttt{seL4\_CapNull}                & null \\
-      \texttt{seL4\_CapInitThreadTCB}       & initial thread's TCB \\
-      \texttt{seL4\_CapInitThreadCNode}     & initial thread's CNode \\
-      \texttt{seL4\_CapInitThreadVSpace}    & initial thread's VSpace \\
-      \texttt{seL4\_CapIRQControl}          & global IRQ controller (see \autoref{sec:interrupts}) \\
-      \texttt{seL4\_CapASIDControl}         & global ASID controller (see \autoref{ch:vspace}) \\
-      \texttt{seL4\_CapInitThreadASIDPool}  & initial thread's ASID pool (see \autoref{ch:vspace}) \\
-      \texttt{seL4\_CapIOPort}              & global I/O port cap, null cap if unsupported
+      0x0 & \texttt{seL4\_CapNull}                & null \\
+      0x1 & \texttt{seL4\_CapInitThreadTCB}       & initial thread's TCB \\
+      0x2 & \texttt{seL4\_CapInitThreadCNode}     & initial thread's CNode \\
+      0x3 & \texttt{seL4\_CapInitThreadPD}        & initial thread's page directory \\
+      0x4 & \texttt{seL4\_CapIRQControl}          & global IRQ controller (see \autoref{sec:interrupts}) \\
+      0x5 & \texttt{seL4\_CapASIDControl}         & global ASID controller (see \autoref{ch:vspace}) \\
+      0x6 & \texttt{seL4\_CapInitThreadASIDPool}  & initial thread's ASID pool (see \autoref{ch:vspace}) \\
+      0x7 & \texttt{seL4\_CapIOPort}              & global I/O port cap, null cap if unsupported
 \ifxeightsix
 (see \autoref{sec:ioports})
 \fi
 \\
-      \texttt{seL4\_CapIOSpace}             & global I/O space cap, null cap if unsupported
+      0x8 & \texttt{seL4\_CapIOSpace}             & global I/O space cap, null cap if unsupported
 \ifxeightsix
 (see \autoref{sec:iospace})
 \fi
 \\
-      \texttt{seL4\_CapBootInfoFrame}       & BootInfo frame (see \autoref{ch:bootup:bootinfo}) \\
-      \texttt{seL4\_CapInitThreadIPCBuffer} & initial thread's IPC buffer (see \autoref{sec:messageinfo}) \\
-      \texttt{seL4\_CapDomain}              & domain cap (see \autoref{sec:domains}) \\
-      \texttt{seL4\_CapInitThreadSC}        & initial thread's scheduling context (MCS only) \\
+      0x9 & \texttt{seL4\_CapBootInfoFrame}       & BootInfo frame (see \autoref{ch:bootup:bootinfo}) \\
+      0xa & \texttt{seL4\_CapInitThreadIPCBuffer} & initial thread's IPC buffer (see \autoref{sec:messageinfo}) \\
+      0xb & \texttt{seL4\_CapDomain}              & domain cap (see \autoref{sec:domains}) \\
       \bottomrule
     \end{tabularx}
   \end{center}
@@ -66,14 +62,14 @@ The first 12 slots contain specific capabilities as listed in
 
 \section{\label{ch:bootup:bootinfo}BootInfo Frame}
 
-CNode slots with CPTR \texttt{seL4\_NumInitialCaps} (defined in the seL4
-userland library) and above are filled dynamically during
+CNode slots with CPTR 0xb and above are filled dynamically during
 bootstrapping. Their exact contents depend on the userland image size,
 platform configuration (devices) etc. In order to tell the initial thread
 which capabilities are stored where in its CNode, the kernel provides
 a \emph{BootInfo Frame} which is mapped into the initial thread's address
 space. The mapped address is chosen by the kernel and given to the initial
-thread via a CPU register.
+thread via a CPU register. The initial thread can access this address
+through the function \texttt{seL4\_GetBootInfo()}.
 
 The BootInfo Frame contains the C struct described in
 \autoref{tab:bootinfo_struct}.
@@ -89,120 +85,89 @@ of slots in the initial thread's CNode, starting with CPTR \texttt{start} and wi
 
 \begin{table}[htb]
   \begin{center}
-    \caption{BootInfo struct.}
+    \caption{BootInfo Struct}
     \label{tab:bootinfo_struct}
     \begin{tabularx}{\textwidth}{llX}
       \toprule
       Field Type & Field Name & Description \\
       \midrule
-      \texttt{seL4\_Word}           & \texttt{extraLen}                & length of additional bootinfo information in bytes \\
-      \texttt{seL4\_NodeId}         & \texttt{nodeID}                  & node ID \\
-      \texttt{seL4\_Word}           & \texttt{numNodes}                & number of nodes \\
-      \texttt{seL4\_Word}           & \texttt{numIOPTLevels}           & number of I/O page-table levels (-1 if CONFIG\_IOMMU unset) \\
+      \texttt{seL4\_Word}           & \texttt{nodeID}                  & node ID (see \autoref{ch:bootup:multikernel}) \\
+      \texttt{seL4\_Word}           & \texttt{numNodes}                & number of nodes (see \autoref{ch:bootup:multikernel}) \\
+      \texttt{seL4\_Word}           & \texttt{numIOPTLevels}           & number of I/O page-table levels (0 if no IOMMU) \\
       \texttt{seL4\_IPCBuffer*}     & \texttt{ipcBuffer}               & pointer to the initial thread's IPC buffer \\
       \texttt{seL4\_SlotRegion}     & \texttt{empty}                   & empty slots (null caps) \\
-      \texttt{seL4\_SlotRegion}     & \texttt{sharedFrames}            & reserved \\
+      \texttt{seL4\_SlotRegion}     & \texttt{sharedFrames}            & see \autoref{ch:bootup:multikernel} \\
       \texttt{seL4\_SlotRegion}     & \texttt{userImageFrames}         & frames containing the userland image \\
-      \texttt{seL4\_SlotRegion}     & \texttt{userImagePaging}         & userland-image paging structure caps \\
-      \texttt{seL4\_SlotRegion}     & \texttt{ioSpaceCaps}             & I/O space capabilities for ARM SMMU \\
-      \texttt{seL4\_SlotRegion}     & \texttt{extraBIPages}            & frames backing additional bootinfo information \\
-      \texttt{seL4\_Uint8}          & \texttt{initThreadCNodeSizeBits} & CNode size ($2^n$ slots) \\
-      \texttt{seL4\_Word}           & \texttt{initThreadDomain}        & domain of the initial thread (see \autoref{sec:domains}) \\
-      \texttt{seL4\_SlotRegion}     & \texttt{schedcontrol}            & seL4\_SchedControl capabilities, one for each node (MCS only). \\
+      \texttt{seL4\_SlotRegion}     & \texttt{userImagePTs}            & page tables covering the userland image \\
       \texttt{seL4\_SlotRegion}     & \texttt{untyped}                 & untyped-memory capabilities \\
-      \texttt{seL4\_UntypedDesc[]}  & \texttt{untypedList}             & array of information about each untyped \\
+      \texttt{seL4\_Word[]}         & \texttt{untypedPaddrList}        & array of untyped-memory physical addresses \\
+      \texttt{uint8\_t[]}           & \texttt{untypedSizeBitsList}     & array of untyped-memory sizes ($2^n$ bytes) \\
+      \texttt{uint8\_t}             & \texttt{initThreadCNodeSizeBits} & CNode size ($2^n$ slots) \\
+      \texttt{seL4\_Word}           & \texttt{numDeviceRegions}        & number of device memory regions \\
+      \texttt{seL4\_DeviceRegion[]} & \texttt{deviceRegions}           & device memory regions (see \autoref{tab:device_region_struct}) \\
+      \texttt{uint32\_t}            & \texttt{initThreadDomain}        & domain of the initial thread (see \autoref{sec:domains}) \\
       \bottomrule
     \end{tabularx}
   \end{center}
 \end{table}
 
-Depending on the architecture and platform there might be additional pieces of boot
-information. If \texttt{extraLen} is greater then zero then 4K after the start of bootinfo
-is a region of extraLen bytes containing additional bootinfo structures. Each chunk starts
-with a \texttt{seL4\_BootInfoHeader}, described in \autoref{tab:bi_header_struct}, that
-describes what the chunk is and how long it is, where the length includes the header. The
-length can be used to skip over chunks that you do not understand. The only generally
-defined chunk type is \texttt{SEL4\_BOOTINFO\_HEADER\_PADDING} and describes an empty
-chunk that has no data, any other types are platform or architecture specific. The
-\texttt{extraBIPages} slot region gives the frames capabilities for the pages that make up
-the additional boot info region.
-
-\begin{table}[htb]
-  \begin{center}
-    \caption{BootInfoHeader struct.}
-    \label{tab:bi_header_struct}
-    \begin{tabular}{lll}
-      \toprule
-      Field Type & Field Name & Description \\
-      \midrule
-      \texttt{seL4\_Word}  & \texttt{id}  & Identifier indicating the contents of the chunk \\
-      \texttt{seL4\_Uint8} & \texttt{len} & Length in bytes of the chunk \\
-      \bottomrule
-    \end{tabular}
-  \end{center}
-\end{table}
-
-The capabilities in \texttt{userImageFrames} are
-ordered such that the first capability references the first frame of the
-userland image and so on.
-The capabilities in \texttt{userImagePaging} are ordered in descending order
-of paging structure size. Within a given paging structure size, capabilities are
-ordered by the virtual address at which the corresponding objects are mapped
-into the initial thread's address space.
-
-It is up to userland to infer the virtual address of frames referenced by
-the capabilities in \texttt{userImageFrames} and the virtual address and
-types of paging structures
-referenced by the capabilities in \texttt{userImagePaging}.
-Userland typically has a way of finding out to which virtual addresses its
+The capabilities in \texttt{userImageFrames} and \texttt{userImagePTs} are
+ordered, i.e.\ the first capability references the first frame of the
+userland image etc. Userland always knows to which virtual addresses its own
 code and data is mapped (e.g.\ in GCC, with the standard linker script, the
 symbols \texttt{\_\_executable\_start} and \texttt{\_end} are available).
-Additionally, the initial thread can assume that its address space is virtually
-contiguous, and is made up of the smallest frames available on the architecture.
-It's also assumed that the initial thread knows which paging structures are
-available on the architecture it's running on.
-This, along with knowledge of how capabilities in \texttt{userImageFrames} and
-\texttt{userImagePaging} are ordered, is sufficient information for userland to infer
-the virtual address of each
-frame capability, and the virtual address and type of each paging structure capability.
+Userland can therefore
+infer the virtual address behind each userland frame and page-table cap.
 
 Untyped memory is given in no particular order. The array entry
-\texttt{untypedList[i]} stores the untyped-memory information of
+\texttt{untypedSizeBitsList[i]} stores the untyped-memory size ($2^n$ bytes) of
 the i-th untyped cap of the slot region \texttt{untyped}. Therefore, the array
 length is at least \texttt{untyped.end - untyped.start}. The actual length is
-hardcoded in the kernel and irrelevant to the reader of the array. The untyped
-memory information is stored in a \texttt{seL4\_UntypedDesc} struct, described
-in \autoref{tab:untyped_desc_struct}, and details the address, size and kind of
-the memory backing the untyped. This allows userland to infer physical memory
-addresses of retyped frames and use them to initiate DMA transfers when no
-IOMMU is available. The kernel makes no guarantees about certain sizes of untyped
-memory being available.
+hardcoded in the kernel and irrelevant to the reader of the array.
+The same is true for the array \texttt{untypedPaddrList}. For each
+untyped-memory capability, it stores the physical addresses backing the
+untyped memory. This allows
+userland to infer physical memory addresses of retyped frames and use them to
+initiate DMA transfers when no IOMMU is available. The kernel makes no
+guarantees about certain sizes of untyped memory being available except that it
+provides a compile-time-configurable minimum number of 4K untyped capabilities
+(default is 12).
 
 \begin{table}[htb]
   \begin{center}
-    \caption{seL4\_UntypedDesc struct}
-    \label{tab:untyped_desc_struct}
+    \caption{DeviceRegion Struct}
+    \label{tab:device_region_struct}
     \begin{tabular}{lll}
       \toprule
       Field Type & Field Name & Description \\
       \midrule
-      \texttt{seL4\_Word}  & \texttt{paddr}    & physical base address of the untyped object \\
-      \texttt{seL4\_Uint8} & \texttt{sizeBits} & size ($2^n$ bytes) of the untyped object \\
-      \texttt{seL4\_Uint8} & \texttt{isDevice} & is this untyped a device or not (see \autoref{sec:kernmemalloc}) \\
-      \texttt{seL4\_Uint8[]} & \texttt{padding} & manual padding so final struct is a multiple of the word size \\
+      \texttt{seL4\_Word}       & \texttt{basePaddr}     & physical base address of the device region \\
+      \texttt{seL4\_Word}       & \texttt{frameSizeBits} & size ($2^n$ bytes) of the frames used \\
+      \texttt{seL4\_SlotRegion} & \texttt{frames}        & capabilities to the frames covering the region \\
       \bottomrule
     \end{tabular}
   \end{center}
 \end{table}
+
+The kernel creates frames covering each physical memory region associated with
+a memory-mapped device. These device regions are either hardcoded (e.g.\ on
+embedded platforms) or discovered at boot time by the kernel through a PCI bus
+scan. The physical base address of each region is stored in \texttt{basePaddr}.
+The slot region \texttt{frames} identifies all frame caps used to back this
+region. They are ordered, so the first frame of the region is referenced by the
+first cap in this slot region and is backed by the physical address
+\texttt{basePaddr}. All frames have the same size: $2^{frameSizeBits}$ bytes.
+Hence, the size of the whole region is:
+\texttt{(frames.end - frames.start) << frameSizeBits}
+
+The array \texttt{deviceRegions} of the BootInfo struct stores all available
+device regions (i.e.\ their structs). There are \texttt{numDeviceRegions} of
+them available in the array.
 
 If the platform has an seL4-supported IOMMU, \texttt{numIOPTLevels} contains
 the number of IOMMU-page-table levels. This information is needed by userland
 when constructing an IOMMU address space (IOSpace). If there is no IOMMU
 support, \texttt{numIOPTLevels} is \texttt{0}.
-
-On ARM if the platform has any available SMMU units the capabilities for them
-will be described by the \texttt{ioSpaceCaps} slot region. The mapping of a
-capability from this region to a specific SMMU is platform specific.
 
 \ifxeightsix
 \section{Boot Command-line Arguments}
@@ -221,7 +186,7 @@ Arguments are listed in \autoref{tab:bootargs} along with their default values (
 
 
 \begin{table}[htb]
-    \caption{IA-32 boot command-line arguments.}
+    \caption{IA-32 boot command-line arguments}
         \begin{tabularx}{\textwidth}{lXX}
             \toprule
               Key & Value & Default \\
@@ -237,8 +202,76 @@ Arguments are listed in \autoref{tab:bootargs} along with their default values (
             \texttt{disable\_iommu} &
             none &
             The IOMMU is enabled by default on VT-d-capable platforms \\
+            \texttt{max\_num\_nodes} &
+            Maximum number of seL4 nodes that can be started up (see \autoref{ch:bootup:multikernel}) &
+            1 \\
+            \texttt{num\_sh\_frames} &
+            Number of frames shared between seL4 nodes (see \autoref{ch:bootup:multikernel}) &
+            0 \\
             \bottomrule
         \end{tabularx}
     \label{tab:bootargs}
 \end{table}
+\fi
+
+\section{\label{ch:bootup:multikernel}Multikernel Bootstrapping}
+
+On ARM, seL4 is uniprocessor only and does not support multikernel
+\cite{Baumann_BDHIPRSS_09} bootstrapping. Therefore, the field \texttt{nodeID}
+of the BootInfo struct
+will always be \texttt{0}, \texttt{numNodes} will be \texttt{1} and
+\texttt{sharedFrames} will be an empty region.
+
+\ifxeightsix
+On IA-32, seL4 can be bootstrapped as a multikernel
+by setting the boot command-line argument \texttt{max\_num\_nodes} to a value
+\texttt{>1}.
+Each available CPU core will then run one isolated \emph{node} of seL4, up to
+the maximum number specified.
+The available physical memory is partitioned equally between nodes.
+All device frames are given to all nodes. The nodes' initial threads have to
+coordinate access to these device frames, e.g.\ by defining which node is
+responsible for which device.
+IOMMU management can only be performed by the first node, the other nodes
+are not given a global IOSpace capability. 
+There is also a hard upper limit of number of nodes defined at compile time
+(default is 8, but it can be increased to 256).
+
+Nodes are isolated from each other, except for
+\emph{shared frames}. When bootstrapping, the kernel creates a number of 4K
+userland frames which are shared between nodes. This number can be configured
+via the boot command-line argument \texttt{num\_sh\_frames}. The shared frames
+will appear in the CNode of each node's initial thread. They are given to
+each initial thread in the same order. In the BootInfo struct, the field
+\texttt{sharedFrames} contains their slot region.
+
+Shared frames can be used by userland to implement
+shared data structures,
+message passing and synchronisation mechanisms. Individual frames can, for
+example, be minted and handed out to subsystems. This allows connecting them
+across nodes in a fine-grained manner. Each node has a node ID (field
+\texttt{nodeID} in BootInfo) whereas the number of nodes can be obtained from
+the field \texttt{numNodes}.
+
+Userland images are given to the kernel by a multiboot-compliant bootloader
+(e.g.\ GRUB, syslinux) via \emph{boot modules}. Each boot module contains an
+ELF file of a userland image. If there is only one userland image,
+each node will get its own copy of that userland image. If
+multiple userland images are given, the first node gets the first image, the
+second node the second image etc. If there are more nodes than images, each
+remaining node gets a copy of the last image.
+
+If the kernel is compiled in debug mode, each node can be assigned a separate
+console port and debug port (see \autoref{tab:bootargs}) which is done by
+specifying an array of I/O-port base addresses. For example,
+\texttt{console\_port=0x3f8,0x2f8,0x3e8,0x2e8}
+assigns port 0x3f8 to node 0, port 0x2f8 to node 1, etc. The remaining nodes
+have no assigned port and produce no console output. The argument
+\texttt{debug\_port} works in exactly the same way.
+
+Further details can be obtained from \cite{vonTessin_10} which mainly talks
+about the formal aspects of seL4's multikernel version but also contains
+details about the bootstrapping. More recent additional information can be
+found in \cite{vonTessin_12}, which focusses less on the formal side
+and more on the OS side.
 \fi

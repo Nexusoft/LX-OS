@@ -20,6 +20,10 @@ config ARCH_ARM_V7A
     bool
     default n
 
+config KERNEL_STABLE
+    bool
+    default y
+
 # Native word size of the current platform. This is primarily intended for use
 # in code generators that need to know, at generation-time, the word size of
 # the target platform.
@@ -200,7 +204,7 @@ menu "seL4 System Parameters"
 
     config TIMER_TICK_MS
         int "Timer tick period in milliseconds"
-        default 2
+        default 20
         help
             The number of milliseconds between timer ticks.
 
@@ -226,13 +230,9 @@ menu "seL4 System Parameters"
             the kernel checks for pending interrupts (and preempts the
             currently running syscall if interrupts are pending).
 
-    config MAX_NUM_BOOTINFO_DEVICE_REGIONS
-        int "Max number of bootinfo device regions"
-        default 199
-
     config MAX_NUM_BOOTINFO_UNTYPED_CAPS
-        int "Max number of bootinfo untyped caps"
-        default 167
+        int #"Max number of bootinfo untyped caps"
+        default 800
 
     config MAX_NUM_NODES
         int "Max number of cpu nodes"
@@ -240,10 +240,20 @@ menu "seL4 System Parameters"
         depends on ARCH_X86
         default 1
 
-    config MAX_NUM_PASSTHROUGH_DEVICES
-        int "Max number of passthrough devices"
+    config MAX_MEM_REGIONS
+        int "Max number of memory regions to describe in bootinfo"
+        depends on ARCH_IA32
+        default 10
+        help
+            Multiboot may describe where additional real memory is
+            that is not inside the kernel window.
+            These regions are passed to the roottask in the arch
+            bootinfo frame.
+
+    config MAX_RMRR_ENTRIES
+        int "Max number of RMRR entries to support finding in ACPI"
         depends on IOMMU
-        default 20
+        default 32
 
     config FASTPATH
         bool "Enable fastpath"
@@ -267,6 +277,7 @@ menu "seL4 System Parameters"
     config NUM_PRIORITIES
         int "Number of priority levels"
         default 256
+        range 1 256
         help
             The number of priority levels per domain
 
@@ -279,15 +290,43 @@ menu "seL4 System Parameters"
             NOTE this is only tested on the sabre and will not work on platforms with < 512mb memory.
             This is not fully implemented for x86.
 
+    config AEP_BINDING
+        bool
+        default y
+
+    config ALLOW_NULL_CSPACE
+        bool "Null CSpace support"
+        default n
+        help
+            This option allows threads to be configured and run without a
+            CSpace. Where configuring a thread with a null cap as its CSpace is
+            usually not allowed, enabling this setting will permit this
+            operation.
+
 endmenu
 
 menu "Build Options"
-    
-    config DEBUG_BUILD
-        bool "Build the kernel with debug support"
-        default y
-        help
-            Enable the debug facilities in the kernel
+   
+    choice 
+        prompt "Build type - Debug or Release?"
+        default DEBUG_BUILD
+
+        config DEBUG_BUILD
+            bool "Build the kernel with debug support"
+            help
+                Enable the debug facilities in the kernel
+
+#        config RELEASE_PRINTF
+#            bool "Release build with release_printf"
+#            help 
+#                Enable 'release_printf' to allow printing in an otherwise 
+#                release build.
+
+        config RELEASE_BUILD
+            bool "Release build"
+            help
+                A release kernel with no debugging symbols, print support or asserts.
+    endchoice
 
     config IRQ_REPORTING
         bool "Report suprious or undelivered IRQs"
@@ -390,6 +429,55 @@ menu "Build Options"
             adjacent cache line prefetcher, the DCU prefetcher and the DCU IP prefetcher.
             Currently unimplemented on other platforms.
 
+endmenu
+
+menu "Boot options"
+    choice
+        depends on ARCH_IA32
+        prompt "Multiboot graphics mode"
+        help
+            The type of graphics mode to request from the boot loader.
+            This is encoded into the multiboot header and is merely a hint,
+            the boot loader is free to ignore or set some other mode
+        default  IA32_MULTIBOOT_GRAPHICS_MODE_NONE
+        config IA32_MULTIBOOT_GRAPHICS_MODE_NONE
+            bool "None"
+            help
+                Request no graphics mode
+        config IA32_MULTIBOOT_GRAPHICS_MODE_TEXT
+            bool "Text"
+            help
+                Request a text mode
+        config IA32_MULTIBOOT_GRAPHICS_MODE_LINEAR
+            bool "Linear"
+            help
+                Request a linear graphics mode
+    endchoice
+    config IA32_MULTIBOOT_GRAPHICS_MODE_WIDTH
+        int "Mode Width"
+        depends on IA32_MULTIBOOT_GRAPHICS_MODE_TEXT || IA32_MULTIBOOT_GRAPHICS_MODE_LINEAR
+        default 80 if IA32_MULTIBOOT_GRAPHICS_MODE_TEXT
+        default 1024 if IA32_MULTIBOOT_GRAPHICS_MODE_LINEAR
+        help
+            The width of the graphics mode to reqest. For a linear graphics mode this
+            is the number of pixels. For a text mode this is the number of characters.
+            Value of zero indicates no preference
+    config IA32_MULTIBOOT_GRAPHICS_MODE_HEIGHT
+        int "Mode Height"
+        depends on IA32_MULTIBOOT_GRAPHICS_MODE_TEXT || IA32_MULTIBOOT_GRAPHICS_MODE_LINEAR
+        default 25 if IA32_MULTIBOOT_GRAPHICS_MODE_TEXT
+        default 768 if IA32_MULTIBOOT_GRAPHICS_MODE_LINEAR
+        help
+            The height of the graphics mode to reqest. For a linear graphics mode this
+            is the number of pixels. For a text mode this is the number of characters
+            Value of zero indicates no preference
+     config IA32_MULTIBOOT_GRAPHICS_MODE_DEPTH
+        int "Mode Depth"
+        depends on IA32_MULTIBOOT_GRAPHICS_MODE_LINEAR
+        default 32
+        help
+            The bits per pixel of the linear graphics mode to request.
+            Value of zero indicates no preference
 endmenu
 
 menu "Errata"

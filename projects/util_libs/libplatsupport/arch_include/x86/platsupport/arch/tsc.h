@@ -1,19 +1,17 @@
 /*
- * Copyright 2017, Data61
- * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
- * ABN 41 687 119 230.
+ * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
  * the BSD 2-Clause license. Note that NO WARRANTY is provided.
  * See "LICENSE_BSD2.txt" for details.
  *
- * @TAG(DATA61_BSD)
+ * @TAG(NICTA_BSD)
  */
-#pragma once
+#ifndef _PLATSUPPORT_TSC_H
+#define _PLATSUPPORT_TSC_H
 
 #include <utils/attribute.h>
-#include <platsupport/plat/hpet.h>
-#include <platsupport/plat/pit.h>
+#include <platsupport/timer.h>
 
 /* just read the tsc. This may be executed out of order as it is unserialised */
 static inline uint64_t
@@ -64,15 +62,22 @@ rdtsc_cpuid(void)
 /**
  * Calculates number of ticks per second of the time stamp counter
  * This function takes complete control of the given timer for
- * the duraction of the calculation and will reprogram it. It
+ * the duraction of the calculation and will repogram it. It
  * may also leave un-acked interrupts
  *
+ * @param timer Timer to use for calculating frequency
  * @return Ticks per second, or 0 on error
  */
-uint64_t tsc_calculate_frequency_hpet(const hpet_t *hpet);
-uint64_t tsc_calculate_frequency_pit(pit_t *pit);
+uint64_t tsc_calculate_frequency(pstimer_t *timer);
 
-static inline uint64_t tsc_get_time(uint64_t freq)
-{
-    return muldivu64(rdtsc_pure(), NS_IN_S, freq);
-}
+/*
+ * Get a tsc-based implementation of pstimer (acts as an up counting clock)
+ *
+ * @param timer a timeout timer to use to calculate tsc frequency.
+ * @return NULL on error.
+ */
+pstimer_t *tsc_get_timer(pstimer_t *timer);
+
+#endif /* _PLATSUPPORT_TSC_H */
+
+

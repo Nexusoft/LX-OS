@@ -1,16 +1,15 @@
 /*
- * Copyright 2017, Data61
- * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
- * ABN 41 687 119 230.
+ * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
  * the BSD 2-Clause license. Note that NO WARRANTY is provided.
  * See "LICENSE_BSD2.txt" for details.
  *
- * @TAG(DATA61_BSD)
+ * @TAG(NICTA_BSD)
  */
 
-#pragma once
+#ifndef __PLAT_SUPPORT_MACH_TMU_H
+#define __PLAT_SUPPORT_MACH_TMU_H
 
 #include <stdint.h>
 #include <platsupport/io.h>
@@ -91,3 +90,4 @@ int exynos_tmu_set_alarms_falling(tmu_t* tmu,
  */
 void exynos_tmu_handle_irq(tmu_t* tmu);
 
+#endif /* __PLAT_SUPPORT_MACH_TMU_H */

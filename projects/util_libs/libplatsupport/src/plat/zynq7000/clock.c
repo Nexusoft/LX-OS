@@ -1,13 +1,11 @@
 /*
- * Copyright 2017, Data61
- * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
- * ABN 41 687 119 230.
+ * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
  * the BSD 2-Clause license. Note that NO WARRANTY is provided.
  * See "LICENSE_BSD2.txt" for details.
  *
- * @TAG(DATA61_BSD)
+ * @TAG(NICTA_BSD)
  */
 #include "src.h"
 #include "../../arch/arm/clock.h"
@@ -163,6 +161,7 @@ static struct pll_cfg_t pll_cfg_tbl[] = {
     {66, PLL_CFG_FDIV66}
 };
 
+
 /******************
  ****  Clocks  ****
  ******************/
@@ -190,15 +189,15 @@ static struct pll_cfg_t pll_cfg_tbl[] = {
 #define CLK_DIVISOR_MASK(div)               CLK_DIVISOR(div, CLK_DIVISOR_MAX)
 #define CLK_SET_DIVISOR(div, reg, val)      \
     do {                                    \
-        uint32_t v;                         \
-        v = reg & ~(CLK_DIVISOR_MASK(div)); \
-        reg = v | CLK_DIVISOR(div, val);    \
+        reg &= ~(CLK_DIVISOR_MASK(div));    \
+        reg |= CLK_DIVISOR(div, val);       \
     } while (0)
 #define CLK_GET_DIVISOR(div, reg)           \
     ((reg & CLK_DIVISOR_MASK(div)) >> CLK_DIVISOR##div##_SHIFT)
 
 /* Clock Control (enable/disable a clock) */
 #define CLK_CLKACT          BIT(0)
+
 
 /**********************
  ****  CPU Clocks  ****
@@ -213,6 +212,11 @@ static struct pll_cfg_t pll_cfg_tbl[] = {
 
 /* CPU Clock Ratio Mode Select */
 #define CPU_CLK_621_TRUE                    BIT(0)
+
+/* CPU Clock Divisor */
+#define CPU_CLK_SET_DIVISOR(val)            \
+    CLK_SET_DIVISOR(0, clk_regs->arm_clk_ctrl, val)
+
 
 /**********************
  ****  DDR Clocks  ****
@@ -235,6 +239,7 @@ static struct pll_cfg_t pll_cfg_tbl[] = {
 #define DDR_CLK_GET_DIVISOR(dom)    \
     ((clk_regs->ddr_clk_ctrl & DDR_CLK_DIVISOR_MASK(dom)) >> DDR_##dom##XCLK_DIVISOR_SHIFT)
 
+
 /**************************
  ****  FPGA PL Clocks  ****
  **************************/
@@ -246,6 +251,7 @@ typedef volatile struct {
     uint32_t thr_cnt;   /* PL Clock x Throttle Count */
     uint32_t thr_sta;   /* PL Clock x Throttle Status */
 } pl_clk_regs_t;
+
 
 /***************************
  ****  Clock Registers  ****
@@ -308,29 +314,8 @@ static const enum clk_id generic_clk_src[] = {
 #define can_clk_src generic_clk_src
 #define pcap_clk_src generic_clk_src
 
+
 static volatile struct zynq7000_clk_regs* clk_regs = NULL;
-
-/* Set divisors, avoiding over clocking peripherals */
-static inline void
-set_divs(volatile uint32_t* ctrl, uint8_t div0, uint8_t div1)
-{
-    uint8_t old_div0;
-    old_div0 = CLK_GET_DIVISOR(0, *ctrl);
-    if (div0 > old_div0) {
-        CLK_SET_DIVISOR(0, *ctrl, div0);
-        CLK_SET_DIVISOR(1, *ctrl, div1);
-    } else {
-        CLK_SET_DIVISOR(1, *ctrl, div1);
-        CLK_SET_DIVISOR(0, *ctrl, div0);
-    }
-}
-
-/* Set divisors where only one divisor is available */
-static inline void
-set_div(volatile uint32_t* ctrl, uint8_t div0)
-{
-    CLK_SET_DIVISOR(0, *ctrl, div0);
-}
 
 /*
  * Calculate the clock rate divisors
@@ -418,6 +403,7 @@ zynq7000_even_divisor(uint8_t divisor)
     }
 }
 
+
 /* PS_CLK */
 static struct clock master_clk = { CLK_OPS_DEFAULT(MASTER) };
 
@@ -465,6 +451,7 @@ _pll_get_freq(clk_t* clk)
 
     return fout;
 }
+
 
 static freq_t
 _pll_set_freq(clk_t* clk, freq_t hz)
@@ -528,36 +515,6 @@ static struct clock arm_pll_clk = { CLK_OPS(ARM_PLL, pll, NULL) };
 static struct clock ddr_pll_clk = { CLK_OPS(DDR_PLL, pll, NULL) };
 static struct clock io_pll_clk  = { CLK_OPS(IO_PLL,  pll, NULL) };
 
-static int
-_cpu_set_621(clk_t* clk, int v)
-{
-    switch (clk->id) {
-    case CLK_CPU_6OR4X:
-    case CLK_CPU_3OR2X:
-    case CLK_CPU_2X:
-    case CLK_CPU_1X:
-        if (v) {
-            clk_regs->clk_621_true |= CPU_CLK_621_TRUE;
-        } else {
-            clk_regs->clk_621_true &= ~CPU_CLK_621_TRUE;
-        }
-        return 0;
-    default:
-        return -1;
-    }
-}
-
-int
-clk_cpu_clk_select_621(clk_t* clk)
-{
-    return _cpu_set_621(clk, 1);
-}
-
-int
-clk_cpu_clk_select_421(clk_t* clk)
-{
-    return _cpu_set_621(clk, 0);
-}
 
 /* CPU Clocks */
 static freq_t
@@ -613,7 +570,8 @@ _cpu_set_freq(clk_t* clk, freq_t hz)
 
     /* CPU clocks must have an even divisor */
     divisor0 = zynq7000_even_divisor(divisor0);
-    set_div(&clk_regs->arm_clk_ctrl, divisor0);
+
+    CPU_CLK_SET_DIVISOR(divisor0);
 
     return clk_get_freq(clk);
 }
@@ -643,6 +601,7 @@ static struct clock cpu_6or4x_clk = { CLK_OPS(CPU_6OR4X, cpu, NULL) };
 static struct clock cpu_3or2x_clk = { CLK_OPS(CPU_3OR2X, cpu, NULL) };
 static struct clock cpu_2x_clk    = { CLK_OPS(CPU_2X,    cpu, NULL) };
 static struct clock cpu_1x_clk    = { CLK_OPS(CPU_1X,    cpu, NULL) };
+
 
 /* DDR Clocks */
 static freq_t
@@ -698,7 +657,8 @@ _ddr_set_freq(clk_t* clk, freq_t hz)
         break;
     case CLK_DCI:
         zynq7000_clk_calc_divs(hz, fin, &divisor0, &divisor1);
-        set_divs(&clk_regs->dci_clk_ctrl, divisor0, divisor1);
+        CLK_SET_DIVISOR(0, clk_regs->dci_clk_ctrl, divisor0);
+        CLK_SET_DIVISOR(1, clk_regs->dci_clk_ctrl, divisor1);
         break;
     default:
         assert(!"Invalid clock");
@@ -730,6 +690,7 @@ _ddr_init(clk_t* clk)
 static struct clock ddr_2x_clk = { CLK_OPS(DDR_2X, ddr, NULL) };
 static struct clock ddr_3x_clk = { CLK_OPS(DDR_3X, ddr, NULL) };
 static struct clock dci_clk    = { CLK_OPS(DCI,    ddr, NULL) };
+
 
 /* I/O Peripheral Clocks */
 static freq_t
@@ -806,40 +767,43 @@ _aper_set_freq(clk_t* clk, freq_t hz)
         /* One divider clocks */
     case CLK_SMC:
         zynq7000_clk_calc_divs(hz, fin, &divisor0, NULL);
-        set_div(&clk_regs->smc_clk_ctrl, divisor0);
+        CLK_SET_DIVISOR(0, clk_regs->smc_clk_ctrl, divisor0);
         break;
     case CLK_LQSPI:
         zynq7000_clk_calc_divs(hz, fin, &divisor0, NULL);
-        set_div(&clk_regs->lqspi_clk_ctrl, divisor0);
+        CLK_SET_DIVISOR(0, clk_regs->lqspi_clk_ctrl, divisor0);
         break;
     case CLK_SDIO0:
     case CLK_SDIO1:
         zynq7000_clk_calc_divs(hz, fin, &divisor0, NULL);
-        set_div(&clk_regs->sdio_clk_ctrl, divisor0);
+        CLK_SET_DIVISOR(0, clk_regs->sdio_clk_ctrl, divisor0);
         break;
     case CLK_UART0:
     case CLK_UART1:
         zynq7000_clk_calc_divs(hz, fin, &divisor0, NULL);
-        set_div(&clk_regs->uart_clk_ctrl, divisor0);
+        CLK_SET_DIVISOR(0, clk_regs->uart_clk_ctrl, divisor0);
         break;
     case CLK_SPI0:
     case CLK_SPI1:
         zynq7000_clk_calc_divs(hz, fin, &divisor0, NULL);
-        set_div(&clk_regs->spi_clk_ctrl, divisor0);
+        CLK_SET_DIVISOR(0, clk_regs->spi_clk_ctrl, divisor0);
         break;
         /* Two divider clocks */
     case CLK_GEM0:
         zynq7000_clk_calc_divs(hz, fin, &divisor0, &divisor1);
-        set_divs(&clk_regs->gem0_clk_ctrl, divisor0, divisor1);
+        CLK_SET_DIVISOR(0, clk_regs->gem0_clk_ctrl, divisor0);
+        CLK_SET_DIVISOR(1, clk_regs->gem0_clk_ctrl, divisor1);
         break;
     case CLK_GEM1:
         zynq7000_clk_calc_divs(hz, fin, &divisor0, &divisor1);
-        set_divs(&clk_regs->gem1_clk_ctrl, divisor0, divisor1);
+        CLK_SET_DIVISOR(0, clk_regs->gem1_clk_ctrl, divisor0);
+        CLK_SET_DIVISOR(1, clk_regs->gem1_clk_ctrl, divisor1);
         break;
     case CLK_CAN0:
     case CLK_CAN1:
         zynq7000_clk_calc_divs(hz, fin, &divisor0, &divisor1);
-        set_divs(&clk_regs->can_clk_ctrl, divisor0, divisor1);
+        CLK_SET_DIVISOR(0, clk_regs->can_clk_ctrl, divisor0);
+        CLK_SET_DIVISOR(1, clk_regs->can_clk_ctrl, divisor1);
         break;
     default:
         assert(!"Invalid clock");
@@ -881,6 +845,7 @@ static struct clock spi1_clk  = { CLK_OPS(SPI1,  aper, NULL) };
 static struct clock can0_clk  = { CLK_OPS(CAN0,  aper, NULL) };
 static struct clock can1_clk  = { CLK_OPS(CAN1,  aper, NULL) };
 
+
 static inline pl_clk_regs_t*
 get_pl_clk_regs(clk_t* clk)
 {
@@ -920,7 +885,8 @@ _fpga_set_freq(clk_t* clk, freq_t hz)
 
     fin = clk_get_freq(clk->parent);
     zynq7000_clk_calc_divs(hz, fin, &div0, &div1);
-    set_divs(&regs->clk_ctrl, div0, div1);
+    CLK_SET_DIVISOR(0, regs->clk_ctrl, div0);
+    CLK_SET_DIVISOR(1, regs->clk_ctrl, div1);
 
     return clk_get_freq(clk);
 }
@@ -981,7 +947,7 @@ clock_sys_init(ps_io_ops_t* o, clock_sys_t* clock_sys)
 {
     src_dev_t slcr;
     int err;
-    assert(sizeof(struct zynq7000_clk_regs) == 0x208);
+    assert(sizeof(struct zynq7000_clk_regs) == 0x308);
     /* Grab a handle to the clock registers */
     err = reset_controller_init(SLCR, o, &slcr);
     if (err) {
@@ -1003,6 +969,7 @@ clk_print_clock_tree(clock_sys_t* sys)
     clk_t *clk = clk_get_clock(sys, CLK_MASTER);
     clk_print_tree(clk, "");
 }
+
 
 clk_t* ps_clocks[] = {
     [CLK_MASTER]    = &master_clk,
@@ -1067,3 +1034,4 @@ freq_t ps_freq_default[] = {
     [CLK_FPGA_PL2]  =    50 * MHZ,
     [CLK_FPGA_PL3]  =    50 * MHZ,
 };
+

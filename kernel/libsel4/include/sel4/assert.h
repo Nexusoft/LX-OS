@@ -1,7 +1,11 @@
 /*
- * Copyright 2020, Data61, CSIRO (ABN 41 687 119 230)
+ * Copyright 2014, NICTA
  *
- * SPDX-License-Identifier: BSD-2-Clause
+ * This software may be distributed and modified according to the terms of
+ * the BSD 2-Clause license. Note that NO WARRANTY is provided.
+ * See "LICENSE_BSD2.txt" for details.
+ *
+ * @TAG(NICTA_BSD)
  */
 
 /**
@@ -12,11 +16,13 @@
  * sl4_DebugCompileTimeAsssert.
  */
 
-#pragma once
+#ifndef __LIBSEL4_ASSERT_H
+#define __LIBSEL4_ASSERT_H
+
 /**
  * Hidden function, use the macros seL4_Fail or seL4_Assert.
  */
-void __assert_fail(const char  *str, const char *file, int line, const char *function);
+void __assert_fail(const char*  str, const char* file, int line, const char* function);
 
 /**
  * If expr evaluates to false _seL4_Fail is called with the
@@ -43,3 +49,4 @@ void __assert_fail(const char  *str, const char *file, int line, const char *fun
 #define seL4_CompileTimeAssert(expr) \
     extern char __seL4_CompileTimeAssertFailed_ ## __COUNTER__[__builtin_constant_p(expr) ? ((expr) ? 1 : -1) : -1] __attribute__((unused))
 
+#endif // __LIBSEL4_ASSERT_H

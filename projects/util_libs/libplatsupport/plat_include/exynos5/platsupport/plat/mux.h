@@ -1,26 +1,22 @@
 /*
- * Copyright 2017, Data61
- * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
- * ABN 41 687 119 230.
+ * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
  * the BSD 2-Clause license. Note that NO WARRANTY is provided.
  * See "LICENSE_BSD2.txt" for details.
  *
- * @TAG(DATA61_BSD)
+ * @TAG(NICTA_BSD)
  */
-#pragma once
+#ifndef _PLATSUPPORT_PLAT_MUX_H
+#define _PLATSUPPORT_PLAT_MUX_H
 
-#include <autoconf.h>
-#include <platsupport/gen_config.h>
-
-#if defined(CONFIG_PLAT_EXYNOS5250)
+#if defined(PLAT_EXYNOS5250)
 /* These are for the arndale */
 #define EXYNOS_GPIOLEFT_PADDR    0x11400000
 #define EXYNOS_GPIORIGHT_PADDR   0x13400000
 #define EXYNOS_GPIOC2C_PADDR     0x10D10000
 #define EXYNOS_GPIOAUDIO_PADDR   0x03860000
-#elif defined(CONFIG_PLAT_EXYNOS54XX)
+#elif defined(PLAT_EXYNOS54XX)
 /* These are for Odroid-XU and XU3 */
 #define EXYNOS_GPIOLEFT_PADDR    0x13400000
 #define EXYNOS_GPIORIGHT_PADDR   0x14000000
@@ -85,3 +81,4 @@ int exynos_mux_init(void* gpioleft,
                     void* gpioaudio,
                     mux_sys_t* mux);
 
+#endif /* _PLATSUPPORT_PLAT_MUX_H */

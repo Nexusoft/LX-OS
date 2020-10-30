@@ -1,13 +1,11 @@
 /*
- * Copyright 2017, Data61
- * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
- * ABN 41 687 119 230.
+ * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
  * the BSD 2-Clause license. Note that NO WARRANTY is provided.
  * See "LICENSE_BSD2.txt" for details.
  *
- * @TAG(DATA61_BSD)
+ * @TAG(NICTA_BSD)
  */
 
 #include <platsupport/plat/acpi/regions.h>
@@ -112,6 +110,7 @@ consolidate_regions(const RegionList_t* regions_in, RegionList_t* consolidated)
     }
 }
 
+
 void
 sort_regions(RegionList_t* regions)
 {
@@ -173,8 +172,10 @@ remove_region(RegionList_t* region_list, int index)
     return 0;
 }
 
+
+
 int
-find_space(const RegionList_t* rlist, size_t size,
+find_space(const RegionList_t* rlist, uint32_t size,
            region_type_t type)
 {
 
@@ -197,7 +198,7 @@ find_space(const RegionList_t* rlist, size_t size,
 }
 
 int
-split_region(RegionList_t* rlist, int index, size_t size)
+split_region(RegionList_t* rlist, int index, uint32_t size)
 {
     int ret;
     Region_t* r = &rlist->regions[index];
@@ -235,6 +236,7 @@ find_region(const RegionList_t* rlist, int start_index,
     return -1;
 }
 
+
 acpi_header_t *
 acpi_find_region(acpi_t *acpi, region_type_t region)
 {
@@ -247,3 +249,4 @@ acpi_find_region(acpi_t *acpi, region_type_t region)
 
     return (acpi_header_t *) regions->regions[index].start;
 }
+

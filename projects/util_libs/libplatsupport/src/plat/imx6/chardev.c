@@ -1,13 +1,11 @@
 /*
- * Copyright 2017, Data61
- * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
- * ABN 41 687 119 230.
+ * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
  * the BSD 2-Clause license. Note that NO WARRANTY is provided.
  * See "LICENSE_BSD2.txt" for details.
  *
- * @TAG(DATA61_BSD)
+ * @TAG(NICTA_BSD)
  */
 
 /**
@@ -19,7 +17,7 @@
 #include "../../common.h"
 #include <utils/util.h>
 
-#include "../../chardev.h"
+#include "serial.h"
 
 static const int uart1_irqs[] = {UART1_IRQ, -1};
 static const int uart2_irqs[] = {UART2_IRQ, -1};
@@ -27,13 +25,15 @@ static const int uart3_irqs[] = {UART3_IRQ, -1};
 static const int uart4_irqs[] = {UART4_IRQ, -1};
 static const int uart5_irqs[] = {UART5_IRQ, -1};
 
+
 #define UART_DEFN(devid) {          \
-    .id      = IMX_UART##devid,    \
+    .id      = IMX6_UART##devid,    \
     .paddr   = UART##devid##_PADDR, \
     .size    = BIT(12),             \
     .irqs    = uart##devid##_irqs,  \
     .init_fn = &uart_init           \
 }
+
 
 static const struct dev_defn dev_defn[] = {
     UART_DEFN(1),

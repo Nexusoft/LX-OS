@@ -1,22 +1,44 @@
 /*
- * Copyright 2020, Data61, CSIRO (ABN 41 687 119 230)
+ * Copyright 2014, NICTA
  *
- * SPDX-License-Identifier: BSD-2-Clause
+ * This software may be distributed and modified according to the terms of
+ * the BSD 2-Clause license. Note that NO WARRANTY is provided.
+ * See "LICENSE_BSD2.txt" for details.
+ *
+ * @TAG(NICTA_BSD)
  */
 
-#pragma once
+#ifndef __LIBSEL4_ARCH_TYPES_H
+#define __LIBSEL4_ARCH_TYPES_H
 
 #include <sel4/simple_types.h>
-#include <sel4/sel4_arch/types.h>
+
+#define seL4_WordBits 32
+
+#define seL4_PageBits 12
+#define seL4_SlotBits 4
+#define seL4_TCBBits 9
+#define seL4_EndpointBits 4
+#define seL4_PageTableBits 10
+#define seL4_PageDirBits 14
+
+#define seL4_Frame_Args 4
+#define seL4_Frame_MRs 7
+#define seL4_Frame_HasNPC 0
+
+typedef seL4_Uint32 seL4_Word;
+typedef seL4_Word seL4_CPtr;
 
 typedef seL4_CPtr seL4_ARM_Page;
 typedef seL4_CPtr seL4_ARM_PageTable;
 typedef seL4_CPtr seL4_ARM_PageDirectory;
-typedef seL4_CPtr seL4_ARM_ASIDControl;
-typedef seL4_CPtr seL4_ARM_ASIDPool;
-typedef seL4_CPtr seL4_ARM_VCPU;
-typedef seL4_CPtr seL4_ARM_IOSpace;
-typedef seL4_CPtr seL4_ARM_IOPageTable;
+
+typedef struct seL4_UserContext_ {
+    /* frame registers */
+    seL4_Word pc, sp, cpsr, r0, r1, r8, r9, r10, r11, r12;
+    /* other integer registers */
+    seL4_Word r2, r3, r4, r5, r6, r7, r14;
+} seL4_UserContext;
 
 typedef enum {
     seL4_ARM_PageCacheable = 0x01,
@@ -27,10 +49,4 @@ typedef enum {
     SEL4_FORCE_LONG_ENUM(seL4_ARM_VMAttributes),
 } seL4_ARM_VMAttributes;
 
-typedef enum {
-    seL4_ARM_CacheI   = 1,
-    seL4_ARM_CacheD   = 2,
-    seL4_ARM_CacheID  = 3,
-    SEL4_FORCE_LONG_ENUM(seL4_ARM_CacheType),
-} seL4_ARM_CacheType;
-
+#endif /* __ARCH_SEL4TYPES_H__ */

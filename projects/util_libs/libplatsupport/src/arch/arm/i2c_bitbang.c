@@ -1,20 +1,15 @@
 /*
- * Copyright 2017, Data61
- * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
- * ABN 41 687 119 230.
+ * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
  * the BSD 2-Clause license. Note that NO WARRANTY is provided.
  * See "LICENSE_BSD2.txt" for details.
  *
- * @TAG(DATA61_BSD)
+ * @TAG(NICTA_BSD)
  */
 
-#include <autoconf.h>
-#include <platsupport/gen_config.h>
-
 /* To extend support, provide platform specific i2c.h and gpio.h and delay.c */
-#if defined(CONFIG_PLAT_EXYNOS5) || defined(CONFIG_PLAT_EXYNOS4) || defined(CONFIG_PLAT_IMX6)
+#if defined(PLAT_EXYNOS5) || defined(PLAT_EXYNOS4) || defined(PLAT_IMX6)
 
 #include <platsupport/i2c.h>
 #include <platsupport/delay.h>
@@ -109,6 +104,7 @@ i2c_bb_stop(struct i2c_bb* d)
     _hold  (d);
 }
 
+
 static inline void
 i2c_bb_sendbit(struct i2c_bb* d, int bit)
 {
@@ -169,18 +165,14 @@ i2c_bb_readbyte(struct i2c_bb* d, int send_nak)
 }
 
 static int
-i2c_bb_read(i2c_bus_t* bus, void* buf, size_t size,
-            UNUSED bool end_with_repeat_start,
-            i2c_callback_fn cb, void* token)
+i2c_bb_read(i2c_bus_t* bus, void* buf, size_t size, i2c_callback_fn cb, void* token)
 {
     assert(!"Not implemented\n");
     return -1;
 }
 
 static int
-i2c_bb_write(i2c_bus_t* bus, const void* buf, size_t size,
-             UNUSED bool end_with_repeat_start,
-             i2c_callback_fn cb, void* token)
+i2c_bb_write(i2c_bus_t* bus, const void* buf, size_t size, i2c_callback_fn cb, void* token)
 {
     assert(!"Not implemented\n");
     return -1;
@@ -193,23 +185,18 @@ i2c_bb_master_stop(i2c_bus_t* bus)
     return -1;
 }
 
+
 static int
-i2c_bb_start_read(i2c_slave_t *sl,
-                  void* vdata, size_t size,
-                  UNUSED bool end_with_repeat_start,
-                  i2c_callback_fn cb, void* token)
+i2c_bb_start_read(i2c_bus_t* i2c_bus, int addr, void* vdata, size_t size, i2c_callback_fn cb, void* token)
 {
     struct i2c_bb* d;
     int nak;
     int count;
     char* data = (char*)vdata;
-
-    assert(sl != NULL && sl->bus != NULL);
-
-    d = i2c_bus_get_priv(sl->bus);
+    d = i2c_bus_get_priv(i2c_bus);
 
     i2c_bb_start(d);
-    nak = i2c_bb_sendbyte(d, sl->address | 1);
+    nak = i2c_bb_sendbyte(d, addr | 1);
     if (nak) {
         i2c_bb_stop(d);
         return -1;
@@ -221,28 +208,22 @@ i2c_bb_start_read(i2c_slave_t *sl,
 
     i2c_bb_stop(d);
     if (cb) {
-        cb(sl->bus, I2CSTAT_COMPLETE, size, token);
+        cb(i2c_bus, I2CSTAT_COMPLETE, size, token);
     }
     return count;
 }
 
 static int
-i2c_bb_start_write(i2c_slave_t *sl,
-                   const void* vdata, size_t size,
-                   UNUSED bool end_with_repeat_start,
-                   i2c_callback_fn cb, void* token)
+i2c_bb_start_write(i2c_bus_t* i2c_bus, int addr, const void* vdata, size_t size, i2c_callback_fn cb, void* token)
 {
     struct i2c_bb* d;
     int nak;
     int count;
     const char* data = (const char*)vdata;
-
-    assert(sl != NULL && sl->bus != NULL);
-
-    d = i2c_bus_get_priv(sl->bus);
+    d = i2c_bus_get_priv(i2c_bus);
 
     i2c_bb_start(d);
-    nak = i2c_bb_sendbyte(d, sl->address & ~1);
+    nak = i2c_bb_sendbyte(d, addr & ~1);
     if (nak) {
         return -1;
     }
@@ -253,7 +234,7 @@ i2c_bb_start_write(i2c_slave_t *sl,
 
     i2c_bb_stop(d);
     if (cb) {
-        cb(sl->bus, I2CSTAT_COMPLETE, size, token);
+        cb(i2c_bus, I2CSTAT_COMPLETE, size, token);
     }
     return count;
 }
@@ -268,65 +249,25 @@ i2c_bb_handle_irq(i2c_bus_t* i2c_bus)
 }
 
 static int
-i2c_bb_set_self_slave_address(i2c_bus_t *i2c_bus, int addr)
+i2c_bb_set_address(i2c_bus_t* i2c_bus, int addr, i2c_aas_callback_fn aas_cb, void* aas_token)
 {
     struct i2c_bb* d;
     d = i2c_bus_get_priv(i2c_bus);
     (void)d;
+    (void)aas_cb;
+    (void)aas_token;
     assert(!"Not implemented");
     return -1;
 }
 
-static void
-i2c_bb_register_slave_event_handler(i2c_bus_t *bus,
-                                    i2c_aas_callback_fn aas_cb, void* aas_token)
-{
-    assert(bus != NULL);
-    bus->aas_cb = aas_cb;
-    bus->aas_token = aas_token;
-}
-
-static const uint32_t i2c_speed_freqs[] = {
-    [I2C_SLAVE_SPEED_STANDARD] = 100000,
-    [I2C_SLAVE_SPEED_FAST] = 400000,
-    [I2C_SLAVE_SPEED_FASTPLUS] = 1000000,
-    [I2C_SLAVE_SPEED_HIGHSPEED] = 3400000
-};
 
 static long
-i2c_bb_set_speed(i2c_bus_t* i2c_bus, enum i2c_slave_speed speed)
+i2c_bb_set_speed(i2c_bus_t* i2c_bus, long speed)
 {
     struct i2c_bb* d;
     d = i2c_bus_get_priv(i2c_bus);
-
-    if (speed < I2C_SLAVE_SPEED_STANDARD || speed > I2C_SLAVE_SPEED_HIGHSPEED) {
-        ZF_LOGE("lib I2C-bitbang: Unsupported speed %d.", speed);
-        return -1;
-    }
-
-    d->speed = i2c_speed_freqs[speed];
+    d->speed = speed;
     return speed;
-}
-
-static int
-i2c_bb_slave_init(i2c_bus_t* i2c_bus, int address,
-                  enum i2c_slave_address_size address_size,
-                  enum i2c_slave_speed max_speed,
-                  uint32_t flags,
-                  i2c_slave_t* sl)
-{
-    assert(sl != NULL);
-
-    sl->address = address;
-    sl->address_size = address_size;
-    sl->max_speed = max_speed;
-    sl->i2c_opts = 0;
-    sl->bus = i2c_bus;
-
-    sl->slave_read      = &i2c_bb_start_read;
-    sl->slave_write     = &i2c_bb_start_write;
-
-    return 0;
 }
 
 int
@@ -339,12 +280,12 @@ i2c_bb_init(gpio_sys_t* gpio_sys, gpio_id_t scl, gpio_id_t sda,
     i2c_bb->speed = DEFAULT_SPEED;
     i2c_bb->gpio_sys = gpio_sys;
     /* Initialise the I2C bus structure */
-    i2c->slave_init  = i2c_bb_slave_init;
+    i2c->start_read  = i2c_bb_start_read;
+    i2c->start_write = i2c_bb_start_write;
     i2c->read        = i2c_bb_read;
     i2c->write       = i2c_bb_write;
     i2c->set_speed   = i2c_bb_set_speed;
-    i2c->set_self_slave_address = i2c_bb_set_self_slave_address;
-    i2c->register_slave_event_handler = i2c_bb_register_slave_event_handler;
+    i2c->set_address = i2c_bb_set_address;
     i2c->master_stop = i2c_bb_master_stop;
     i2c->handle_irq  = i2c_bb_handle_irq;
     i2c->priv        = (void*)i2c_bb;

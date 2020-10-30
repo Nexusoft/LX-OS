@@ -1,13 +1,11 @@
 /*
- * Copyright 2017, Data61
- * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
- * ABN 41 687 119 230.
+ * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
  * the BSD 2-Clause license. Note that NO WARRANTY is provided.
  * See "LICENSE_BSD2.txt" for details.
  *
- * @TAG(DATA61_BSD)
+ * @TAG(NICTA_BSD)
  */
 #include "../../arch/arm/clock.h"
 #include "../../services.h"
@@ -15,9 +13,11 @@
 #include <string.h>
 #include <utils/util.h>
 
+
 static volatile struct clock_regs {
     int dummy;
 } clk_regs;
+
 
 static struct clock master_clk = { CLK_OPS_DEFAULT(MASTER) };
 
@@ -50,3 +50,5 @@ clk_t* ps_clocks[] = {
 freq_t ps_freq_default[] = {
     [CLK_MASTER]   = 24 * MHZ,
 };
+
+

@@ -1,16 +1,15 @@
 /*
- * Copyright 2017, Data61
- * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
- * ABN 41 687 119 230.
+ * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
  * the BSD 2-Clause license. Note that NO WARRANTY is provided.
  * See "LICENSE_BSD2.txt" for details.
  *
- * @TAG(DATA61_BSD)
+ * @TAG(NICTA_BSD)
  */
 
-#pragma once
+#ifndef _PLATSUPPORT_PLAT_CLOCK_H_
+#define _PLATSUPPORT_PLAT_CLOCK_H_
 
 #define PXO_HZ    27000000UL
 #define CXO_HZ    19200000UL
@@ -18,6 +17,7 @@
 #define SLPXO_HZ     32768UL
 
 #define TCXO_HZ   19200000UL /* Alias: TXCO (typo in docs) */
+
 
 #define APQ8064_CLK_CTL0_PADDR 0x00900000
 #define APQ8064_CLK_CTL1_PADDR 0x00901000
@@ -66,3 +66,4 @@ int apq_clock_sys_init(void* clk_ctl_base0, void* clk_ctl_base1,
                        void* clk_ctl_base2, void* clk_ctl_base3,
                        clock_sys_t* clk_sys);
 
+#endif /* _PLATSUPPORT_PLAT_CLOCK_H_ */

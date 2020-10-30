@@ -1,16 +1,15 @@
 /*
- * Copyright 2017, Data61
- * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
- * ABN 41 687 119 230.
+ * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
  * the BSD 2-Clause license. Note that NO WARRANTY is provided.
  * See "LICENSE_BSD2.txt" for details.
  *
- * @TAG(DATA61_BSD)
+ * @TAG(NICTA_BSD)
  */
 
-#pragma once
+#ifndef __MACHSUPPORT_MACH_PMIC__
+#define __MACHSUPPORT_MACH_PMIC__
 
 #include <stdint.h>
 
@@ -20,9 +19,9 @@
 #define MAX77686_BUSADDR  0x12
 #define MAX77802_BUSADDR  0x12
 
+
 typedef struct pmic {
     i2c_slave_t i2c_slave;
-    i2c_kvslave_t kvslave;
     void* priv;;
 } pmic_t;
 
@@ -46,6 +45,7 @@ int pmic_init(i2c_bus_t* i2c, int addr, pmic_t* pmic);
  * Print the status of of the PMIC and its power rails
  */
 void pmic_print_status(pmic_t* pmic);
+
 
 /**
  * Returns the number of LDOs that the PMIC controls
@@ -95,4 +95,6 @@ int pmic_set_reset_delay(pmic_t* pmic, int ms);
  *                 Otherwise, returns -1.
  */
 int pmic_get_reset_delay(pmic_t* pmic);
+
+#endif /* __MACHSUPPORT_MACH_PMIC__ */
 

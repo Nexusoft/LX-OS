@@ -1,14 +1,19 @@
 /*
  * Copyright 2014, General Dynamics C4 Systems
  *
- * SPDX-License-Identifier: GPL-2.0-only
+ * This software may be distributed and modified according to the terms of
+ * the GNU General Public License version 2. Note that NO WARRANTY is provided.
+ * See "LICENSE_GPLv2.txt" for details.
+ *
+ * @TAG(GD_GPL)
  */
 
-#pragma once
+#ifndef __OBJECT_H
+#define __OBJECT_H
 
 #include <object/structures.h>
 #include <object/objecttype.h>
-#include <object/notification.h>
+#include <object/asyncendpoint.h>
 #include <object/cnode.h>
 #include <object/endpoint.h>
 #include <object/interrupt.h>
@@ -17,3 +22,4 @@
 #include <object/tcb.h>
 #include <object/untyped.h>
 
+#endif

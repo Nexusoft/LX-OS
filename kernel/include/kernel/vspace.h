@@ -1,14 +1,16 @@
 /*
  * Copyright 2014, General Dynamics C4 Systems
  *
- * SPDX-License-Identifier: GPL-2.0-only
+ * This software may be distributed and modified according to the terms of
+ * the GNU General Public License version 2. Note that NO WARRANTY is provided.
+ * See "LICENSE_GPLv2.txt" for details.
+ *
+ * @TAG(GD_GPL)
  */
-#pragma once
 
-#include <config.h>
+#ifndef __KERNEL_VSPACE_H
+#define __KERNEL_VSPACE_H
+
 #include <arch/kernel/vspace.h>
 
-#ifdef CONFIG_BENCHMARK_USE_KERNEL_LOG_BUFFER
-exception_t benchmark_arch_map_logBuffer(word_t frame_cptr);
-#endif /* CONFIG_BENCHMARK_USE_KERNEL_LOG_BUFFER */
-
+#endif

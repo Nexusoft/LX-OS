@@ -1,17 +1,14 @@
 /*
- * Copyright 2017, Data61
- * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
- * ABN 41 687 119 230.
+ * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
  * the BSD 2-Clause license. Note that NO WARRANTY is provided.
  * See "LICENSE_BSD2.txt" for details.
  *
- * @TAG(DATA61_BSD)
+ * @TAG(NICTA_BSD)
  */
 #include "../../mach/exynos/mux.h"
 #include <platsupport/gpio.h>
-#include <platsupport/plat/gpio.h>
 
 /* I2C */
 static struct mux_feature_data i2c0_data[] = {
@@ -129,6 +126,7 @@ static struct mux_feature_data spi1_isp_data[] = {
     { .port = GPIOPORT_NONE }
 };
 
+
 struct mux_feature_data* feature_data[] = {
     [MUX_I2C0]       = i2c0_data,
     [MUX_I2C1]       = i2c1_data,
@@ -151,3 +149,5 @@ struct mux_feature_data* feature_data[] = {
     [MUX_SPI0_ISP]   = spi0_isp_data,
     [MUX_SPI1_ISP]   = spi1_isp_data
 };
+
+

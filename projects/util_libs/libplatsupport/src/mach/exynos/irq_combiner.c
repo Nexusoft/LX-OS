@@ -1,19 +1,23 @@
 /*
- * Copyright 2017, Data61
- * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
- * ABN 41 687 119 230.
+ * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
  * the BSD 2-Clause license. Note that NO WARRANTY is provided.
  * See "LICENSE_BSD2.txt" for details.
  *
- * @TAG(DATA61_BSD)
+ * @TAG(NICTA_BSD)
  */
 
-#include <utils/util.h>
 #include <platsupport/irq_combiner.h>
 #include "../../services.h"
 
+//#define DEBUG_COMBINER
+
+#ifdef DEBUG_MAPPINGS
+#define DCOMBINER(...) printf("Combiner:" __VA_ARGS__)
+#else
+#define DCOMBINER(...) do{}while(0)
+#endif
 
 #define NGROUPS 32
 
@@ -24,6 +28,8 @@ struct combiner_gmap {
     uint32_t masked_status;
 };
 
+
+
 struct irq_combiner_map {
     struct combiner_gmap g[NGROUPS / 4];
     uint32_t res[32];
@@ -31,6 +37,7 @@ struct irq_combiner_map {
 };
 
 volatile struct irq_combiner_map *_combiner_regs = NULL;
+
 
 #define GROUP_INDEX(cirq) (COMBINER_IRQ_GET_GROUP(cirq) >> 2)
 #define GROUP_SHIFT(cirq) ((COMBINER_IRQ_GET_GROUP(cirq) & 0x3) * 8)
@@ -97,6 +104,8 @@ exynos_irq_combiner_grp_pending(irq_combiner_t* combiner, int group)
     return (v >> shift) & GROUP_INDEX_MASK;
 }
 
+
+
 static int
 irq_combiner_init_common(irq_combiner_t* combiner)
 {
@@ -126,7 +135,7 @@ int
 irq_combiner_init(enum irq_combiner_id id, ps_io_ops_t* io_ops, irq_combiner_t* combiner)
 {
     /* Map memory */
-    ZF_LOGD("Mapping device ID %d\n", id);
+    DCOMBINER("Mapping device ID %d\n", id);
     switch (id) {
     case IRQ_COMBINER0:
         MAP_IF_NULL(io_ops, EXYNOS_IRQ_COMBINER, _combiner_regs);
@@ -158,3 +167,5 @@ int irq_combiner_irq(enum irq_combiner_id id, int group)
         return -1;
     }
 }
+
+

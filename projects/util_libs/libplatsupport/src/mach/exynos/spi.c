@@ -1,23 +1,18 @@
 /*
- * Copyright 2017, Data61
- * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
- * ABN 41 687 119 230.
+ * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
  * the BSD 2-Clause license. Note that NO WARRANTY is provided.
  * See "LICENSE_BSD2.txt" for details.
  *
- * @TAG(DATA61_BSD)
+ * @TAG(NICTA_BSD)
  */
 
 /* SPI driver */
 
-#include <autoconf.h>
-#include <platsupport/gen_config.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <platsupport/spi.h>
-#include <platsupport/plat/mux.h>
 #include "../../services.h"
 
 //#define DEBUG_SPI
@@ -31,6 +26,7 @@
 #else
 #define DSPI(...) do{}while(0)
 #endif
+
 
 /* SPI configuration */
 #define CH_CFG_HIGH_SPEED_EN       BIT(6)
@@ -122,14 +118,17 @@ enum spi_mode {
     SLAVE_MODE
 };
 
+enum spi_cs_state {
+    SPI_CS_ASSERT,
+    SPI_CS_RELAX
+};
+
 struct spi_bus {
     volatile struct spi_regs* regs;
     enum mux_feature mux;
-    enum clk_id clkid;
     int mode: 1;              //0 -- Master, 1 -- Slave
     int high_speed: 1;        //High speed operation in slave mode.
     int cs_auto: 1;           //Auto chip selection.
-    clk_t *clk;               //Clock for changing the bus speed.
 
     /* Transfer management */
     const char *txbuf;
@@ -141,14 +140,15 @@ struct spi_bus {
 };
 
 static spi_bus_t _spi[NSPI] = {
-    { .regs = NULL, .mux = MUX_SPI0, .clkid = CLK_SPI0 },
-    { .regs = NULL, .mux = MUX_SPI1, .clkid = CLK_SPI1 },
-    { .regs = NULL, .mux = MUX_SPI2, .clkid = CLK_SPI2 },
-#if defined(CONFIG_PLAT_EXYNOS5)
-    { .regs = NULL, .mux = MUX_SPI0_ISP, .clkid = CLK_SPI0_ISP },
-    { .regs = NULL, .mux = MUX_SPI1_ISP, .clkid = CLK_SPI1_ISP },
+    { .regs = NULL, .mux = MUX_SPI0  },
+    { .regs = NULL, .mux = MUX_SPI1  },
+    { .regs = NULL, .mux = MUX_SPI2  },
+#if defined(PLAT_EXYNOS5)
+    { .regs = NULL, .mux = MUX_SPI0_ISP },
+    { .regs = NULL, .mux = MUX_SPI1_ISP },
 #endif /* EXYNOSX */
 };
+
 
 static void
 spi_reset(spi_bus_t *spi_bus)
@@ -176,6 +176,7 @@ spi_reset(spi_bus_t *spi_bus)
     spi_bus->regs->ch_cfg = v;
 }
 
+
 static void
 spi_config(spi_bus_t *spi_bus)
 {
@@ -201,7 +202,7 @@ spi_config(spi_bus_t *spi_bus)
      * The feedback clock only works in the master mode.
      */
     if (spi_bus->mode == MASTER_MODE) {
-        v = (0x2 << FB_CLK_SEL_SHF);
+        v = (0x0 << FB_CLK_SEL_SHF);
         spi_bus->regs->fb_clk_sel = v;
     }
 
@@ -253,16 +254,15 @@ static int
 spi_init_common(spi_bus_t* spi_bus, mux_sys_t* mux_sys, clock_sys_t* clock_sys)
 {
     if (mux_sys && mux_sys_valid(mux_sys)) {
-        mux_feature_enable(mux_sys, spi_bus->mux, MUX_DIR_NOT_A_GPIO);
+        mux_feature_enable(mux_sys, spi_bus->mux);
     } else {
 //        LOG_INFO("SPI: Skipping MUX initialisation as no mux subsystem was provided\n");
     }
 
     if (clock_sys && clock_sys_valid(clock_sys)) {
-        spi_bus->clk = clk_get_clock(clock_sys, spi_bus->clkid);
+//        LOG_INFO("SPI: Assuming default clock frequent (Implement me)\n");
     } else {
 //        LOG_INFO("SPI: Assuming default clock frequency as no clock subsystem was provided\n");
-        spi_bus->clk = NULL;
     }
 
     spi_bus->mode = 0;
@@ -345,6 +345,8 @@ spi_handle_irq(spi_bus_t* spi_bus)
     transfer_data(spi_bus);
 }
 
+
+
 int
 spi_xfer(spi_bus_t* spi_bus, const void* txdata, size_t txcnt,
          void* rxdata, size_t rxcnt, spi_callback_fn cb, void* token)
@@ -378,23 +380,11 @@ spi_xfer(spi_bus_t* spi_bus, const void* txdata, size_t txcnt,
     return spi_bus->rxcnt;
 }
 
+
 long
 spi_set_speed(spi_bus_t* spi_bus, long bps)
 {
     return 0;
-}
-
-void
-spi_prepare_transfer(spi_bus_t* spi_bus, const spi_slave_config_t* cfg)
-{
-    if (spi_bus->clk && clk_get_freq(spi_bus->clk) != cfg->speed_hz) {
-        clk_set_freq(spi_bus->clk, cfg->speed_hz);
-    }
-
-    /* Set feedback clock, only when SPI runs at a high frequency */
-    if (cfg->speed_hz >= 1 * MHZ) {
-        spi_bus->regs->fb_clk_sel = (cfg->fb_delay << FB_CLK_SEL_SHF);
-    }
 }
 
 int
@@ -429,7 +419,7 @@ spi_init(enum spi_id id, ps_io_ops_t* io_ops, spi_bus_t** ret_spi_bus)
     case SPI2:
         MAP_IF_NULL(io_ops, EXYNOS_SPI2,      spi_bus->regs);
         break;
-#ifdef CONFIG_PLAT_EXYNOS5
+#ifdef PLAT_EXYNOS5
     case SPI0_ISP:
         MAP_IF_NULL(io_ops, EXYNOS_SPI0_ISP,  spi_bus->regs);
         break;
@@ -440,6 +430,6 @@ spi_init(enum spi_id id, ps_io_ops_t* io_ops, spi_bus_t** ret_spi_bus)
     default:
         return -1;
     }
-
     return spi_init_common(spi_bus, &io_ops->mux_sys, &io_ops->clock_sys);
 }
+

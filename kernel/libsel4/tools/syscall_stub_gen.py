@@ -1,8 +1,12 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 #
-# Copyright 2020, Data61, CSIRO (ABN 41 687 119 230)
+# Copyright 2014, NICTA
 #
-# SPDX-License-Identifier: BSD-2-Clause
+# This software may be distributed and modified according to the terms of
+# the BSD 2-Clause license. Note that NO WARRANTY is provided.
+# See "LICENSE_BSD2.txt" for details.
+#
+# @TAG(NICTA_BSD)
 #
 
 #
@@ -31,49 +35,31 @@
 #     object's size wrong, which should help mitigate the number of bugs caused
 #     because of this script becoming out of date compared to the source files.
 #
+#   * The word-size is fixed at 32 bits, and we may implicitly assume that
+#     sizeof(int) == sizeof(long) == 32.
+#
+#     Though the constant 'WORD_SIZE_BITS' has been used throughout, there
+#     may be implicit assumptions hanging around causing things to fail.
+#
 #   * The script has only been tested on the actual seL4 API XML description.
 #
 #     No stress testing has taken place; there may be bugs if new and wonderful
 #     XML method descriptions are added.
 #
 
-import operator
-import itertools
 import xml.dom.minidom
-from argparse import ArgumentParser
-import sys
-from functools import reduce
+import optparse
 
 # Number of bits in a standard word
-WORD_SIZE_BITS_ARCH = {
-    "aarch32": 32,
-    "ia32": 32,
-    "aarch64": 64,
-    "ia64": 64,
-    "x86_64": 64,
-    "arm_hyp": 32,
-    "riscv32": 32,
-    "riscv64": 64,
-}
-
-MESSAGE_REGISTERS_FOR_ARCH = {
-    "aarch32": 4,
-    "aarch64": 4,
-    "ia32": 2,
-    "ia32-mcs": 1,
-    "x86_64": 4,
-    "arm_hyp": 4,
-    "riscv32": 4,
-    "riscv64": 4,
-}
-
-WORD_CONST_SUFFIX_BITS = {
-    32: "ul",
-    64: "ull",
-}
+WORD_SIZE_BITS = 32
 
 # Maximum number of words that will be in a message.
-MAX_MESSAGE_LENGTH = 64
+MAX_MESSAGE_LENGTH = 32
+
+MESSAGE_REGISTERS_FOR_ARCH = {
+    "arm": 4,
+    "x86": 2,
+}
 
 # Headers to include
 INCLUDES = [
@@ -87,14 +73,13 @@ TYPES = {
     64: "seL4_Uint64"
 }
 
-
 class Type(object):
     """
     This class represents a C type (such as an 'int', structure or
     pointer.
     """
 
-    def __init__(self, name, size_bits, wordsize, double_word=False, native_size_bits=None):
+    def __init__(self, name, size_bits, double_word=False, native_size_bits=None):
         """
         Define a new type, named 'name' that is 'size_bits' bits
         long.
@@ -102,7 +87,6 @@ class Type(object):
 
         self.name = name
         self.size_bits = size_bits
-        self.wordsize = wordsize
         self.double_word = double_word
 
         #
@@ -118,7 +102,7 @@ class Type(object):
             self.native_size_bits = size_bits
 
     def pass_by_reference(self):
-        return self.size_bits > self.wordsize and not self.double_word
+        return self.size_bits > WORD_SIZE_BITS and not self.double_word
 
     def render_parameter_name(self, name):
         """
@@ -132,7 +116,7 @@ class Type(object):
         Return a new Type class representing a pointer to this
         object.
         """
-        return PointerType(self, self.wordsize)
+        return PointerType(self)
 
     def c_expression(self, var_name, word_num=0):
         """
@@ -142,24 +126,22 @@ class Type(object):
         assert word_num == 0
         return "%s" % var_name
 
-    def double_word_expression(self, var_name, word_num, word_size):
+    def double_word_expression(self, var_name, word_num):
 
-        assert word_num == 0 or word_num == 1
-
+        assert(word_num == 0 or word_num == 1)
+        
         if word_num == 0:
-            return "({0}) {1}".format(TYPES[self.size_bits], var_name)
+            return "({0}) {1}".format(TYPES[WORD_SIZE_BITS], var_name)
         elif word_num == 1:
-            return "({0}) ({1} >> {2})".format(TYPES[self.size_bits], var_name,
-                                               word_size)
-
+            return "({0}) ({1} >> {2})".format(TYPES[WORD_SIZE_BITS], var_name, WORD_SIZE_BITS)
+        
 
 class PointerType(Type):
     """
     A pointer to a standard type.
     """
-
-    def __init__(self, base_type, wordsize):
-        Type.__init__(self, base_type.name, wordsize, wordsize)
+    def __init__(self, base_type):
+        Type.__init__(self, base_type.name, WORD_SIZE_BITS)
         self.base_type = base_type
 
     def render_parameter_name(self, name):
@@ -172,216 +154,114 @@ class PointerType(Type):
     def pointer(self):
         raise NotImplementedError()
 
-
 class CapType(Type):
     """
     A type that is just a typedef of seL4_CPtr.
     """
-
-    def __init__(self, name, wordsize):
-        Type.__init__(self, name, wordsize, wordsize)
-
+    def __init__(self, name):
+        Type.__init__(self, name, WORD_SIZE_BITS)
 
 class StructType(Type):
     """
     A C 'struct' definition.
     """
-
-    def __init__(self, name, size_bits, wordsize):
-        Type.__init__(self, name, size_bits, wordsize)
+    def __init__(self, name, size_bits):
+        Type.__init__(self, name, size_bits)
 
     def c_expression(self, var_name, word_num, member_name):
-        assert word_num < self.size_bits / self.wordsize
+        assert word_num < self.size_bits / WORD_SIZE_BITS
 
         # Multiword structure.
         assert self.pass_by_reference()
         return "%s->%s" % (var_name, member_name[word_num])
 
-
 class BitFieldType(Type):
     """
     A special C 'struct' generated by the bitfield generator
     """
-
-    def __init__(self, name, size_bits, wordsize):
-        Type.__init__(self, name, size_bits, wordsize)
-
+    def __init__(self, name, size_bits):
+        Type.__init__(self, name, size_bits)
+    
     def c_expression(self, var_name, word_num=0):
-
+        
         return "%s.words[%d]" % (var_name, word_num)
-
-
+        
 class Parameter(object):
     def __init__(self, name, type):
         self.name = name
         self.type = type
 
-
-class Api(object):
-    def __init__(self, node):
-        self.name = node.getAttribute("name")
-        self.label_prefix = node.getAttribute("label_prefix") or ""
-
 #
-# Types
+# Return the size (in bits) of a particular type.
 #
-
-
-def init_data_types(wordsize):
-    types = [
+types = [
         # Simple Types
-        Type("int", 32, wordsize),
-        Type("long", wordsize, wordsize),
+        Type("int", WORD_SIZE_BITS),
 
-        Type("seL4_Uint8", 8, wordsize),
-        Type("seL4_Uint16", 16, wordsize),
-        Type("seL4_Uint32", 32, wordsize),
-        Type("seL4_Uint64", 64, wordsize, double_word=(wordsize == 32)),
-        Type("seL4_Time", 64, wordsize, double_word=(wordsize == 32)),
-        Type("seL4_Word", wordsize, wordsize),
-        Type("seL4_Bool", 1, wordsize, native_size_bits=8),
+        Type("seL4_Uint8", 8),
+        Type("seL4_Uint16", 16),
+        Type("seL4_Uint32", 32),
+        Type("seL4_Uint64", 64, double_word=True),
+        Type("seL4_Word", WORD_SIZE_BITS),
+        Type("seL4_Bool", 1, native_size_bits=8),
+        Type("seL4_CapRights", WORD_SIZE_BITS),
 
         # seL4 Structures
-        BitFieldType("seL4_CapRights_t", wordsize, wordsize),
+        BitFieldType("seL4_CapData_t", WORD_SIZE_BITS),
 
         # Object types
-        CapType("seL4_CPtr", wordsize),
-        CapType("seL4_CNode", wordsize),
-        CapType("seL4_IRQHandler", wordsize),
-        CapType("seL4_IRQControl", wordsize),
-        CapType("seL4_TCB", wordsize),
-        CapType("seL4_Untyped", wordsize),
-        CapType("seL4_DomainSet", wordsize),
-        CapType("seL4_SchedContext", wordsize),
-        CapType("seL4_SchedControl", wordsize),
-    ]
+        CapType("seL4_CPtr"),
+        CapType("seL4_CNode"),
+        CapType("seL4_IRQHandler"),
+        CapType("seL4_IRQControl"),
+        CapType("seL4_TCB"),
+        CapType("seL4_Untyped"),
+        CapType("seL4_DomainSet"),
+        ]
 
-    return types
-
-
-def init_arch_types(wordsize):
-    arch_types = {
-        "aarch32": [
-            Type("seL4_ARM_VMAttributes", wordsize, wordsize),
-            CapType("seL4_ARM_Page", wordsize),
-            CapType("seL4_ARM_PageTable", wordsize),
-            CapType("seL4_ARM_PageDirectory", wordsize),
-            CapType("seL4_ARM_ASIDControl", wordsize),
-            CapType("seL4_ARM_ASIDPool", wordsize),
-            CapType("seL4_ARM_VCPU", wordsize),
-            CapType("seL4_ARM_IOSpace", wordsize),
-            CapType("seL4_ARM_IOPageTable", wordsize),
-            StructType("seL4_UserContext", wordsize * 19, wordsize),
+#
+# Arch-specific types.
+#
+arch_types = {
+    "arm" : [
+        Type("seL4_ARM_VMAttributes", WORD_SIZE_BITS),
+        CapType("seL4_ARM_Page"),
+        CapType("seL4_ARM_PageTable"),
+        CapType("seL4_ARM_PageDirectory"),
+        StructType("seL4_UserContext", WORD_SIZE_BITS * 17),
         ],
 
-        "aarch64": [
-            Type("seL4_ARM_VMAttributes", wordsize, wordsize),
-            CapType("seL4_ARM_Page", wordsize),
-            CapType("seL4_ARM_PageTable", wordsize),
-            CapType("seL4_ARM_PageDirectory", wordsize),
-            CapType("seL4_ARM_PageUpperDirectory", wordsize),
-            CapType("seL4_ARM_PageGlobalDirectory", wordsize),
-            CapType("seL4_ARM_VSpace", wordsize),
-            CapType("seL4_ARM_ASIDControl", wordsize),
-            CapType("seL4_ARM_ASIDPool", wordsize),
-            CapType("seL4_ARM_VCPU", wordsize),
-            CapType("seL4_ARM_IOSpace", wordsize),
-            CapType("seL4_ARM_IOPageTable", wordsize),
-            StructType("seL4_UserContext", wordsize * 36, wordsize),
-        ],
-
-        "arm_hyp": [
-            Type("seL4_ARM_VMAttributes", wordsize, wordsize),
-            CapType("seL4_ARM_Page", wordsize),
-            CapType("seL4_ARM_PageTable", wordsize),
-            CapType("seL4_ARM_PageDirectory", wordsize),
-            CapType("seL4_ARM_ASIDControl", wordsize),
-            CapType("seL4_ARM_ASIDPool", wordsize),
-            CapType("seL4_ARM_VCPU", wordsize),
-            CapType("seL4_ARM_IOSpace", wordsize),
-            CapType("seL4_ARM_IOPageTable", wordsize),
-            StructType("seL4_UserContext", wordsize * 19, wordsize),
-        ],
-
-        "ia32": [
-            Type("seL4_X86_VMAttributes", wordsize, wordsize),
-            CapType("seL4_X86_IOPort", wordsize),
-            CapType("seL4_X86_IOPortControl", wordsize),
-            CapType("seL4_X86_ASIDControl", wordsize),
-            CapType("seL4_X86_ASIDPool", wordsize),
-            CapType("seL4_X86_IOSpace", wordsize),
-            CapType("seL4_X86_Page", wordsize),
-            CapType("seL4_X86_PageDirectory", wordsize),
-            CapType("seL4_X86_PageTable", wordsize),
-            CapType("seL4_X86_IOPageTable", wordsize),
-            CapType("seL4_X86_VCPU", wordsize),
-            CapType("seL4_X86_EPTPML4", wordsize),
-            CapType("seL4_X86_EPTPDPT", wordsize),
-            CapType("seL4_X86_EPTPD", wordsize),
-            CapType("seL4_X86_EPTPT", wordsize),
-            StructType("seL4_VCPUContext", wordsize * 7, wordsize),
-            StructType("seL4_UserContext", wordsize * 12, wordsize),
-        ],
-
-        "x86_64": [
-            Type("seL4_X86_VMAttributes", wordsize, wordsize),
-            CapType("seL4_X86_IOPort", wordsize),
-            CapType("seL4_X86_IOPortControl", wordsize),
-            CapType("seL4_X86_ASIDControl", wordsize),
-            CapType("seL4_X86_ASIDPool", wordsize),
-            CapType("seL4_X86_IOSpace", wordsize),
-            CapType("seL4_X86_Page", wordsize),
-            CapType("seL4_X64_PML4", wordsize),
-            CapType("seL4_X86_PDPT", wordsize),
-            CapType("seL4_X86_PageDirectory", wordsize),
-            CapType("seL4_X86_PageTable", wordsize),
-            CapType("seL4_X86_IOPageTable", wordsize),
-            CapType("seL4_X86_VCPU", wordsize),
-            CapType("seL4_X86_EPTPML4", wordsize),
-            CapType("seL4_X86_EPTPDPT", wordsize),
-            CapType("seL4_X86_EPTPD", wordsize),
-            CapType("seL4_X86_EPTPT", wordsize),
-            StructType("seL4_VCPUContext", wordsize * 7, wordsize),
-            StructType("seL4_UserContext", wordsize * 20, wordsize),
-        ],
-        "riscv32": [
-            Type("seL4_RISCV_VMAttributes", wordsize, wordsize),
-            CapType("seL4_RISCV_Page", wordsize),
-            CapType("seL4_RISCV_PageTable", wordsize),
-            CapType("seL4_RISCV_ASIDControl", wordsize),
-            CapType("seL4_RISCV_ASIDPool", wordsize),
-            StructType("seL4_UserContext", wordsize * 32, wordsize),
-        ],
-        "riscv64": [
-            Type("seL4_RISCV_VMAttributes", wordsize, wordsize),
-            CapType("seL4_RISCV_Page", wordsize),
-            CapType("seL4_RISCV_PageTable", wordsize),
-            CapType("seL4_RISCV_ASIDControl", wordsize),
-            CapType("seL4_RISCV_ASIDPool", wordsize),
-            StructType("seL4_UserContext", wordsize * 32, wordsize),
+    "x86" : [
+        Type("seL4_IA32_VMAttributes", WORD_SIZE_BITS),
+        CapType("seL4_IA32_IOSpace"),
+        CapType("seL4_IA32_IOPort"),
+        CapType("seL4_IA32_Page"),
+        CapType("seL4_IA32_PageDirectory"),
+        CapType("seL4_IA32_PageTable"),
+        CapType("seL4_IA32_IOPageTable"),
+        CapType("seL4_IA32_VCPU"),
+        CapType("seL4_IA32_EPTPageDirectoryPointerTable"),
+        CapType("seL4_IA32_EPTPageDirectory"),
+        CapType("seL4_IA32_EPTPageTable"),
+        CapType("seL4_IA32_IPI"),
+        StructType("seL4_UserContext", WORD_SIZE_BITS * 13),
+        StructType("seL4_VCPUContext", WORD_SIZE_BITS * 7),
         ]
     }
 
-    return arch_types
-
 # Retrieve a member list for a given struct type
-
-
-def struct_members(typ, structs):
-    members = [member for struct_name, member in structs if struct_name == typ.name]
+def struct_members(type, structs):
+    members = [member for struct_name, member in structs if struct_name == type.name]
     assert len(members) == 1
     return members[0]
 
 # Keep increasing the given number 'x' until 'x % a == 0'.
-
-
 def align_up(x, a):
     if x % a == 0:
         return x
     return x + a - (x % a)
 
-
-def get_parameter_positions(parameters, wordsize):
+def get_parameter_positions(parameters):
     """
     Determine where each parameter should be packed in the generated message.
     We generate a list of:
@@ -392,6 +272,7 @@ def get_parameter_positions(parameters, wordsize):
 
     We guarantee that either (num_words == 1) or (bit_offset == 0).
     """
+    words_used = 0
     bits_used = 0
     results = []
 
@@ -400,17 +281,16 @@ def get_parameter_positions(parameters, wordsize):
         type_size = param.type.size_bits
 
         # We need everything to be a power of two, or word sized.
-        assert ((type_size & (type_size - 1)) == 0) or (type_size % wordsize == 0)
+        assert ((type_size & (type_size - 1)) == 0) or (type_size % WORD_SIZE_BITS == 0)
 
         # Align up to our own size, or the next word. (Whichever is smaller)
-        bits_used = align_up(bits_used, min(type_size, wordsize))
+        bits_used = align_up(bits_used, min(type_size, WORD_SIZE_BITS))
 
         # Place ourself.
         results.append((param, bits_used, type_size))
         bits_used += type_size
 
     return results
-
 
 def generate_param_list(input_params, output_params):
     # Generate parameters
@@ -427,7 +307,7 @@ def generate_param_list(input_params, output_params):
     return ", ".join(params)
 
 
-def generate_marshal_expressions(params, num_mrs, structs, wordsize):
+def generate_marshal_expressions(params, num_mrs, structs):
     """
     Generate marshalling expressions for the given set of inputs.
 
@@ -435,7 +315,7 @@ def generate_marshal_expressions(params, num_mrs, structs, wordsize):
     to marshal all the inputs.
     """
 
-    def generate_param_code(param, first_bit, num_bits, word_array, wordsize):
+    def generate_param_code(param, first_bit, num_bits, word_array):
         """
         Generate code to marshal the given parameter into the correct
         location in the message.
@@ -446,29 +326,26 @@ def generate_marshal_expressions(params, num_mrs, structs, wordsize):
         be bitwise-or'ed into it.
         """
 
-        target_word = first_bit // wordsize
-        target_offset = first_bit % wordsize
+        target_word = first_bit / WORD_SIZE_BITS
+        target_offset = first_bit % WORD_SIZE_BITS
 
         # double word type
         if param.type.double_word:
-            word_array[target_word].append(
-                param.type.double_word_expression(param.name, 0, wordsize))
-            word_array[target_word +
-                       1].append(param.type.double_word_expression(param.name, 1, wordsize))
+            word_array[target_word].append(param.type.double_word_expression(param.name, 0))
+            word_array[target_word + 1].append(param.type.double_word_expression(param.name, 1))
             return
 
         # Single full word?
-        if num_bits == wordsize:
+        if num_bits == WORD_SIZE_BITS:
             assert target_offset == 0
-            expr = param.type.c_expression(param.name)
+            expr = param.type.c_expression(param.name);
             word_array[target_word].append(expr)
             return
 
         # Part of a word?
-        if num_bits < wordsize:
-            expr = param.type.c_expression(param.name)
-            expr = "(%s & %#x%s)" % (expr, (1 << num_bits) - 1,
-                                     WORD_CONST_SUFFIX_BITS[wordsize])
+        if num_bits < WORD_SIZE_BITS:
+            expr = param.type.c_expression(param.name);
+            expr = "(%s & %#x)" % (expr, (1 << num_bits) - 1)
             if target_offset:
                 expr = "(%s << %d)" % (expr, target_offset)
             word_array[target_word].append(expr)
@@ -476,24 +353,24 @@ def generate_marshal_expressions(params, num_mrs, structs, wordsize):
 
         # Multiword array
         assert target_offset == 0
-        num_words = num_bits // wordsize
+        num_words = num_bits / WORD_SIZE_BITS
         for i in range(num_words):
-            expr = param.type.c_expression(param.name, i, struct_members(param.type, structs))
+            expr = param.type.c_expression(param.name, i, struct_members(param.type, structs));
             word_array[target_word + i].append(expr)
 
+
     # Get their marshalling positions
-    positions = get_parameter_positions(params, wordsize)
+    positions = get_parameter_positions(params)
 
     # Generate marshal code.
     words = [[] for _ in range(num_mrs, MAX_MESSAGE_LENGTH)]
     for (param, first_bit, num_bits) in positions:
-        generate_param_code(param, first_bit, num_bits, words, wordsize)
+        generate_param_code(param, first_bit, num_bits, words)
 
     # Return list of expressions.
     return [" | ".join(x) for x in words if len(x) > 0]
 
-
-def generate_unmarshal_expressions(params, wordsize):
+def generate_unmarshal_expressions(params):
     """
     Generate unmarshalling expressions for the given set of outputs.
 
@@ -504,43 +381,38 @@ def generate_unmarshal_expressions(params, wordsize):
     in them, indicating a read from a word in the message.
     """
 
-    def unmarshal_single_param(first_bit, num_bits, wordsize):
+    def unmarshal_single_param(first_bit, num_bits):
         """
         Unmarshal a single parameter.
         """
-        first_word = first_bit // wordsize
-        bit_offset = first_bit % wordsize
+        first_word = first_bit / WORD_SIZE_BITS
+        bit_offset = first_bit % WORD_SIZE_BITS
 
         # Multiword type?
-        if num_bits > wordsize:
+        if num_bits > WORD_SIZE_BITS:
             result = []
-            for x in range(num_bits // wordsize):
+            for x in range(num_bits / WORD_SIZE_BITS):
                 result.append("%%(w%d)s" % (x + first_word))
             return result
 
         # Otherwise, bit packed.
-        if num_bits == wordsize:
+        if num_bits == WORD_SIZE_BITS:
             return ["%%(w%d)s" % first_word]
         elif bit_offset == 0:
             return ["(%%(w%d)s & %#x)" % (
-                first_word, (1 << num_bits) - 1)]
+                    first_word, (1 << num_bits) - 1)]
         else:
             return ["(%%(w%d)s >> %d) & %#x" % (
-                first_word, bit_offset, (1 << num_bits) - 1)]
+                    first_word, bit_offset, (1 << num_bits) - 1)]
 
     # Get their marshalling positions
-    positions = get_parameter_positions(params, wordsize)
+    positions = get_parameter_positions(params)
 
     # Generate the unmarshal code.
     results = []
     for (param, first_bit, num_bits) in positions:
-        results.append((param, unmarshal_single_param(first_bit, num_bits, wordsize)))
+        results.append((param, unmarshal_single_param(first_bit, num_bits)))
     return results
-
-
-def is_result_struct_required(output_params):
-    return len([x for x in output_params if not x.type.pass_by_reference()]) != 0
-
 
 def generate_result_struct(interface_name, method_name, output_params):
     """
@@ -560,7 +432,7 @@ def generate_result_struct(interface_name, method_name, output_params):
     """
 
     # Do we actually need a structure?
-    if not is_result_struct_required(output_params):
+    if len([x for x in output_params if not x.type.pass_by_reference()]) == 0:
         return None
 
     #
@@ -580,22 +452,18 @@ def generate_result_struct(interface_name, method_name, output_params):
             result.append("\t%s;" % i.type.render_parameter_name(i.name))
     result.append("};")
     result.append("typedef struct %s_%s %s_%s_t;" % (
-        (interface_name, method_name, interface_name, method_name)))
+            (interface_name, method_name, interface_name, method_name)))
     result.append("")
 
     return "\n".join(result)
 
-
-def generate_stub(arch, wordsize, interface_name, method_name, method_id, input_params, output_params, structs, use_only_ipc_buffer, comment, mcs):
+def generate_stub(arch, interface_name, method_name, method_id, input_params, output_params, structs, use_only_ipc_buffer):
     result = []
 
     if use_only_ipc_buffer:
         num_mrs = 0
     else:
-        if mcs and "%s-mcs" % arch in MESSAGE_REGISTERS_FOR_ARCH:
-            num_mrs = MESSAGE_REGISTERS_FOR_ARCH["%s-mcs" % arch]
-        else:
-            num_mrs = MESSAGE_REGISTERS_FOR_ARCH[arch]
+        num_mrs = MESSAGE_REGISTERS_FOR_ARCH[arch]
 
     # Split out cap parameters and standard parameters
     standard_params = []
@@ -613,12 +481,7 @@ def generate_stub(arch, wordsize, interface_name, method_name, method_id, input_
         return_type = "%s_%s_t" % (interface_name, method_name)
         returning_struct = True
     else:
-        return_type = "seL4_Error"
-
-    #
-    # Print doxygen comment.
-    #
-    result.append(comment)
+        return_type = "int"
 
     #
     # Print function header.
@@ -627,16 +490,15 @@ def generate_stub(arch, wordsize, interface_name, method_name, method_id, input_
     #   seL4_Untyped_Retype(...)
     #   {
     #
-    result.append("LIBSEL4_INLINE %s" % return_type)
+    result.append("static inline %s" % return_type)
     result.append("%s_%s(%s)" % (interface_name, method_name,
-                                 generate_param_list(input_params, output_params)))
+        generate_param_list(input_params, output_params)))
     result.append("{")
 
     #
     # Get a list of expressions for our caps and inputs.
     #
-    input_expressions = generate_marshal_expressions(standard_params, num_mrs,
-                                                     structs, wordsize)
+    input_expressions = generate_marshal_expressions(standard_params, num_mrs, structs)
     cap_expressions = [x.name for x in cap_params]
     service_cap = cap_expressions[0]
     cap_expressions = cap_expressions[1:]
@@ -645,16 +507,16 @@ def generate_stub(arch, wordsize, interface_name, method_name, method_id, input_
     # Compute how many words the inputs and output will require.
     #
     input_param_words = len(input_expressions)
-    output_param_words = sum([p.type.size_bits for p in output_params]) / wordsize
+    output_param_words = sum([p.type.size_bits for p in output_params]) / WORD_SIZE_BITS
 
     #
     # Setup variables we will need.
     #
-    result.append("\t%s result;" % return_type)
-    result.append("\tseL4_MessageInfo_t tag = seL4_MessageInfo_new(%s, 0, %d, %d);" %
-                  (method_id, len(cap_expressions), len(input_expressions)))
+    if returning_struct:
+        result.append("\t%s result;" % return_type)
+    result.append("\tseL4_MessageInfo_t tag = seL4_MessageInfo_new(%s, 0, %d, %d);"  % (method_id, len(cap_expressions), len(input_expressions)))
     result.append("\tseL4_MessageInfo_t output_tag;")
-    for i in range(num_mrs):
+    for i in range(min(num_mrs, max(input_param_words, output_param_words))):
         result.append("\tseL4_Word mr%d;" % i)
     result.append("")
 
@@ -677,22 +539,24 @@ def generate_stub(arch, wordsize, interface_name, method_name, method_id, input_
     #   seL4_SetMR(i, v);
     #   ...
     #
-    if max(num_mrs, len(input_expressions)) > 0:
-        result.append("\t/* Marshal and initialise parameters. */")
-        # Initialise in-register parameters
-        for i in range(num_mrs):
-            if i < len(input_expressions):
+    if len(input_expressions) > 0:
+        result.append("\t/* Marshal input parameters. */")
+        for i in range(len(input_expressions)):
+            if i < num_mrs:
                 result.append("\tmr%d = %s;" % (i, input_expressions[i]))
             else:
-                result.append("\tmr%d = 0;" % i)
-        # Initialise buffered parameters
-        for i in range(num_mrs, len(input_expressions)):
-            result.append("\tseL4_SetMR(%d, %s);" % (i, input_expressions[i]))
+                result.append("\tseL4_SetMR(%d, %s);" % (i, input_expressions[i]))
         result.append("")
 
     #
     # Generate the call.
     #
+    call_arguments = []
+    for i in range(num_mrs):
+        if i < max(input_param_words, output_param_words):
+            call_arguments.append("&mr%d" % i)
+        else:
+            call_arguments.append("seL4_Null")
     if use_only_ipc_buffer:
         result.append("\t/* Perform the call. */")
         result.append("\toutput_tag = seL4_Call(%s, tag);" % service_cap)
@@ -700,30 +564,8 @@ def generate_stub(arch, wordsize, interface_name, method_name, method_id, input_
         result.append("\t/* Perform the call, passing in-register arguments directly. */")
         result.append("\toutput_tag = seL4_CallWithMRs(%s, tag," % (service_cap))
         result.append("\t\t%s);" % ', '.join(
-            ("&mr%d" % i) for i in range(num_mrs)))
-
-    #
-    # Prepare the result.
-    #
-    label = "result.error" if returning_struct else "result"
-    cast = " (%s)" % return_type if not returning_struct else ""
-    result.append("\t%s =%s seL4_MessageInfo_get_label(output_tag);" % (label, cast))
+                [call_arguments[i] for i in range(num_mrs)]))
     result.append("")
-
-    if not use_only_ipc_buffer:
-        result.append("\t/* Unmarshal registers into IPC buffer on error. */")
-        result.append("\tif (%s != seL4_NoError) {" % label)
-        for i in range(num_mrs):
-            result.append("\t\tseL4_SetMR(%d, mr%d);" % (i, i))
-        result.append("#ifdef CONFIG_KERNEL_INVOCATION_REPORT_ERROR_IPC")
-        result.append("\t\tif (seL4_CanPrintError()) {")
-        result.append("\t\t\tseL4_DebugPutString(seL4_GetDebugError());")
-        result.append("\t\t}")
-        result.append("#endif")
-        if returning_struct:
-            result.append("\t\treturn result;")
-        result.append("\t}")
-        result.append("")
 
     #
     # Generate unmarshalling code.
@@ -733,79 +575,37 @@ def generate_stub(arch, wordsize, interface_name, method_name, method_id, input_
         source_words = {}
         for i in range(MAX_MESSAGE_LENGTH):
             if i < num_mrs:
-                source_words["w%d" % i] = "mr%d" % i
+                source_words["w%d" % i] = "mr%d" % i;
             else:
-                source_words["w%d" % i] = "seL4_GetMR(%d)" % i
-        unmashalled_params = generate_unmarshal_expressions(output_params, wordsize)
+                source_words["w%d" % i] = "seL4_GetMR(%d)" % i;
+        unmashalled_params = generate_unmarshal_expressions(output_params)
         for (param, words) in unmashalled_params:
             if param.type.pass_by_reference():
-                members = struct_members(param.type, structs)
+                members = struct_members(param.type, structs);
                 for i in range(len(words)):
-                    result.append("\t%s->%s = %s;" %
-                                  (param.name, members[i], words[i] % source_words))
+                    result.append("\t%s->%s = %s;" % (param.name, members[i], words[i] % source_words))
             else:
                 if param.type.double_word:
-                    result.append("\tresult.%s = ((%s)%s + ((%s)%s << 32));" %
-                                  (param.name, TYPES[64], words[0] % source_words,
-                                   TYPES[64], words[1] % source_words))
+                    result.append("\tresult.%s = ((%s)%s + ((%s)%s << 32));" % (param.name, TYPES[64], words[0] % source_words, TYPES[64], words[1] % source_words))
                 else:
                     for word in words:
                         result.append("\tresult.%s = %s;" % (param.name, word % source_words))
 
+        result.append("")
+
+    # Return result
+    if returning_struct:
+        result.append("\tresult.error = seL4_MessageInfo_get_label(output_tag);")
+        result.append("\treturn result;")
+    else:
+        result.append("\treturn seL4_MessageInfo_get_label(output_tag);")
+
     #
     # }
     #
-    result.append("\treturn result;")
     result.append("}")
 
     return "\n".join(result) + "\n"
-
-
-def get_xml_element_contents(element):
-    """
-    Converts the contents of an xml element into a string, with all
-    child xml nodes unchanged.
-    """
-    return "".join([c.toxml() for c in element.childNodes])
-
-
-def get_xml_element_content_with_xmlonly(element):
-    """
-    Converts the contents of an xml element into a string, wrapping
-    all child xml nodes in doxygen @xmlonly/@endxmlonly keywords.
-    """
-
-    result = []
-    prev_element = False
-    for node in element.childNodes:
-        if node.nodeType == xml.dom.Node.TEXT_NODE:
-            if prev_element:
-                # text node following element node
-                result.append(" @endxmlonly ")
-            prev_element = False
-        else:
-            if not prev_element:
-                # element node following text node
-                result.append(" @xmlonly ")
-            prev_element = True
-
-        result.append(node.toxml())
-
-    return "".join(result)
-
-
-def normalise_text(text):
-    """
-    Removes leading and trailing whitespace from each line of text.
-    Removes leading and trailing blank lines from text.
-    """
-    stripped = text.strip()
-    stripped_lines = [line.strip() for line in text.split("\n")]
-    # remove leading and trailing empty lines
-    stripped_head = list(itertools.dropwhile(lambda s: not s, stripped_lines))
-    stripped_tail = itertools.dropwhile(lambda s: not s, reversed(stripped_head))
-    return "\n".join(reversed(list(stripped_tail)))
-
 
 def parse_xml_file(input_file, valid_types):
     """
@@ -822,72 +622,26 @@ def parse_xml_file(input_file, valid_types):
     structs = []
     doc = xml.dom.minidom.parse(input_file)
 
-    api = Api(doc.getElementsByTagName("api")[0])
-
     for struct in doc.getElementsByTagName("struct"):
-        _struct_members = []
+        struct_members = []
         struct_name = struct.getAttribute("name")
         for members in struct.getElementsByTagName("member"):
             member_name = members.getAttribute("name")
-            _struct_members.append(member_name)
-        structs.append((struct_name, _struct_members))
+            struct_members.append(member_name)
+        structs.append( (struct_name, struct_members) )
 
     for interface in doc.getElementsByTagName("interface"):
         interface_name = interface.getAttribute("name")
-        interface_manual_name = interface.getAttribute("manual_name") or interface_name
-
-        interface_cap_description = interface.getAttribute("cap_description")
-
         for method in interface.getElementsByTagName("method"):
             method_name = method.getAttribute("name")
             method_id = method.getAttribute("id")
-            method_condition = method.getAttribute("condition")
-            method_manual_name = method.getAttribute("manual_name") or method_name
-            method_manual_label = method.getAttribute("manual_label")
-
-            if not method_manual_label:
-                # If no manual label is specified, infer one from the interface and method
-                # names by combining the interface name and method name.
-                method_manual_label = ("%s_%s" % (interface_manual_name, method_manual_name)) \
-                    .lower() \
-                    .replace(" ", "_") \
-                    .replace("/", "")
-
-            # Prefix the label with an api-wide label prefix
-            method_manual_label = "%s%s" % (api.label_prefix, method_manual_label)
-
-            comment_lines = ["@xmlonly <manual name=\"%s\" label=\"%s\"/> @endxmlonly" %
-                             (method_manual_name, method_manual_label)]
-
-            method_brief = method.getElementsByTagName("brief")
-            if method_brief:
-                method_brief_text = get_xml_element_contents(method_brief[0])
-                normalised_method_brief_text = normalise_text(method_brief_text)
-                comment_lines.append("@brief @xmlonly %s @endxmlonly" %
-                                     normalised_method_brief_text)
-
-            method_description = method.getElementsByTagName("description")
-            if method_description:
-                method_description_text = get_xml_element_contents(method_description[0])
-                normalised_method_description_text = normalise_text(method_description_text)
-                comment_lines.append("\n@xmlonly\n%s\n@endxmlonly\n" %
-                                     normalised_method_description_text)
 
             #
             # Get parameters.
             #
             # We always have an implicit cap parameter.
             #
-            input_params = [Parameter("_service", type_names[interface_name])]
-
-            cap_description = interface_cap_description
-            cap_param = method.getElementsByTagName("cap_param")
-            if cap_param:
-                append_description = cap_param[0].getAttribute("append_description")
-                if append_description:
-                    cap_description += append_description
-
-            comment_lines.append("@param[in] _service %s" % cap_description)
+            input_params = [Parameter("service", type_names[interface_name])]
             output_params = []
             for param in method.getElementsByTagName("param"):
                 param_name = param.getAttribute("name")
@@ -896,64 +650,30 @@ def parse_xml_file(input_file, valid_types):
                     raise Exception("Unknown type '%s'." % (param.getAttribute("type")))
                 param_dir = param.getAttribute("dir")
                 assert (param_dir == "in") or (param_dir == "out")
-                if param_dir == "in":
+                if (param_dir == "in"):
                     input_params.append(Parameter(param_name, param_type))
                 else:
                     output_params.append(Parameter(param_name, param_type))
+            methods.append((interface_name, method_name, method_id, input_params, output_params))
 
-                if param_dir == "in" or param_type.pass_by_reference():
-                    param_description = param.getAttribute("description")
-                    if not param_description:
-                        param_description_element = param.getElementsByTagName("description")
-                        if param_description_element:
-                            param_description_text = get_xml_element_content_with_xmlonly(
-                                param_description_element[0])
-                            param_description = normalise_text(param_description_text)
+    return (methods, structs)
 
-                    comment_lines.append("@param[%s] %s %s " %
-                                         (param_dir, param_name, param_description))
-
-            method_return_description = method.getElementsByTagName("return")
-            if method_return_description:
-                comment_lines.append("@return @xmlonly %s @endxmlonly" %
-                                     get_xml_element_contents(method_return_description[0]))
-            else:
-                # no return documentation given - default to something sane
-                if is_result_struct_required(output_params):
-                    comment_lines.append("@return @xmlonly @endxmlonly")
-                else:
-                    comment_lines.append("@return @xmlonly <errorenumdesc/> @endxmlonly")
-
-            # split each line on newlines
-            comment_lines = reduce(operator.add, [l.split("\n") for l in comment_lines], [])
-
-            # place the comment text in a c comment
-            comment = "\n".join(["/**"] + [" * %s" % l for l in comment_lines] + [" */"])
-
-            methods.append((interface_name, method_name, method_id, input_params,
-                            output_params, method_condition, comment))
-
-    return (methods, structs, api)
-
-
-def generate_stub_file(arch, wordsize, input_files, output_file, use_only_ipc_buffer, mcs):
+def generate_stub_file(arch, input_files, output_file, use_only_ipc_buffer):
     """
     Generate a header file containing system call stubs for seL4.
     """
     result = []
 
     # Ensure architecture looks sane.
-    if arch not in WORD_SIZE_BITS_ARCH.keys():
-        raise Exception("Invalid architecture.")
-
-    data_types = init_data_types(wordsize)
-    arch_types = init_arch_types(wordsize)
+    if not arch in arch_types.keys():
+        raise Exception("Invalid architecture. Expected %s.",
+                " or ".join(arch_types.keys()))
 
     # Parse XML
     methods = []
     structs = []
-    for infile in input_files:
-        method, struct, _ = parse_xml_file(infile, data_types + arch_types[arch])
+    for file in input_files:
+        method, struct = parse_xml_file(file, types + arch_types[arch])
         methods += method
         structs += struct
 
@@ -965,10 +685,10 @@ def generate_stub_file(arch, wordsize, input_files, output_file, use_only_ipc_bu
 
 #ifndef __LIBSEL4_SEL4_CLIENT_H
 #define __LIBSEL4_SEL4_CLIENT_H
-""")
+""");
 
     # Emit the includes
-    result.append('\n'.join(['#include <%s>' % include for include in INCLUDES]))
+    result.append('\n'.join(map(lambda x: '#include <%s>' % x, INCLUDES)))
 
     #
     # Emit code to ensure that all of our type sizes are consistent with
@@ -986,7 +706,7 @@ def generate_stub_file(arch, wordsize, input_files, output_file, use_only_ipc_bu
         typedef unsigned long __type_##type##_size_incorrect[ \\
                 (sizeof(type) == expected_bytes) ? 1 : -1]
 """)
-    for x in data_types + arch_types[arch]:
+    for x in types + arch_types[arch]:
         result.append("assert_size_correct(%s, %d);" % (x.name, x.native_size_bits / 8))
     result.append("")
 
@@ -999,7 +719,7 @@ def generate_stub_file(arch, wordsize, input_files, output_file, use_only_ipc_bu
     result.append("/*")
     result.append(" * Return types for generated methods.")
     result.append(" */")
-    for (interface_name, method_name, _, _, output_params, _, _) in methods:
+    for (interface_name, method_name, _, _, output_params) in methods:
         results_structure = generate_result_struct(interface_name, method_name, output_params)
         if results_structure:
             result.append(results_structure)
@@ -1010,13 +730,9 @@ def generate_stub_file(arch, wordsize, input_files, output_file, use_only_ipc_bu
     result.append("/*")
     result.append(" * Generated stubs.")
     result.append(" */")
-    for (interface_name, method_name, method_id, inputs, outputs, condition, comment) in methods:
-        if condition != "":
-            result.append("#if %s" % condition)
-        result.append(generate_stub(arch, wordsize, interface_name, method_name,
-                                    method_id, inputs, outputs, structs, use_only_ipc_buffer, comment, mcs))
-        if condition != "":
-            result.append("#endif")
+    for (interface_name, method_name, method_id, inputs, outputs) in methods:
+        result.append(generate_stub(arch, interface_name, method_name,
+                method_id, inputs, outputs, structs, use_only_ipc_buffer))
 
     # Print footer.
     result.append("#endif /* __LIBSEL4_SEL4_CLIENT_H */")
@@ -1027,68 +743,33 @@ def generate_stub_file(arch, wordsize, input_files, output_file, use_only_ipc_bu
     output.write("\n".join(result))
     output.close()
 
-
-def process_args():
-    usage_str = """
-    %(prog)s [OPTIONS] [FILES] """
-    epilog_str = """
-
-    """
-    parser = ArgumentParser(description='seL4 System Call Stub Generator.',
-                            usage=usage_str,
-                            epilog=epilog_str)
-    parser.add_argument("-o", "--output", dest="output", default="/dev/stdout",
-                        help="Output file to write stub to. (default: %(default)s).")
-    parser.add_argument("-b", "--buffer", dest="buffer", action="store_true", default=False,
-                        help="Use IPC buffer exclusively, i.e. do not pass syscall arguments by registers. (default: %(default)s)")
-    parser.add_argument("-a", "--arch", dest="arch", required=True, choices=WORD_SIZE_BITS_ARCH,
-                        help="Architecture to generate stubs for.")
-    parser.add_argument("--mcs", dest="mcs", action="store_true",
-                        help="Generate MCS api.")
-
-    wsizegroup = parser.add_mutually_exclusive_group()
-    wsizegroup.add_argument("-w", "--word-size", dest="wsize",
-                            help="Word size(in bits), for the platform.")
-    wsizegroup.add_argument("-c", "--cfile", dest="cfile",
-                            help="Config file for Kbuild, used to get Word size.")
-
-    parser.add_argument("files", metavar="FILES", nargs="+",
-                        help="Input XML files.")
-
-    return parser
-
-
 def main():
+    #
+    # Read command line arguments.
+    #
+    parser = optparse.OptionParser(
+            usage = "usage: %prog -a <arch> -e [sel4 | libsel4] [-o <ouput file] <input XML> [<input XML> ...]")
+    parser.add_option("-a", "--arch",
+            dest="arch", help="Architecture to generate stubs for.")
+    parser.add_option("-o", "--output",
+            dest="output", help="Output file to write stub to.")
+    parser.add_option("-b", "--buffer", action="store_true",
+            help="Use IPC buffer exclusively (i.e. do not pass syscall "
+            "arguments by registers).")
+    (options, args) = parser.parse_args()
 
-    parser = process_args()
-    args = parser.parse_args()
-
-    if not (args.wsize or args.cfile):
-        parser.error("Require either -w/--word-size or -c/--cfile argument.")
-        sys.exit(2)
-
-    # Get word size
-    wordsize = -1
-
-    if args.cfile:
-        try:
-            with open(args.cfile) as conffile:
-                for line in conffile:
-                    if line.startswith('CONFIG_WORD_SIZE'):
-                        wordsize = int(line.split('=')[1].strip())
-        except IndexError:
-            print("Invalid word size in configuration file.")
-            sys.exit(2)
-    else:
-        wordsize = int(args.wsize)
-
-    if wordsize == -1:
-        print("Invalid word size.")
-        sys.exit(2)
+    # Validate arguments
+    if len(args) < 1:
+        parser.error("Require at least one input file.")
+    if not options.arch:
+        parser.error("Require an architecture to be specified.")
+    if not options.output:
+        options.output = "/dev/stdout"
+    input_files = args
 
     # Generate the stubs.
-    generate_stub_file(args.arch, wordsize, args.files, args.output, args.buffer, args.mcs)
 
+    generate_stub_file(options.arch, input_files, options.output, options.buffer)
 
-if __name__ == "__main__":
-    sys.exit(main())
+main()
+

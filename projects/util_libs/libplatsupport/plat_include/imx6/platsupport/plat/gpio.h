@@ -1,22 +1,19 @@
 /*
- * Copyright 2017, Data61
- * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
- * ABN 41 687 119 230.
+ * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
  * the BSD 2-Clause license. Note that NO WARRANTY is provided.
  * See "LICENSE_BSD2.txt" for details.
  *
- * @TAG(DATA61_BSD)
+ * @TAG(NICTA_BSD)
  */
 
-#pragma once
+#ifndef _IMX6_GPIO_H
+#define _IMX6_GPIO_H
 
-#include <utils/util.h>
 #include <platsupport/gpio.h>
 #include <platsupport/mux.h>
 
-/* GPIO IDs */
 #define GPIOID_GPIO0     GPIOID(GPIO_BANK1,  0)
 #define GPIOID_GPIO1     GPIOID(GPIO_BANK1,  1)
 #define GPIOID_GPIO2     GPIOID(GPIO_BANK1,  2)
@@ -40,15 +37,14 @@
 #define GPIOID_NAND_D06  GPIOID(GPIO_BANK2,  6)
 #define GPIOID_NAND_D07  GPIOID(GPIO_BANK2,  7)
 
-#define MAX_GPIO_ID GPIOID_NAND_D07
 
-/* Aliases */
 #define KEY_VOL_UP  GPIOID_GPIO18
 #define KEY_HOME    GPIOID_NAND_D04
 #define KEY_SEARCH  GPIOID_NAND_D03
 #define KEY_BACK    GPIOID_NAND_D02
 #define KEY_MENU    GPIOID_NAND_D01
 #define KEY_VOL_DN  GPIOID_GPIO19
+
 
 enum gpio_port {
     GPIO_BANK1,
@@ -69,8 +65,10 @@ enum gpio_port {
  * @param[out] gpio_sys  A handle to a gpio subsystem to populate.
  * @return               0 on success
  */
-int imx6_gpio_sys_init(void *bank1, void *bank2, void *bank3,
-                       void *bank4, void *bank5, void *bank6,
-                       void *bank7,
-                       mux_sys_t *mux_sys, gpio_sys_t *gpio_sys);
+int imx6_gpio_sys_init(void* bank1, void* bank2, void* bank3,
+                       void* bank4, void* bank5, void* bank6,
+                       void* bank7,
+                       mux_sys_t* mux_sys, gpio_sys_t* gpio_sys);
+
+#endif /* _IMX6_GPIO_H */
 

@@ -1,22 +1,20 @@
 /*
- * Copyright 2017, Data61
- * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
- * ABN 41 687 119 230.
+ * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
  * the BSD 2-Clause license. Note that NO WARRANTY is provided.
  * See "LICENSE_BSD2.txt" for details.
  *
- * @TAG(DATA61_BSD)
+ * @TAG(NICTA_BSD)
  */
 
 #include "keyboard_vkey.h"
-#include <stdbool.h>
 #include <stdio.h>
-#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sel4/sel4.h>
 #include <assert.h>
+
 
 /* This requires ISO-C99 gcc standard. */
 /* ref: http://www.unix-manuals.com/refs/misc/ascii-table.html */
@@ -186,6 +184,7 @@ int16_t ps2_to_vkey[PS2_MAX_KEYCODES_BASIC] = {
     [PS2_KEY_NUM_0] = VK_NUMPAD0,
     [PS2_KEY_NUM_DOT] = VK_DECIMAL
 };
+
 
 void
 keycode_init(keycode_state_t *s,

@@ -1,130 +1,403 @@
 /*
  * Copyright 2014, General Dynamics C4 Systems
  *
- * SPDX-License-Identifier: GPL-2.0-only
+ * This software may be distributed and modified according to the terms of
+ * the GNU General Public License version 2. Note that NO WARRANTY is provided.
+ * See "LICENSE_GPLv2.txt" for details.
+ *
+ * @TAG(GD_GPL)
  */
 
 #include <config.h>
 #include <kernel/boot.h>
+#include <machine.h>
 #include <machine/io.h>
 #include <model/statedata.h>
 #include <object/interrupt.h>
-#include <arch/object/interrupt.h>
 #include <arch/machine.h>
 #include <arch/kernel/apic.h>
 #include <arch/kernel/boot.h>
+#include <arch/kernel/bootinfo.h>
 #include <arch/kernel/boot_sys.h>
 #include <arch/kernel/vspace.h>
-#include <machine/fpu.h>
-#include <arch/machine/timer.h>
+#include <arch/machine/fpu.h>
 #include <arch/object/ioport.h>
-#include <linker.h>
+#include <arch/linker.h>
 #include <util.h>
 
+#ifdef CONFIG_IOMMU
 #include <plat/machine/intel-vtd.h>
+#endif
 
-#define MAX_RESERVED 1
-BOOT_DATA static region_t reserved[MAX_RESERVED];
+#ifdef CONFIG_VTX
+#include <arch/object/vtx.h>
+#endif
 
 /* functions exactly corresponding to abstract specification */
 
-BOOT_CODE static void init_irqs(cap_t root_cnode_cap)
+BOOT_CODE static void
+init_irqs(cap_t root_cnode_cap, bool_t mask_irqs)
 {
     irq_t i;
 
     for (i = 0; i <= maxIRQ; i++) {
         if (i == irq_timer) {
             setIRQState(IRQTimer, i);
-#ifdef ENABLE_SMP_SUPPORT
-        } else if (i == irq_remote_call_ipi || i == irq_reschedule_ipi) {
-            setIRQState(IRQIPI, i);
-#endif /* ENABLE_SMP_SUPPORT */
-#ifdef CONFIG_IOMMU
         } else if (i == irq_iommu) {
             setIRQState(IRQReserved, i);
-#endif
-        } else if (i == 2 && config_set(CONFIG_IRQ_PIC)) {
+#ifdef CONFIG_IRQ_PIC
+        } else if (i == 2) {
             /* cascaded legacy PIC */
             setIRQState(IRQReserved, i);
-        } else if (i >= irq_isa_min && i <= irq_isa_max) {
-            if (config_set(CONFIG_IRQ_PIC)) {
-                setIRQState(IRQInactive, i);
+#endif
+        } else if (i >= irq_controller_min && i <= irq_controller_max)
+            if (mask_irqs)
+                /* Don't use setIRQState() here because it implicitly also enables */
+                /* the IRQ on the interrupt controller which only node 0 is allowed to do. */
+            {
+                intStateIRQTable[i] = IRQReserved;
             } else {
-                setIRQState(IRQReserved, i);
-            }
-        } else if (i >= irq_user_min && i <= irq_user_max) {
-            if (config_set(CONFIG_IRQ_IOAPIC)) {
                 setIRQState(IRQInactive, i);
-            } else {
-                setIRQState(IRQReserved, i);
             }
-        } else {
-            setIRQState(IRQReserved, i);
+        else if (i >= irq_msi_min && i <= irq_msi_max) {
+            setIRQState(IRQInactive, i);
+        } else if (i >= irq_ipi_min && i <= irq_ipi_max) {
+            setIRQState(IRQInactive, i);
         }
     }
-    Arch_irqStateInit();
+
     /* provide the IRQ control cap */
-    write_slot(SLOT_PTR(pptr_of_cap(root_cnode_cap), seL4_CapIRQControl), cap_irq_control_cap_new());
+    write_slot(SLOT_PTR(pptr_of_cap(root_cnode_cap), BI_CAP_IRQ_CTRL), cap_irq_control_cap_new());
 }
 
-BOOT_CODE static bool_t create_untypeds(
-    cap_t root_cnode_cap,
-    region_t boot_mem_reuse_reg)
+/* Create a frame cap for the initial thread. */
+
+BOOT_CODE cap_t
+create_unmapped_it_frame_cap(pptr_t pptr, bool_t use_large)
 {
-    seL4_SlotPos     slot_pos_before;
-    seL4_SlotPos     slot_pos_after;
+    vm_page_size_t frame_size;
+
+    if (use_large) {
+        frame_size = IA32_LargePage;
+    } else {
+        frame_size = IA32_SmallPage;
+    }
+    return
+        cap_frame_cap_new(
+            frame_size,                    /* capFSize           */
+            0,                             /* capFMappedObject   */
+            0,                             /* capFMappedIndex    */
+            IA32_MAPPING_PD,               /* capFMappedType     */
+            wordFromVMRights(VMReadWrite), /* capFVMRights       */
+            pptr                           /* capFBasePtr        */
+        );
+}
+
+BOOT_CODE cap_t
+create_mapped_it_frame_cap(cap_t vspace_cap, pptr_t pptr, vptr_t vptr, bool_t use_large, bool_t executable)
+{
+    cap_t cap;
+    int shift = PT_BITS + PD_BITS + PAGE_BITS;
+    pde_t *pd;
+    uint32_t pd_index;
+    if (shift == 32) {
+        pd = PD_PTR(cap_page_directory_cap_get_capPDBasePtr(vspace_cap));
+    } else {
+        uint32_t pdpt_index = vptr >> shift;
+        pdpte_t *pdpt = PDPT_PTR(cap_pdpt_cap_get_capPDPTBasePtr(vspace_cap));
+        pd = paddr_to_pptr(pdpte_get_pd_base_address(pdpt[pdpt_index]));
+    }
+    pd_index = vptr >> (PT_BITS + PAGE_BITS);
+
+    if (use_large) {
+        cap = cap_frame_cap_new(
+                  IA32_LargePage,                /* capFSize           */
+                  PD_REF(pd),                    /* capFMappedObject   */
+                  pd_index,                      /* capFMappedIndex    */
+                  IA32_MAPPING_PD,               /* capFMappedType     */
+                  wordFromVMRights(VMReadWrite), /* capFVMRights       */
+                  pptr                           /* capFBasePtr        */
+              );
+    } else {
+        uint32_t pt_index = (vptr >> PAGE_BITS) & MASK(PT_BITS);
+        pte_t *pt = paddr_to_pptr(pde_pde_small_get_pt_base_address(pd[pd_index]));
+        cap = cap_frame_cap_new(
+                  IA32_SmallPage,                /* capFSize           */
+                  PT_REF(pt),                    /* capFMappedObject   */
+                  pt_index,                      /* capFMappedIndex    */
+                  IA32_MAPPING_PD,               /* capFMappedType     */
+                  wordFromVMRights(VMReadWrite), /* capFVMRights       */
+                  pptr                           /* capFBasePtr        */
+              );
+    }
+    map_it_frame_cap(cap);
+    return cap;
+}
+
+/* Create a page table for the initial thread */
+
+static BOOT_CODE cap_t
+create_it_page_table_cap(cap_t vspace_cap, pptr_t pptr, vptr_t vptr)
+{
+    cap_t cap;
+    int shift = PT_BITS + PD_BITS + PAGE_BITS;
+    pde_t *pd;
+    uint32_t pd_index;
+    if (shift == 32) {
+        pd = PD_PTR(cap_page_directory_cap_get_capPDBasePtr(vspace_cap));
+    } else {
+        uint32_t pdpt_index = vptr >> shift;
+        pdpte_t *pdpt = PDPT_PTR(cap_pdpt_cap_get_capPDPTBasePtr(vspace_cap));
+        pd = paddr_to_pptr(pdpte_get_pd_base_address(pdpt[pdpt_index]));
+    }
+    pd_index = vptr >> (PT_BITS + PAGE_BITS);
+    cap = cap_page_table_cap_new(
+              PD_REF(pd),   /* capPTMappedObject */
+              pd_index,     /* capPTMappedIndex  */
+              pptr          /* capPTBasePtr      */
+          );
+    map_it_pt_cap(cap);
+    return cap;
+}
+
+static BOOT_CODE cap_t
+create_it_page_directory_cap(cap_t vspace_cap, pptr_t pptr, vptr_t vptr)
+{
+    cap_t cap;
+    int shift = PT_BITS + PD_BITS + PAGE_BITS;
+    uint32_t pdpt_index;
+    pdpte_t *pdpt;
+    if (shift == 32) {
+        pdpt = NULL;
+        pdpt_index = 0;
+    } else {
+        pdpt = PDPT_PTR(cap_pdpt_cap_get_capPDPTBasePtr(vspace_cap));
+        pdpt_index = vptr >> shift;
+    }
+    cap = cap_page_directory_cap_new(
+              PDPT_REF(pdpt),   /* capPDMappedObject */
+              pdpt_index,       /* capPDMappedIndex  */
+              pptr              /* capPDBasePtr      */
+          );
+    if (cap_get_capType(vspace_cap) != cap_null_cap) {
+        map_it_pd_cap(cap);
+    }
+    return cap;
+}
+
+/* Create an address space for the initial thread.
+ * This includes page directory and page tables */
+BOOT_CODE static cap_t
+create_it_address_space(cap_t root_cnode_cap, v_region_t it_v_reg)
+{
+    cap_t      vspace_cap;
+    vptr_t     vptr;
+    pptr_t     pptr;
+    slot_pos_t slot_pos_before;
+    slot_pos_t slot_pos_after;
 
     slot_pos_before = ndks_boot.slot_pos_cur;
-    create_device_untypeds(root_cnode_cap, slot_pos_before);
-    create_kernel_untypeds(root_cnode_cap, boot_mem_reuse_reg, slot_pos_before);
+    if (PDPT_BITS == 0) {
+        cap_t pd_cap;
+        pptr_t pd_pptr;
+        /* just create single PD obj and cap */
+        pd_pptr = alloc_region(PD_SIZE_BITS);
+        if (!pd_pptr) {
+            return cap_null_cap_new();
+        }
+        memzero(PDE_PTR(pd_pptr), 1 << PD_SIZE_BITS);
+        copyGlobalMappings(PDE_PTR(pd_pptr));
+        pd_cap = create_it_page_directory_cap(cap_null_cap_new(), pd_pptr, 0);
+        if (!provide_cap(root_cnode_cap, pd_cap)) {
+            return cap_null_cap_new();
+        }
+        write_slot(SLOT_PTR(pptr_of_cap(root_cnode_cap), BI_CAP_IT_VSPACE), pd_cap);
+        vspace_cap = pd_cap;
+    } else {
+        cap_t pdpt_cap;
+        pptr_t pdpt_pptr;
+        unsigned int i;
+        /* create a PDPT obj and cap */
+        pdpt_pptr = alloc_region(PDPT_SIZE_BITS);
+        if (!pdpt_pptr) {
+            return cap_null_cap_new();
+        }
+        memzero(PDPTE_PTR(pdpt_pptr), 1 << PDPT_SIZE_BITS);
+        pdpt_cap = cap_pdpt_cap_new(
+                       pdpt_pptr        /* capPDPTBasePtr */
+                   );
+        /* create all PD objs and caps necessary to cover userland image. For simplicity
+         * to ensure we also cover the kernel window we create all PDs */
+        for (i = 0; i < BIT(PDPT_BITS); i++) {
+            /* The compiler is under the mistaken belief here that this shift could be
+             * undefined. However, in the case that it would be undefined this code path
+             * is not reachable because PDPT_BITS == 0 (see if statement at the top of
+             * this function), so to work around it we must both put in a redundant
+             * if statement AND place the shift in a variable. While the variable
+             * will get compiled away it prevents the compiler from evaluating
+             * the 1 << 32 as a constant when it shouldn't
+             * tl;dr gcc evaluates constants even if code is unreachable */
+            int shift = (PD_BITS + PT_BITS + PAGE_BITS);
+            if (shift != 32) {
+                vptr = i << shift;
+            } else {
+                return cap_null_cap_new();
+            }
+
+            pptr = alloc_region(PD_SIZE_BITS);
+            if (!pptr) {
+                return cap_null_cap_new();
+            }
+            memzero(PDE_PTR(pptr), 1 << PD_SIZE_BITS);
+            if (!provide_cap(root_cnode_cap,
+                             create_it_page_directory_cap(pdpt_cap, pptr, vptr))
+               ) {
+                return cap_null_cap_new();
+            }
+        }
+        /* now that PDs exist we can copy the global mappings */
+        copyGlobalMappings(PDPTE_PTR(pdpt_pptr));
+        write_slot(SLOT_PTR(pptr_of_cap(root_cnode_cap), BI_CAP_IT_VSPACE), pdpt_cap);
+        vspace_cap = pdpt_cap;
+    }
 
     slot_pos_after = ndks_boot.slot_pos_cur;
-    ndks_boot.bi_frame->untyped = (seL4_SlotRegion) {
+    ndks_boot.bi_frame->ui_pd_caps = (slot_region_t) {
+        slot_pos_before, slot_pos_after
+    };
+    /* create all PT objs and caps necessary to cover userland image */
+    slot_pos_before = ndks_boot.slot_pos_cur;
+
+    for (vptr = ROUND_DOWN(it_v_reg.start, PT_BITS + PAGE_BITS);
+            vptr < it_v_reg.end;
+            vptr += BIT(PT_BITS + PAGE_BITS)) {
+        pptr = alloc_region(PT_SIZE_BITS);
+        if (!pptr) {
+            return cap_null_cap_new();
+        }
+        memzero(PTE_PTR(pptr), 1 << PT_SIZE_BITS);
+        if (!provide_cap(root_cnode_cap,
+                         create_it_page_table_cap(vspace_cap, pptr, vptr))
+           ) {
+            return cap_null_cap_new();
+        }
+    }
+
+    slot_pos_after = ndks_boot.slot_pos_cur;
+    ndks_boot.bi_frame->ui_pt_caps = (slot_region_t) {
+        slot_pos_before, slot_pos_after
+    };
+
+    return vspace_cap;
+}
+
+BOOT_CODE static bool_t
+create_device_untypeds(
+    cap_t root_cnode_cap,
+    dev_p_regs_t *dev_p_regs)
+{
+    slot_pos_t     slot_pos_before;
+    slot_pos_t     slot_pos_after;
+    uint32_t       i;
+
+    slot_pos_before = ndks_boot.slot_pos_cur;
+    for (i = 0; i < dev_p_regs->count; i++) {
+        if (!create_untypeds_for_region(root_cnode_cap, true, paddr_to_pptr_reg(dev_p_regs->list[i]), ndks_boot.bi_frame->ut_obj_caps.start)) {
+            return false;
+        }
+    }
+    slot_pos_after = ndks_boot.slot_pos_cur;
+    ndks_boot.bi_frame->ut_device_obj_caps = (slot_region_t) {
         slot_pos_before, slot_pos_after
     };
     return true;
 }
 
-BOOT_CODE static void arch_init_freemem(p_region_t ui_p_reg, v_region_t v_reg,
-                                        mem_p_regs_t *mem_p_regs, word_t extra_bi_size_bits)
+BOOT_CODE static void
+create_ia32_bootinfo(ia32_bootinfo_frame_t *bootinfo, vesa_info_t *vesa_info, ia32_mem_region_t* mem_regions)
 {
-    ui_p_reg.start = 0;
-    reserved[0] = paddr_to_pptr_reg(ui_p_reg);
-    init_freemem(mem_p_regs->count, mem_p_regs->list, MAX_RESERVED, reserved, v_reg, extra_bi_size_bits);
+    int i;
+    bootinfo->vbe_control_info = vesa_info->vbe_control_info;
+    bootinfo->vbe_mode_info = vesa_info->vbe_mode_info;
+    bootinfo->vbe_mode = vesa_info->vbe_mode;
+    bootinfo->vbe_interface_seg = vesa_info->vbe_interface_seg;
+    bootinfo->vbe_interface_off = vesa_info->vbe_interface_off;
+    bootinfo->vbe_interface_len = vesa_info->vbe_interface_len;
+    for (i = 0; i < CONFIG_MAX_MEM_REGIONS; i++) {
+        bootinfo->mem_regions[i] = mem_regions[i];
+    }
+}
+
+BOOT_CODE static pptr_t
+create_arch_bi_frame_cap(
+    cap_t root_cnode_cap,
+    cap_t pd_cap,
+    vptr_t vptr
+)
+{
+    pptr_t pptr;
+    cap_t cap;
+
+    pptr = alloc_region(PAGE_BITS);
+    if (!pptr) {
+        printf("Kernel init failed: could not allocate arch bootinfo frame\n");
+        return 0;
+    }
+    clearMemory((void*)pptr, PAGE_BITS);
+
+    /* create a cap and write it into the root cnode */
+    cap = create_mapped_it_frame_cap(pd_cap, pptr, vptr, false, false);
+    write_slot(SLOT_PTR(pptr_of_cap(root_cnode_cap), BI_CAP_BI_ARCH_FRAME), cap);
+
+    return pptr;
 }
 
 /* This function initialises a node's kernel state. It does NOT initialise the CPU. */
 
-BOOT_CODE bool_t init_sys_state(
-    cpu_id_t      cpu_id,
-    mem_p_regs_t  *mem_p_regs,
+BOOT_CODE bool_t
+init_node_state(
+    p_region_t    avail_p_reg,
+    p_region_t    sh_p_reg,
+    dev_p_regs_t* dev_p_regs,
     ui_info_t     ui_info,
     p_region_t    boot_mem_reuse_p_reg,
+    node_id_t     node_id,
+    uint32_t      num_nodes,
+    cpu_id_t*     cpu_list,
     /* parameters below not modeled in abstract specification */
+    pdpte_t*      kernel_pdpt,
+    pde_t*        kernel_pd,
+    pte_t*        kernel_pt,
+    vesa_info_t*  vesa_info,
+    ia32_mem_region_t* mem_regions
+#ifdef CONFIG_IOMMU
+    , cpu_id_t      cpu_id,
     uint32_t      num_drhu,
-    paddr_t      *drhu_list,
-    acpi_rmrr_list_t *rmrr_list,
-    acpi_rsdp_t      *acpi_rsdp,
-    seL4_X86_BootInfo_VBE *vbe,
-    seL4_X86_BootInfo_mmap_t *mb_mmap,
-    seL4_X86_BootInfo_fb_t *fb_info
+    paddr_t*      drhu_list,
+    acpi_rmrr_list_t *rmrr_list
+#endif
 )
 {
     cap_t         root_cnode_cap;
-    vptr_t        extra_bi_frame_vptr;
+    vptr_t        arch_bi_frame_vptr;
     vptr_t        bi_frame_vptr;
     vptr_t        ipcbuf_vptr;
     cap_t         it_vspace_cap;
-    cap_t         it_ap_cap;
     cap_t         ipcbuf_cap;
-    word_t        extra_bi_size = sizeof(seL4_BootInfoHeader);
-    pptr_t        extra_bi_offset = 0;
-    uint32_t      tsc_freq;
+    pptr_t        bi_frame_pptr;
+    pptr_t        arch_bi_frame_pptr;
     create_frames_of_region_ret_t create_frames_ret;
-    create_frames_of_region_ret_t extra_bi_ret;
+    int i;
+#ifdef CONFIG_BENCHMARK
+    vm_attributes_t buffer_attr = {{ 0 }};
+    uint32_t paddr;
+    pde_t pde;
+#endif /* CONFIG_BENCHMARK */
 
     /* convert from physical addresses to kernel pptrs */
+    region_t avail_reg          = paddr_to_pptr_reg(avail_p_reg);
     region_t ui_reg             = paddr_to_pptr_reg(ui_info.p_reg);
+    region_t sh_reg             = paddr_to_pptr_reg(sh_p_reg);
     region_t boot_mem_reuse_reg = paddr_to_pptr_reg(boot_mem_reuse_p_reg);
 
     /* convert from physical addresses to userland vptrs */
@@ -135,118 +408,88 @@ BOOT_CODE bool_t init_sys_state(
 
     ipcbuf_vptr = ui_v_reg.end;
     bi_frame_vptr = ipcbuf_vptr + BIT(PAGE_BITS);
-    extra_bi_frame_vptr = bi_frame_vptr + BIT(PAGE_BITS);
+    arch_bi_frame_vptr = bi_frame_vptr + BIT(PAGE_BITS);
 
-    if (vbe->vbeMode != -1) {
-        extra_bi_size += sizeof(seL4_X86_BootInfo_VBE);
-    }
-    if (acpi_rsdp) {
-        extra_bi_size += sizeof(seL4_BootInfoHeader) + sizeof(*acpi_rsdp);
-    }
-    if (fb_info && fb_info->addr) {
-        extra_bi_size += sizeof(seL4_BootInfoHeader) + sizeof(*fb_info);
-    }
-
-    word_t mb_mmap_size = sizeof(seL4_X86_BootInfo_mmap_t);
-    extra_bi_size += mb_mmap_size;
-
-    // room for tsc frequency
-    extra_bi_size += sizeof(seL4_BootInfoHeader) + 4;
-    word_t extra_bi_size_bits = calculate_extra_bi_size_bits(extra_bi_size);
-
-    /* The region of the initial thread is the user image + ipcbuf and boot info */
+    /* The region of the initial thread is the user image + ipcbuf + boot info and arch boot info */
     it_v_reg.start = ui_v_reg.start;
-    it_v_reg.end = ROUND_UP(extra_bi_frame_vptr + BIT(extra_bi_size_bits), PAGE_BITS);
-#ifdef CONFIG_IOMMU
-    /* calculate the number of io pts before initialising memory */
-    if (!vtd_init_num_iopts(num_drhu)) {
+    it_v_reg.end = arch_bi_frame_vptr + BIT(PAGE_BITS);
+
+    /* make the free memory available to alloc_region() */
+    ndks_boot.freemem[0] = avail_reg;
+    for (i = 1; i < MAX_NUM_FREEMEM_REG; i++) {
+        ndks_boot.freemem[i] = REG_EMPTY;
+    }
+
+    /* initialise virtual-memory-related data structures (not in abstract spec) */
+    if (!init_vm_state(kernel_pdpt, kernel_pd, kernel_pt)) {
         return false;
     }
-#endif /* CONFIG_IOMMU */
 
-    arch_init_freemem(ui_info.p_reg, it_v_reg, mem_p_regs, extra_bi_size_bits);
+#ifdef CONFIG_BENCHMARK
+    /* allocate and create the log buffer */
+    buffer_attr.words[0] = IA32_PAT_MT_WRITE_THROUGH;
+
+    paddr = pptr_to_paddr((void *) alloc_region(pageBitsForSize(IA32_LargePage)));
+
+    /* allocate a large frame for logging */
+    pde = pde_pde_large_new(
+              paddr,                                   /* page_base_address    */
+              vm_attributes_get_ia32PATBit(buffer_attr),      /* pat                  */
+              0,                                       /* avl_cte_depth        */
+              1,                                       /* global               */
+              0,                                       /* dirty                */
+              0,                                       /* accessed             */
+              vm_attributes_get_ia32PCDBit(buffer_attr),      /* cache_disabled       */
+              vm_attributes_get_ia32PWTBit(buffer_attr),      /* write_through        */
+              0,                                       /* super_user           */
+              1,                                       /* read_write           */
+              1                                        /* present              */
+          );
+
+    /* TODO this shouldn't be hardcoded */
+    ia32KSkernelPD[IA32_KSLOG_IDX] = pde;
+
+
+    /* flush the tlb */
+    invalidatePageStructureCache();
+
+    /* if we crash here, the log isn't working */
+#ifdef CONFIG_DEBUG_BUILD
+    printf("Testing log\n");
+    ksLog[0] = 0xdeadbeef;
+    printf("Wrote to ksLog %x\n", ksLog[0]);
+    assert(ksLog[0] == 0xdeadbeef);
+#endif /* CONFIG_DEBUG_BUILD */
+#endif /* CONFIG_BENCHMARK */
 
     /* create the root cnode */
     root_cnode_cap = create_root_cnode();
 
     /* create the IO port cap */
     write_slot(
-        SLOT_PTR(pptr_of_cap(root_cnode_cap), seL4_CapIOPortControl),
-        cap_io_port_control_cap_new()
+        SLOT_PTR(pptr_of_cap(root_cnode_cap), BI_CAP_IO_PORT),
+        cap_io_port_cap_new(
+            0,                /* first port */
+            NUM_IO_PORTS - 1 /* last port  */
+        )
     );
 
     /* create the cap for managing thread domains */
     create_domain_cap(root_cnode_cap);
 
+    /* create the IRQ CNode */
+    if (!create_irq_cnode()) {
+        return false;
+    }
+
     /* initialise the IRQ states and provide the IRQ control cap */
-    init_irqs(root_cnode_cap);
+    init_irqs(root_cnode_cap, node_id != 0);
 
-    tsc_freq = tsc_init();
-
-    /* populate the bootinfo frame */
-    populate_bi_frame(0, ksNumCPUs, ipcbuf_vptr, extra_bi_size);
-    region_t extra_bi_region = {
-        .start = rootserver.extra_bi,
-        .end = rootserver.extra_bi + BIT(extra_bi_size_bits)
-    };
-
-    /* populate vbe info block */
-    if (vbe->vbeMode != -1) {
-        vbe->header.id = SEL4_BOOTINFO_HEADER_X86_VBE;
-        vbe->header.len = sizeof(seL4_X86_BootInfo_VBE);
-        memcpy((void *)(rootserver.extra_bi + extra_bi_offset), vbe, sizeof(seL4_X86_BootInfo_VBE));
-        extra_bi_offset += sizeof(seL4_X86_BootInfo_VBE);
+    /* create the bootinfo frame */
+    bi_frame_pptr = allocate_bi_frame(node_id, num_nodes, ipcbuf_vptr);
+    if (!bi_frame_pptr) {
+        return false;
     }
-
-    /* populate acpi rsdp block */
-    if (acpi_rsdp) {
-        seL4_BootInfoHeader header;
-        header.id = SEL4_BOOTINFO_HEADER_X86_ACPI_RSDP;
-        header.len = sizeof(header) + sizeof(*acpi_rsdp);
-        *(seL4_BootInfoHeader *)(rootserver.extra_bi + extra_bi_offset) = header;
-        extra_bi_offset += sizeof(header);
-        memcpy((void *)(rootserver.extra_bi + extra_bi_offset), acpi_rsdp, sizeof(*acpi_rsdp));
-        extra_bi_offset += sizeof(*acpi_rsdp);
-    }
-
-    /* populate framebuffer information block */
-    if (fb_info && fb_info->addr) {
-        seL4_BootInfoHeader header;
-        header.id = SEL4_BOOTINFO_HEADER_X86_FRAMEBUFFER;
-        header.len = sizeof(header) + sizeof(*fb_info);
-        *(seL4_BootInfoHeader *)(rootserver.extra_bi + extra_bi_offset) = header;
-        extra_bi_offset += sizeof(header);
-        memcpy((void *)(rootserver.extra_bi + extra_bi_offset), fb_info, sizeof(*fb_info));
-        extra_bi_offset += sizeof(*fb_info);
-    }
-
-    /* populate multiboot mmap block */
-    mb_mmap->header.id = SEL4_BOOTINFO_HEADER_X86_MBMMAP;
-    mb_mmap->header.len = mb_mmap_size;
-    memcpy((void *)(rootserver.extra_bi + extra_bi_offset), mb_mmap, mb_mmap_size);
-    extra_bi_offset += mb_mmap_size;
-
-    /* populate tsc frequency block */
-    {
-        seL4_BootInfoHeader header;
-        header.id = SEL4_BOOTINFO_HEADER_X86_TSC_FREQ;
-        header.len = sizeof(header) + 4;
-        *(seL4_BootInfoHeader *)(extra_bi_region.start + extra_bi_offset) = header;
-        extra_bi_offset += sizeof(header);
-        *(uint32_t *)(extra_bi_region.start + extra_bi_offset) = tsc_freq;
-        extra_bi_offset += 4;
-    }
-
-    /* provde a chunk for any leftover padding in the extended boot info */
-    seL4_BootInfoHeader padding_header;
-    padding_header.id = SEL4_BOOTINFO_HEADER_PADDING;
-    padding_header.len = (extra_bi_region.end - extra_bi_region.start) - extra_bi_offset;
-    *(seL4_BootInfoHeader *)(extra_bi_region.start + extra_bi_offset) = padding_header;
-
-#ifdef CONFIG_KERNEL_MCS
-    /* set up sched control for each core */
-    init_sched_control(root_cnode_cap, CONFIG_MAX_NUM_NODES);
-#endif
 
     /* Construct an initial address space with enough virtual addresses
      * to cover the user image + ipc buffer and bootinfo frames */
@@ -259,25 +502,19 @@ BOOT_CODE bool_t init_sys_state(
     create_bi_frame_cap(
         root_cnode_cap,
         it_vspace_cap,
+        bi_frame_pptr,
         bi_frame_vptr
     );
 
-    /* create and map extra bootinfo region */
-    extra_bi_ret =
-        create_frames_of_region(
-            root_cnode_cap,
-            it_vspace_cap,
-            extra_bi_region,
-            true,
-            pptr_to_paddr((void *)(extra_bi_region.start - extra_bi_frame_vptr))
-        );
-    if (!extra_bi_ret.success) {
-        return false;
-    }
-    ndks_boot.bi_frame->extraBIPages = extra_bi_ret.region;
+    /* Create and map arch bootinfo frame cap */
+    arch_bi_frame_pptr = create_arch_bi_frame_cap(
+                             root_cnode_cap,
+                             it_vspace_cap,
+                             arch_bi_frame_vptr
+                         );
 
     /* create the initial thread's IPC buffer */
-    ipcbuf_cap = create_ipcbuf_frame_cap(root_cnode_cap, it_vspace_cap, ipcbuf_vptr);
+    ipcbuf_cap = create_ipcbuf_frame(root_cnode_cap, it_vspace_cap, ipcbuf_vptr);
     if (cap_get_capType(ipcbuf_cap) == cap_null_cap) {
         return false;
     }
@@ -294,18 +531,16 @@ BOOT_CODE bool_t init_sys_state(
     if (!create_frames_ret.success) {
         return false;
     }
-    ndks_boot.bi_frame->userImageFrames = create_frames_ret.region;
+    ndks_boot.bi_frame->ui_frame_caps = create_frames_ret.region;
 
-    /* create the initial thread's ASID pool */
-    it_ap_cap = create_it_asid_pool(root_cnode_cap);
-    if (cap_get_capType(it_ap_cap) == cap_null_cap) {
-        return false;
-    }
-    write_it_asid_pool(it_ap_cap, it_vspace_cap);
-
-#ifdef CONFIG_KERNEL_MCS
-    NODE_STATE(ksCurTime) = getCurrentTime();
-#endif
+    /*
+     * Initialise the NULL FPU state. This is different from merely zero'ing it
+     * out (i.e., the NULL FPU state is non-zero), and must be performed before
+     * the first thread is created.
+     */
+    resetFpu();
+    saveFpuState(&ia32KSnullFpuState);
+    ia32KSfpuOwner = NULL;
 
     /* create the idle thread */
     if (!create_idle_thread()) {
@@ -313,125 +548,120 @@ BOOT_CODE bool_t init_sys_state(
     }
 
     /* create the initial thread */
-    tcb_t *initial = create_initial_thread(root_cnode_cap,
-                                           it_vspace_cap,
-                                           ui_info.v_entry,
-                                           bi_frame_vptr,
-                                           ipcbuf_vptr,
-                                           ipcbuf_cap);
-    if (initial == NULL) {
+    if (!create_initial_thread(
+                root_cnode_cap,
+                it_vspace_cap,
+                ui_info.v_entry,
+                bi_frame_vptr,
+                ipcbuf_vptr,
+                ipcbuf_cap
+            )) {
         return false;
     }
-    init_core_state(initial);
 
 #ifdef CONFIG_IOMMU
     /* initialise VTD-related data structures and the IOMMUs */
-    if (!vtd_init(cpu_id, rmrr_list)) {
+    if (!vtd_init(cpu_id, num_drhu, rmrr_list)) {
         return false;
     }
 
     /* write number of IOMMU PT levels into bootinfo */
-    ndks_boot.bi_frame->numIOPTLevels = x86KSnumIOPTLevels;
+    ndks_boot.bi_frame->num_iopt_levels = ia32KSnumIOPTLevels;
 
     /* write IOSpace master cap */
-    write_slot(SLOT_PTR(pptr_of_cap(root_cnode_cap), seL4_CapIOSpace), master_iospace_cap());
-#else
-    ndks_boot.bi_frame->numIOPTLevels = -1;
+    if (ia32KSnumDrhu != 0) {
+        write_slot(SLOT_PTR(pptr_of_cap(root_cnode_cap), BI_CAP_IO_SPACE), master_iospace_cap());
+    }
 #endif
 
-    /* create all of the untypeds. Both devices and kernel window memory */
+#ifdef CONFIG_VTX
+    /* allow vtx to allocate any memory it may need before we give
+       the rest away */
+    if (!vtx_allocate()) {
+        return false;
+    }
+#endif
+
+    /* convert the remaining free memory into UT objects and provide the caps */
     if (!create_untypeds(root_cnode_cap, boot_mem_reuse_reg)) {
         return false;
     }
+    /* WARNING: alloc_region() must not be called anymore after here! */
+
+    /* create device frames */
+    if (!create_device_untypeds(root_cnode_cap, dev_p_regs)) {
+        return false;
+    }
+
+    /* create all shared frames */
+    create_frames_ret =
+        create_frames_of_region(
+            root_cnode_cap,
+            it_vspace_cap,
+            sh_reg,
+            false,
+            0
+        );
+    if (!create_frames_ret.success) {
+        return false;
+    }
+    ndks_boot.bi_frame->sh_frame_caps = create_frames_ret.region;;
+
+    /* create ia32 specific bootinfo frame */
+    create_ia32_bootinfo( (ia32_bootinfo_frame_t*)arch_bi_frame_pptr, vesa_info, mem_regions);
 
     /* finalise the bootinfo frame */
     bi_finalise();
+
+#if defined DEBUG || defined RELEASE_PRINTF
+    ia32KSconsolePort = console_port_of_node(node_id);
+    ia32KSdebugPort = debug_port_of_node(node_id);
+#endif
+
+    ia32KSNodeID = node_id;
+    ia32KSNumNodes = num_nodes;
+    ia32KSCPUList = cpu_list;
+
+    /* write IPI cap */
+    write_slot(SLOT_PTR(pptr_of_cap(root_cnode_cap), BI_CAP_IPI), cap_ipi_cap_new());
 
     return true;
 }
 
 /* This function initialises the CPU. It does NOT initialise any kernel state. */
 
-BOOT_CODE bool_t init_cpu(
+BOOT_CODE bool_t
+init_node_cpu(
+    uint32_t apic_khz,
     bool_t   mask_legacy_irqs
 )
 {
-    /* initialise virtual-memory-related data structures */
-    if (!init_vm_state()) {
-        return false;
-    }
-
     /* initialise CPU's descriptor table registers (GDTR, IDTR, LDTR, TR) */
     init_dtrs();
 
-    if (config_set(CONFIG_SYSENTER)) {
-        /* initialise MSRs (needs an initialised TSS) */
-        init_sysenter_msrs();
-    } else if (config_set(CONFIG_SYSCALL)) {
-        init_syscall_msrs();
-    } else {
-        return false;
-    }
+    /* initialise MSRs (needs an initialised TSS) */
+    init_sysenter_msrs();
 
     /* setup additional PAT MSR */
     if (!init_pat_msr()) {
         return false;
     }
 
-    /* enable the Write Protect bit in cr0. This prevents the kernel from writing to
-     * read only memory, which we shouldn't do under correct execution */
-    write_cr0(read_cr0() | CR0_WRITE_PROTECT);
-
-    /* check for SMAP and SMEP and enable */
-    cpuid_007h_ebx_t ebx_007;
-    ebx_007.words[0] = x86_cpuid_ebx(0x7, 0);
-    if (cpuid_007h_ebx_get_smap(ebx_007)) {
-        /* if we have user stack trace enabled or dangerous code injection then we cannot
-         * enable this as SMAP will make them fault. */
-        if (!config_set(CONFIG_PRINTING) && !config_set(CONFIG_DANGEROUS_CODE_INJECTION)) {
-            write_cr4(read_cr4() | CR4_SMAP);
-        }
-    }
-    if (cpuid_007h_ebx_get_smep(ebx_007)) {
-        /* similar to smap we cannot enable smep if using dangerous code injection. it
-         * does not affect stack trace printing though */
-        if (!config_set(CONFIG_DANGEROUS_CODE_INJECTION)) {
-            write_cr4(read_cr4() | CR4_SMEP);
-        }
-    }
-
-    if (!init_ibrs()) {
-        return false;
-    }
-
-#ifdef CONFIG_HARDWARE_DEBUG_API
-    /* Initialize hardware breakpoints */
-    Arch_initHardwareBreakpoints();
-#endif
-
     /* initialise floating-point unit */
-    if (!Arch_initFpu()) {
-        return false;
-    }
+    Arch_initFpu();
 
     /* initialise local APIC */
-    if (!apic_init(mask_legacy_irqs)) {
+    if (!apic_init(apic_khz, mask_legacy_irqs)) {
         return false;
-    }
-
-#ifdef CONFIG_DEBUG_DISABLE_PREFETCHERS
-    if (!disablePrefetchers()) {
-        return false;
-    }
-#endif
-
-    if (config_set(CONFIG_EXPORT_PMC_USER)) {
-        enablePMCUser();
     }
 
 #ifdef CONFIG_VTX
     /* initialise Intel VT-x extensions */
-    if (!vtx_init()) {
+    vtx_enable();
+#endif
+
+#ifdef CONFIG_DEBUG_DISABLE_PREFETCHERS
+    if (!disablePrefetchers()) {
         return false;
     }
 #endif

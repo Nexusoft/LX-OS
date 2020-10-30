@@ -1,17 +1,15 @@
 /*
- * Copyright 2017, Data61
- * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
- * ABN 41 687 119 230.
+ * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
  * the BSD 2-Clause license. Note that NO WARRANTY is provided.
  * See "LICENSE_BSD2.txt" for details.
  *
- * @TAG(DATA61_BSD)
+ * @TAG(NICTA_BSD)
  */
 /* @AUTHOR(akroh@ertos.nicta.com.au) */
-
-#pragma once
+#ifndef _PLATSUPPORT_PLAT_TIMER_H
+#define _PLATSUPPORT_PLAT_TIMER_H
 
 #include <platsupport/timer.h>
 
@@ -85,6 +83,7 @@ enum timer_id {
 };
 #define TMR_DEFAULT TMR_KPSS_GPT0
 
+
 static const uintptr_t apq8064_timer_paddrs[] = {
     [TMR_PPSS_XO_TMR0 ] = PPSS_XO_TIMERS_PADDR,
     [TMR_PPSS_XO_TMR1 ] = PPSS_XO_TIMERS_PADDR,
@@ -127,37 +126,14 @@ static const int apq8064_timer_irqs[] = {
     [TMR_GSS_WDT1     ] = GSS_WDT1_INTERRUPT
 };
 
+
+
 typedef struct {
     /* vaddr pwm is mapped to */
     void *vaddr;
-    int id;
 } timer_config_t;
 
-typedef struct {
-   void *data;
-   int id;
-} timer_t;
 
-int gpt_timer_start(timer_t *timer);
-int gpt_timer_stop(timer_t *timer);
-uint64_t gpt_get_time(timer_t *timer);
-void gpt_handle_irq(timer_t *timer);
-int gpt_periodic(timer_t *timer, uint64_t ns);
+pstimer_t *ps_get_timer(enum timer_id id, timer_config_t *config);
 
-int dgt_timer_start(timer_t *timer);
-int dgt_timer_stop(timer_t *timer);
-uint64_t dpt_get_time(timer_t *timer);
-int dgt_periodic(timer_t *timer, uint64_t ns);
-void dgt_handle_irq(timer_t *timer);
-
-int tmr_timer_start(timer_t *timer);
-int tmr_timer_stop(timer_t *timer);
-uint64_t tmr_get_time(timer_t *timer);
-int tmr_periodic(timer_t *timer, uint64_t ns);
-void tmr_handle_irq(timer_t *timer);
-
-int wdt_timer_start(timer_t *timer);
-uint64_t wdt_get_time(timer_t *timer);
-int wdt_periodic(timer_t *timer, uint64_t ns);
-
-int timer_init(timer_t *timer, timer_config_t config);
+#endif /* _PLATSUPPORT_PLAT_TIMER_H */

@@ -1,23 +1,21 @@
 /*
- * Copyright 2017, Data61
- * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
- * ABN 41 687 119 230.
+ * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
  * the BSD 2-Clause license. Note that NO WARRANTY is provided.
  * See "LICENSE_BSD2.txt" for details.
  *
- * @TAG(DATA61_BSD)
+ * @TAG(NICTA_BSD)
  */
 
-#pragma once
+#ifndef __PLATSUPPORT_PLAT_MUX_H__
+#define __PLATSUPPORT_PLAT_MUX_H__
 
 enum mux_feature {
     MUX_I2C1,
     MUX_I2C2,
     MUX_I2C3,
     MUX_GPIO0_CLKO1,
-    MUX_UART1,
     NMUX_FEATURES
 };
 
@@ -30,3 +28,6 @@ enum mux_feature {
  */
 int imx6_mux_init(void* iomuxc, mux_sys_t* mux);
 
+
+
+#endif /* __PLATSUPPORT_PLAT_MUX_H__ */

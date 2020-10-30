@@ -1,20 +1,15 @@
 /*
- * Copyright 2017, Data61
- * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
- * ABN 41 687 119 230.
+ * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
  * the BSD 2-Clause license. Note that NO WARRANTY is provided.
  * See "LICENSE_BSD2.txt" for details.
  *
- * @TAG(DATA61_BSD)
+ * @TAG(NICTA_BSD)
  */
 
-#pragma once
-
-#include <autoconf.h>
-#include <platsupport/gen_config.h>
-#include <platsupport/mach/serial.h>
+#ifndef __PLATSUPPORT_PLAT_SERIAL_H__
+#define __PLATSUPPORT_PLAT_SERIAL_H__
 
 #define UART1_PADDR  0x02020000
 #define UART2_PADDR  0x021E8000
@@ -28,12 +23,24 @@
 #define UART4_IRQ    61
 #define UART5_IRQ    62
 
-#define UART_REF_CLK 40089600
+/* official device names */
+enum chardev_id {
+    IMX6_UART1,
+    IMX6_UART2,
+    IMX6_UART3,
+    IMX6_UART4,
+    IMX6_UART5,
+    /* Aliases */
+    PS_SERIAL0 = IMX6_UART1,
+    PS_SERIAL1 = IMX6_UART2,
+    PS_SERIAL2 = IMX6_UART3,
+    PS_SERIAL3 = IMX6_UART4,
+    PS_SERIAL4 = IMX6_UART5,
+    /* defaults */
+    PS_SERIAL_DEFAULT = IMX6_UART2
+};
 
-#if defined(CONFIG_PLAT_SABRE)
-    #define DEFAULT_SERIAL_PADDR UART2_PADDR
-    #define DEFAULT_SERIAL_INTERRUPT UART2_IRQ
-#elif defined(CONFIG_PLAT_WANDQ)
-    #define DEFAULT_SERIAL_PADDR UART1_PADDR
-    #define DEFAULT_SERIAL_INTERRUPT UART1_IRQ
-#endif
+
+#endif /* __PLATSUPPORT_PLAT_SERIAL_H__ */
+
+

@@ -1,7 +1,11 @@
 /*
  * Copyright 2014, General Dynamics C4 Systems
  *
- * SPDX-License-Identifier: GPL-2.0-only
+ * This software may be distributed and modified according to the terms of
+ * the GNU General Public License version 2. Note that NO WARRANTY is provided.
+ * See "LICENSE_GPLv2.txt" for details.
+ *
+ * @TAG(GD_GPL)
  */
 
 /*
@@ -11,7 +15,8 @@
  * 2007 Ported to seL4 C kernel by Philip Derrin
  */
 
-#pragma once
+#ifndef __MACHINE__PROFILER_H__
+#define __MACHINE__PROFILER_H__
 
 #include <machine/registerset.h>
 #include <machine/hardware.h>
@@ -74,4 +79,5 @@ extern profiler_entry_t profiler_entries[MAX_UNIQUE_INSTRUCTIONS];
 
 #endif /* PROFILER */
 
+#endif /* !__MACHINE__PROFILER_H__ */
 

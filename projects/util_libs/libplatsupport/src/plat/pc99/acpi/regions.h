@@ -1,16 +1,15 @@
 /*
- * Copyright 2017, Data61
- * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
- * ABN 41 687 119 230.
+ * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
  * the BSD 2-Clause license. Note that NO WARRANTY is provided.
  * See "LICENSE_BSD2.txt" for details.
  *
- * @TAG(DATA61_BSD)
+ * @TAG(NICTA_BSD)
  */
 
-#pragma once
+#ifndef __REGIONS_INTERNAL_H__
+#define __REGIONS_INTERNAL_H__
 
 #include <platsupport/plat/acpi/regions.h>
 
@@ -26,7 +25,7 @@
 typedef struct Region {
     region_type_t type;
     void* start;
-    size_t size;
+    uint32_t size;
     int parent;
 } Region_t;
 
@@ -37,8 +36,9 @@ typedef struct RegionList {
      * This offset is added to region start addresses when
      * traversing/updating links within regions.
      */
-    size_t offset;
+    uint32_t offset;
 } RegionList_t;
+
 
 #define REGIONLIST_INIT(_offset) (RegionList_t) \
     { \
@@ -67,7 +67,7 @@ int
 add_region(RegionList_t* region_list, const Region_t r);
 
 static inline
-Region_t new_region(region_type_t type, void *start, size_t size, int parent)
+Region_t new_region(region_type_t type, void *start, uint32_t size, int parent)
 {
     Region_t r;
     r.type = type;
@@ -78,9 +78,10 @@ Region_t new_region(region_type_t type, void *start, size_t size, int parent)
     return r;
 }
 
+
 static inline int
 add_region_size(RegionList_t* region_list, region_type_t type,
-                void* start, size_t size, int parent)
+                void* start, uint32_t size, int parent)
 {
     return add_region(region_list, new_region(type, start, size, parent));
 }
@@ -112,7 +113,7 @@ remove_region_last(RegionList_t* region_list)
  *
  */
 int
-find_space(const RegionList_t* region_list, size_t size,
+find_space(const RegionList_t* region_list, uint32_t size,
            region_type_t type);
 
 /*
@@ -129,5 +130,7 @@ find_region(const RegionList_t* rlist, int start_index,
  * Returns the index of the new region or -1 on error
  */
 int
-split_region(RegionList_t* region_list, int index, size_t size);
+split_region(RegionList_t* region_list, int index, uint32_t size);
+
+#endif /* __REGIONS_INTERAL_H__ */
 

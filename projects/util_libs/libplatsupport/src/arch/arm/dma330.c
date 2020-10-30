@@ -1,23 +1,28 @@
 /*
- * Copyright 2017, Data61
- * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
- * ABN 41 687 119 230.
+ * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
  * the BSD 2-Clause license. Note that NO WARRANTY is provided.
  * See "LICENSE_BSD2.txt" for details.
  *
- * @TAG(DATA61_BSD)
+ * @TAG(NICTA_BSD)
  */
 
-#include <autoconf.h>
-#include <platsupport/gen_config.h>
+
 
 /* This is core ARM IP, but we will limit the compile to EXYNOS5 for now */
-#ifdef CONFIG_PLAT_EXYNOS5
+#ifdef PLAT_EXYNOS5
 
 #include <platsupport/dma330.h>
 #include "string.h"
+
+
+//#define DMA330_DEBUG
+#ifdef DMA330_DEBUG
+#define D330(...) printf("DMA330: " __VA_ARGS__)
+#else
+#define D330(...) do{}while(0)
+#endif
 
 /* Debug control */
 #define DBGCMD_EXEC            0b00
@@ -94,7 +99,7 @@
 /* DMAKILL       */
 #define DMAI_MOV_SAR(a)        /* DMAMOV        */ ((PTR64(a) << 16) | 0xBC)
 #define DMAI_MOV_DAR(a)        /* DMAMOV        */ (DMAI_MOV_SAR(a) | (0x2 << 8))
-#define DMAI_MOV_CCR(a)        /* DMAMOV        */ (DMAI_MOV_SAR(a) | (BIT(8)))
+#define DMAI_MOV_CCR(a)        /* DMAMOV        */ (DMAI_MOV_SAR(a) | (0x1 << 8))
 #define DMAI_NOP               /* DMANOP        */ (0x18)
 /* DMARMB        */
 #define DMAI_SEV(e)            /* DMASEV        */ (((e) << 11) | 0x34)
@@ -139,6 +144,7 @@
 /* DMAWFE        */
 /* DMAWFP<S|B|P> */
 #define DMAISZ_WMB               1
+
 
 #define APPEND_INSTRUCTION(buf, op)                   \
     do {                                              \
@@ -204,6 +210,7 @@ typedef volatile struct dma330_map {
         uint32_t pcell[4];      /* RO */
     } id;
 } dma330_map_t;
+
 
 struct channel_data {
     dma330_signal_cb cb;
@@ -439,6 +446,7 @@ dmac_print_fault(dma330_t dma330, int channel)
     printf("\n");
 }
 
+
 UNUSED static void
 program_dump(void *vbin)
 {
@@ -553,7 +561,7 @@ dma330_xfer(dma330_t* dma330_ptr, int ch, uintptr_t program, dma330_signal_cb cb
         return -1;
     }
 
-    ZF_LOGD("Executing 0x%x on channel %d\n", program, ch);
+    D330("Executing 0x%x on channel %d\n", program, ch);
     dma330->channel_data[ch].cb = cb;
     dma330->channel_data[ch].token = token;
 
@@ -562,7 +570,7 @@ dma330_xfer(dma330_t* dma330_ptr, int ch, uintptr_t program, dma330_signal_cb cb
         UNUSED uint32_t status;
         while (dmac_get_status(dma330, ch) == CHSTS_EXECUTING);
         status = CHSTS_STATUS(dmac_get_status(dma330, ch));
-        ZF_LOGD("Transfer @ 0x%x completed with status: 0x%x\n", program, status);
+        D330("Transfer @ 0x%x completed with status: 0x%x\n", program, status);
         if (dmac_has_fault(dma330, ch)) {
             dmac_print_fault(dma330, ch);
         }
@@ -590,7 +598,7 @@ dma330_handle_irq(dma330_t* dma330_ptr)
         sig &= 0x3;
         cdata = &dma330->channel_data[ch];
 
-        ZF_LOGD("IRQ: Channel %d.%d\n", ch, sig);
+        D330("IRQ: Channel %d.%d\n", ch, sig);
 
         /* We should only get an IRQ if a callback is registered */
         assert(cdata->cb);
@@ -668,7 +676,7 @@ dma330_copy_compile(int channel, void* vbin)
 int
 dma330_copy_configure(uintptr_t pdst, uintptr_t psrc, size_t len, void* vbin)
 {
-    ZF_LOGD("Copy configure @ 0x%x: 0x%x -> 0x%x (%d bytes)\n",
+    D330("Copy configure @ 0x%x: 0x%x -> 0x%x (%d bytes)\n",
          (uint32_t)vbin, (uint32_t)psrc, (uint32_t)pdst, len);
     char* bin = (char*)vbin;
     uint32_t cfg = 0;
@@ -690,3 +698,4 @@ dma330_copy_configure(uintptr_t pdst, uintptr_t psrc, size_t len, void* vbin)
 }
 
 #endif
+

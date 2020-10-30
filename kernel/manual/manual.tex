@@ -1,7 +1,11 @@
 %
 % Copyright 2014, General Dynamics C4 Systems
 %
-% SPDX-License-Identifier: GPL-2.0-only
+% This software may be distributed and modified according to the terms of
+% the GNU General Public License version 2. Note that NO WARRANTY is provided.
+% See "LICENSE_GPLv2.txt" for details.
+%
+% @TAG(GD_GPL)
 %
 
 \documentclass[a4paper,11pt,twoside]{report}
@@ -9,7 +13,6 @@
 
 % Setting this to true turns on the `draft' watermark
 \newif \ifDraft \Draftfalse
-%\Drafttrue
 
 \newif \ifxeightsix   \xeightsixtrue
 
@@ -34,11 +37,9 @@
 \chead{}
 \rhead[\fancyplain{}{\sl\leftmark}]{\fancyplain{}{\sl\thepage}}
 \lfoot[\fancyplain{\sl\thepage}{}]{}
-\cfoot{\ifDraft\textsf{Data61 Confidential}\fi}
+\cfoot{\ifDraft\textsf{NICTA Confidential}\fi}
 \rfoot[]{\fancyplain{\sl\thepage}{}}
 
-\usepackage[T1]{fontenc}
-\usepackage{lmodern}
 \usepackage{listings}
 \usepackage{multirow}
 \usepackage{setspace}
@@ -64,15 +65,6 @@
 \newcommand{\Htextbf}[1]{\textbf{\hyperpage{#1}}}
 \urlstyle{rm}
 
-% If statements
-\usepackage{ifthen}
-
-% Numbered subsubsections
-\setcounter{secnumdepth}{5}
-
-% Subsubsections it table of contents
-\setcounter{tocdepth}{5}
-
 % API functions / Kernel Objects
 \newcommand{\obj}[1]{\textsf{\small #1}}
 \newcommand{\apifunc}[2]{\hyperref[api:#2]{\texttt{#1()}}}
@@ -90,10 +82,10 @@
 
 \begin{document}
 
-  \title{seL4 Reference Manual\\Version \version}
+  \title{seL4 Reference Manual\\with Asynchronous Endpoint Binding Extensions\\API version \version}
 
-  \author{Trustworthy~Systems~Team, Data61}
-  \AuthorEmail{https://sel4.systems/contact/}
+  \author{Trustworthy~Systems~Team, NICTA}
+  \AuthorEmail{ssrg@nicta.com.au}
   \date{\commitdate}
 
   \maketitle
@@ -115,11 +107,11 @@
 % This list of contributors is based on the hg log. If you make commits please
 % add your name in alphabetical order.
 The primary authors of this document are Matthew Grosvenor and Adam Walker,
-with contributions from Adrian Danis, Andrew Boyton, Anna Lyons, David Greenaway, Etienne
+with contributions from Adrian Danis, Andrew Boyton, David Greenaway, Etienne
 Le Sueur, Gernot Heiser, Gerwin Klein, Godfrey van der Linden, Kevin
 Elphinstone, Matthew Fernandez, Matthias Daum, Michael von Tessin, Peter Chubb,
 Simon Winwood, Thomas Sewell, Timothy Bourke and Toby Murray. All authors 
-and contributors can be contacted at firstname.lastname@data61.csiro.au.
+and contributors can be contacted at firstname.lastname@nicta.com.au.
   \end{abstract}
   \thispagestyle{empty}
 
@@ -140,7 +132,6 @@ and contributors can be contacted at firstname.lastname@data61.csiro.au.
   \input{parts/objects}
   \input{parts/cspace}
   \input{parts/ipc}
-  \input{parts/notifications}
   \input{parts/threads}
   \input{parts/vspace}
   \input{parts/io}

@@ -1,16 +1,15 @@
 /*
- * Copyright 2017, Data61
- * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
- * ABN 41 687 119 230.
+ * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
  * the BSD 2-Clause license. Note that NO WARRANTY is provided.
  * See "LICENSE_BSD2.txt" for details.
  *
- * @TAG(DATA61_BSD)
+ * @TAG(NICTA_BSD)
  */
 
-#pragma once
+#ifndef _EXYNOS5_GPIO_H
+#define _EXYNOS5_GPIO_H
 
 #include <platsupport/gpio.h>
 
@@ -21,7 +20,6 @@
 #define GPIOPORT(bank, port)        _GPIOPORT(GPIO_##bank##_BANK, port)
 #define GPIOPORT_NONE               _GPIOPORT(GPIO_NBANKS, 0)
 
-/* GPIO IDs */
 #define XEINT0   GPIOID(GPX0, 0)
 #define XEINT1   GPIOID(GPX0, 1)
 #define XEINT2   GPIOID(GPX0, 2)
@@ -55,7 +53,9 @@
 #define XEINT30  GPIOID(GPX3, 6)
 #define XEINT31  GPIOID(GPX3, 7)
 
-#define MAX_GPIO_ID XEINT31
+
+
+
 
 enum gpio_bank {
     GPIO_LEFT_BANK,
@@ -125,5 +125,7 @@ enum gpio_port {
  * @param[out] gpio_sys  A handle to a gpio subsystem to populate.
  * @return               0 on success
  */
-int exynos_gpio_sys_init(mux_sys_t *mux_sys, gpio_sys_t *gpio_sys);
+int exynos_gpio_sys_init(mux_sys_t* mux_sys, gpio_sys_t* gpio_sys);
+
+#endif /* _EXYNOS5_GPIO_H */
 

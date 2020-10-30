@@ -1,19 +1,15 @@
 /*
- * Copyright 2017, Data61
- * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
- * ABN 41 687 119 230.
+ * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
  * the BSD 2-Clause license. Note that NO WARRANTY is provided.
  * See "LICENSE_BSD2.txt" for details.
  *
- * @TAG(DATA61_BSD)
+ * @TAG(NICTA_BSD)
  */
 
-#pragma once
-
-#include <autoconf.h>
-#include <platsupport/gen_config.h>
+#ifndef __PLATSUPPORT_PLAT_SERIAL_H__
+#define __PLATSUPPORT_PLAT_SERIAL_H__
 
 #define EXYNOS_UART0_PADDR  0x12C00000
 #define EXYNOS_UART1_PADDR  0x12C10000
@@ -25,11 +21,11 @@
 #define EXYNOS_UART2_IRQ    85
 #define EXYNOS_UART3_IRQ    86
 
-#if defined(CONFIG_PLAT_EXYNOS5250)
+#if defined(PLAT_EXYNOS5250)
 #define UART_DEFAULT_FIN    100000000
-#elif defined(CONFIG_PLAT_EXYNOS5410)
+#elif defined(PLAT_EXYNOS5410)
 #define UART_DEFAULT_FIN     64000000
-#elif defined(CONFIG_PLAT_EXYNOS5422)
+#elif defined(PLAT_EXYNOS5422)
 #define UART_DEFAULT_FIN  53200000
 #else
 #error Unknown platform
@@ -48,5 +44,6 @@ enum chardev_id {
 
 #include <platsupport/mach/serial.h>
 
-#define DEFAULT_SERIAL_PADDR EXYNOS_UART2_PADDR
-#define DEFAULT_SERIAL_INTERRUPT EXYNOS_UART2_IRQ
+#endif /* __PLATSUPPORT_PLAT_SERIAL_H__ */
+
+

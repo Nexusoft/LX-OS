@@ -1,39 +1,44 @@
 /*
  * Copyright 2014, General Dynamics C4 Systems
  *
- * SPDX-License-Identifier: GPL-2.0-only
+ * This software may be distributed and modified according to the terms of
+ * the GNU General Public License version 2. Note that NO WARRANTY is provided.
+ * See "LICENSE_GPLv2.txt" for details.
+ *
+ * @TAG(GD_GPL)
  */
 
-#pragma once
+#ifndef __MACHINE_IO_H
+#define __MACHINE_IO_H
 
-#include <config.h>
 #include <util.h>
 #include <arch/types.h>
+#include <plat/machine/io.h>
 
-#define FORMAT(archetype, string_index, first_to_check) \
-        __attribute__((format(archetype, string_index, first_to_check)))
-
-#if (defined CONFIG_DEBUG_BUILD) || (defined CONFIG_PRINTING)
-void putDebugChar(unsigned char c);
+#if defined DEBUG || defined RELEASE_PRINTF
+unsigned int puts(const char *s) VISIBLE;
+/* for prints that you want enabled in both DEBUG and RELEASE_PRINTF modes,
+   use kprintf directly */
+unsigned int kprintf(const char *format, ...) VISIBLE;
+unsigned int print_unsigned_long(unsigned long x, unsigned int ui_base) VISIBLE;
 #endif
 
-#ifdef CONFIG_DEBUG_BUILD
-/* io for dumping capdl */
-unsigned char getDebugChar(void);
-#endif
-
-#ifdef CONFIG_PRINTING
+#ifdef DEBUG
 /* printf will result in output */
-void putchar(char c);
-#define kernel_putchar(c) putchar(c)
-word_t kprintf(const char *format, ...) VISIBLE FORMAT(printf, 1, 2);
-word_t ksnprintf(char *str, word_t size, const char *format, ...);
-word_t puts(const char *s) VISIBLE;
 #define printf(args...) kprintf(args)
-#define snprintf(args...) ksnprintf(args)
-#else /* CONFIG_PRINTING */
+#else
 /* printf will NOT result in output */
-#define kernel_putchar(c) ((void)(0))
 #define printf(args...) ((void)(0))
+/* and neither will puts */
 #define puts(s) ((void)(0))
-#endif /* CONFIG_PRINTING */
+#endif
+
+#ifdef RELEASE_PRINTF
+/* release_printfs will result in output */
+#define release_printf(args...) kprintf(args)
+#else
+/* release_printfs will NOT result in output */
+#define release_printf(args...) ((void)(0))
+#endif
+
+#endif

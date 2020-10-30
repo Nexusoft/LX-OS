@@ -1,21 +1,18 @@
 /*
- * Copyright 2017, Data61
- * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
- * ABN 41 687 119 230.
+ * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
  * the BSD 2-Clause license. Note that NO WARRANTY is provided.
  * See "LICENSE_BSD2.txt" for details.
  *
- * @TAG(DATA61_BSD)
+ * @TAG(NICTA_BSD)
  */
 
 #include <stdlib.h>
 #include <platsupport/serial.h>
 #include <platsupport/plat/serial.h>
+#include "serial.h"
 #include <string.h>
-
-#include "../../chardev.h"
 
 #define USR       0x0008 /* Status register */
 #define UCR       0x0010 /* Control register */
@@ -29,12 +26,13 @@
 
 #define UART_REG(base, x)    ((volatile uint32_t *)((uintptr_t)(base) + (x)))
 
+
 static void
 uart_handle_irq(ps_chardevice_t* d UNUSED)
 {
 }
 
-int uart_putchar(ps_chardevice_t* d, int c)
+static int uart_putchar(ps_chardevice_t* d, int c)
 {
     while (!(*UART_REG(d->vaddr, USR) & USR_TXEMP));
 
@@ -46,9 +44,40 @@ int uart_putchar(ps_chardevice_t* d, int c)
     return 0;
 }
 
-int uart_getchar(ps_chardevice_t* d UNUSED)
+static int uart_getchar(ps_chardevice_t* d UNUSED)
 {
     return EOF;
+}
+
+static ssize_t
+uart_write(ps_chardevice_t* d, const void* vdata, size_t count, chardev_callback_t rcb UNUSED, void* token UNUSED)
+{
+    const char* data = (const char*)vdata;
+    int i;
+    for (i = 0; i < count; i++) {
+        if (uart_putchar(d, *data++) < 0) {
+            return i;
+        }
+    }
+    return count;
+}
+
+static ssize_t
+uart_read(ps_chardevice_t* d, void* vdata, size_t count, chardev_callback_t rcb UNUSED, void* token UNUSED)
+{
+    char* data;
+    int ret;
+    int i;
+    data = (char*)vdata;
+    for (i = 0; i < count; i++) {
+        ret = uart_getchar(d);
+        if (ret != EOF) {
+            *data++ = ret;
+        } else {
+            return i;
+        }
+    }
+    return count;
 }
 
 int uart_init(const struct dev_defn* defn,
@@ -74,3 +103,4 @@ int uart_init(const struct dev_defn* defn,
 
     return 0;
 }
+

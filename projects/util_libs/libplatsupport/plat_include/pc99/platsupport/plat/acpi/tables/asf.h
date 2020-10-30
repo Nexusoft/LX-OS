@@ -1,16 +1,19 @@
 /*
- * Copyright 2017, Data61
- * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
- * ABN 41 687 119 230.
+ * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
  * the BSD 2-Clause license. Note that NO WARRANTY is provided.
  * See "LICENSE_BSD2.txt" for details.
  *
- * @TAG(DATA61_BSD)
+ * @TAG(NICTA_BSD)
  */
 
+#ifndef __ACPI_H__
+#error This file should not be included directly
+#endif
+
 #pragma pack(push,1)
+
 
 /* Alert Standard Format table */
 typedef struct acpi_asf_hdr {
@@ -91,6 +94,7 @@ typedef struct acpi_asf_rmcp {
     uint16_t           oem_param;
 } acpi_asf_rmcp_t;
 
+
 typedef struct acpi_asf_addr_smb {
     uint8_t smb;
 } acpi_asf_addr_smb_t;
@@ -101,6 +105,7 @@ typedef struct acpi_asf_addr {
     uint8_t            num_devices;
     // acpi_asf_addr_smbus_t smb;
 } acpi_asf_addr_t;
+
 
 #pragma pack(pop)
 
@@ -146,6 +151,7 @@ acpi_asf_alrt_next_dev(acpi_asf_alrt_t* h, acpi_asf_dev_array_t* cur)
     }
 }
 
+
 /**********************
  **** RCTL helpers ****
  ***********************/
@@ -170,6 +176,7 @@ acpi_asf_rtcl_next_ctl(acpi_asf_rctl_t* h, acpi_asf_ctl_array_t* cur)
     }
 }
 
+
 /**********************
  **** ADDR helpers ****
  ***********************/
@@ -193,3 +200,6 @@ acpi_asf_addr_smb_next(acpi_asf_addr_t* h, acpi_asf_addr_smb_t* cur)
         return NULL;
     }
 }
+
+
+

@@ -1,89 +1,67 @@
 /*
- * Copyright 2017, Data61
- * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
- * ABN 41 687 119 230.
+ * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
  * the BSD 2-Clause license. Note that NO WARRANTY is provided.
  * See "LICENSE_BSD2.txt" for details.
  *
- * @TAG(DATA61_BSD)
+ * @TAG(NICTA_BSD)
  */
-#pragma once
+#ifndef _PLATSUPPORT_PLAT_TIMER_H
+#define _PLATSUPPORT_PLAT_TIMER_H
 
-#include <platsupport/timer.h>
-#include <platsupport/ltimer.h>
+/* Memory maps */
+#define DMTIMER2_PADDR 0x48040000
+#define DMTIMER3_PADDR 0x48042000
+#define DMTIMER4_PADDR 0x48044000
+#define DMTIMER5_PADDR 0x48046000
+#define DMTIMER6_PADDR 0x48048000
+#define DMTIMER7_PADDR 0x4804A000
 
-#define DMTIMER2_PATH "/ocp/timer@48040000"
-#define DMTIMER3_PATH "/ocp/timer@48042000"
+/* IRQs */
+#define DMTIMER2_INTERRUPT 68
+#define DMTIMER3_INTERRUPT 69
+#define DMTIMER4_INTERRUPT 92
+#define DMTIMER5_INTERRUPT 93
+#define DMTIMER6_INTERRUPT 94
+#define DMTIMER7_INTERRUPT 95
 
-#define DMT_REG_CHOICE 0
-#define DMT_IRQ_CHOICE 0
+/* Timers */
+enum timer_id {
+    DMTIMER2,
+    DMTIMER3,
+    DMTIMER4,
+    DMTIMER5,
+    DMTIMER6,
+    DMTIMER7,
+    NTIMERS
+};
+#define TMR_DEFAULT DMTIMER2
 
-static UNUSED timer_properties_t dmt_properties = {
-    .upcounter = false,
-    .timeouts = true,
-    .relative_timeouts = true,
-    .periodic_timeouts = true,
-    .bit_width = 32,
-    .irqs = 1
+static const uintptr_t dm_timer_paddrs[] = {
+    [DMTIMER2] = DMTIMER2_PADDR,
+    [DMTIMER3] = DMTIMER3_PADDR,
+    [DMTIMER4] = DMTIMER4_PADDR,
+    [DMTIMER5] = DMTIMER5_PADDR,
+    [DMTIMER6] = DMTIMER6_PADDR,
+    [DMTIMER7] = DMTIMER7_PADDR,
+};
+
+static const int dm_timer_irqs[] = {
+    [DMTIMER2] = DMTIMER2_INTERRUPT,
+    [DMTIMER3] = DMTIMER3_INTERRUPT,
+    [DMTIMER4] = DMTIMER4_INTERRUPT,
+    [DMTIMER5] = DMTIMER5_INTERRUPT,
+    [DMTIMER6] = DMTIMER6_INTERRUPT,
+    [DMTIMER7] = DMTIMER7_INTERRUPT,
 };
 
 typedef struct {
-    char *fdt_path;
-    ltimer_callback_fn_t user_cb_fn;
-    void *user_cb_token;
-    ltimer_event_t user_cb_event;
-} dmt_config_t;
+    /* vaddr pwm is mapped to */
+    void *vaddr;
+    uint32_t irq;
+} timer_config_t;
 
-struct dmt_map {
-    uint32_t tidr; // 00h TIDR Identification Register
-    uint32_t padding1[3];
-    uint32_t cfg; // 10h TIOCP_CFG Timer OCP Configuration Register
-    uint32_t padding2[3];
-    uint32_t tieoi; // 20h IRQ_EOI Timer IRQ End-Of-Interrupt Register
-    uint32_t tisrr; // 24h IRQSTATUS_RAW Timer IRQSTATUS Raw Register
-    uint32_t tisr; // 28h IRQSTATUS Timer IRQSTATUS Register
-    uint32_t tier; // 2Ch IRQENABLE_SET Timer IRQENABLE Set Register
-    uint32_t ticr; // 30h IRQENABLE_CLR Timer IRQENABLE Clear Register
-    uint32_t twer; // 34h IRQWAKEEN Timer IRQ Wakeup Enable Register
-    uint32_t tclr; // 38h TCLR Timer Control Register
-    uint32_t tcrr; // 3Ch TCRR Timer Counter Register
-    uint32_t tldr; // 40h TLDR Timer Load Register
-    uint32_t ttgr; // 44h TTGR Timer Trigger Register
-    uint32_t twps; // 48h TWPS Timer Write Posted Status Register
-    uint32_t tmar; // 4Ch TMAR Timer Match Register
-    uint32_t tcar1; // 50h TCAR1 Timer Capture Register
-    uint32_t tsicr; // 54h TSICR Timer Synchronous Interface Control Register
-    uint32_t tcar2; // 58h TCAR2 Timer Capture Register
-};
+pstimer_t *ps_get_timer(enum timer_id id, timer_config_t *config);
 
-typedef struct dmt {
-    /* set in init */
-    ps_io_ops_t ops;
-    ltimer_callback_fn_t user_cb_fn;
-    void *user_cb_token;
-    ltimer_event_t user_cb_event;  /* what are we being used for? */
-
-    /* set in fdt helper */
-    volatile struct dmt_map *hw;
-    pmem_region_t pmem;
-    irq_id_t irq_id;
-
-    /* set in setup */
-    uint32_t time_h;
-} dmt_t;
-
-int dmt_init(dmt_t *dmt, ps_io_ops_t ops, dmt_config_t config);
-int dmt_start(dmt_t *dmt);
-int dmt_stop(dmt_t *dmt);
-/* configure a timeout */
-int dmt_set_timeout(dmt_t *dmt, uint64_t ns, bool periodic);
-/* start the ticking timer */
-int dmt_start_ticking_timer(dmt_t *dmt);
-void dmt_handle_irq(void *data, ps_irq_acknowledge_fn_t acknowledge_fn, void *ack_data);
-/* return true if an overflow is pending */
-bool dmt_pending_overflow(dmt_t *dmt);
-/* return time */
-uint64_t dmt_get_time(dmt_t *dmt);
-void dmt_destroy(dmt_t *dmt);
+#endif /* _PLATSUPPORT_PLAT_TIMER_H */

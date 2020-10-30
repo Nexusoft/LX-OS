@@ -1,5 +1,3 @@
-% SPDX-License-Identifier: LPPL-1.3c
-
 %%
 %% This is file `export.bst',
 %% generated with the docstrip utility.

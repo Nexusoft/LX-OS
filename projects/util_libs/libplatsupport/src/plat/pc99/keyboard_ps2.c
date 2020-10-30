@@ -1,21 +1,18 @@
 /*
- * Copyright 2017, Data61
- * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
- * ABN 41 687 119 230.
+ * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
  * the BSD 2-Clause license. Note that NO WARRANTY is provided.
  * See "LICENSE_BSD2.txt" for details.
  *
- * @TAG(DATA61_BSD)
+ * @TAG(NICTA_BSD)
  */
 
 #include "keyboard_ps2.h"
 #include "keyboard_vkey.h"
-#include <stdbool.h>
-#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sel4/sel4.h>
 #include <assert.h>
 
 static void
@@ -85,9 +82,13 @@ ps2_send_keyboard_cmd_param(ps_io_ops_t *ops, uint8_t cmd, uint8_t param)
 /* ---------------------------------------------------------------------------------------------- */
 
 static keyboard_key_event_t
-keyboard_state_push_ps2_keyevent(struct keyboard_state *s, uint16_t ps2_keyevent)
+keyboard_state_push_ps2_keyevent(struct keyboard_state *s, int16_t ps2_keyevent)
 {
     keyboard_key_event_t ev_none = { .vkey = -1, .pressed = false };
+
+    if (ps2_keyevent <= -1) {
+        return ev_none;
+    }
 
     if (s->state == KEYBOARD_PS2_STATE_IGNORE) {
         s->num_ignore--;

@@ -1,14 +1,17 @@
 /*
- * Copyright 2017, Data61
- * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
- * ABN 41 687 119 230.
+ * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
  * the BSD 2-Clause license. Note that NO WARRANTY is provided.
  * See "LICENSE_BSD2.txt" for details.
  *
- * @TAG(DATA61_BSD)
+ * @TAG(NICTA_BSD)
  */
+
+#ifndef __ACPI_H__
+#error This file should not be included directly
+#endif
+
 
 #pragma pack(push,1)
 /* These table not checked. */
@@ -21,6 +24,7 @@ typedef struct acpi_mcfg_desc {
     uint8_t  res[4];
 } acpi_mcfg_desc_t;
 
+
 typedef struct acpi_mcfg {
     acpi_header_t header;
     uint8_t       res[8];
@@ -28,7 +32,9 @@ typedef struct acpi_mcfg {
 //     acpi_mcfg_descriptor_t descriptor
 } acpi_mcfg_t;
 
+
 #pragma pack(pop)
+
 
 static inline acpi_mcfg_desc_t*
 acpi_mcfg_desc_first(acpi_mcfg_t* hdr)

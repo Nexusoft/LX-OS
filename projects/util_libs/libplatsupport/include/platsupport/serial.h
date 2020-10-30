@@ -1,16 +1,16 @@
 /*
- * Copyright 2017, Data61
- * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
- * ABN 41 687 119 230.
+ * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
  * the BSD 2-Clause license. Note that NO WARRANTY is provided.
  * See "LICENSE_BSD2.txt" for details.
  *
- * @TAG(DATA61_BSD)
+ * @TAG(NICTA_BSD)
  */
 
-#pragma once
+#ifndef __PLATSUPPORT_SERIAL_H__
+#define __PLATSUPPORT_SERIAL_H__
+
 
 #include <platsupport/chardev.h>
 #include <platsupport/plat/serial.h>
@@ -36,7 +36,7 @@ enum serial_parity {
  * @param  id: the id of the character device
  * @param ops: a structure containing OS specific operations for memory access
  * @param dev: a character device structure to populate
- * @return   : 0 on success
+ * @return   : NULL on error, otherwise returns the device structure pointer
  */
 int serial_init(enum chardev_id id,
                 ps_io_ops_t* ops,
@@ -55,3 +55,4 @@ int serial_configure(ps_chardevice_t* dev,
                      enum serial_parity parity,
                      int  stop_bits);
 
+#endif /* __PLATSUPPORT_SERIAL_H__ */

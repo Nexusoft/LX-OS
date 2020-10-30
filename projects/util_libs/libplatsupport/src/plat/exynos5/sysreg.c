@@ -1,13 +1,11 @@
 /*
- * Copyright 2017, Data61
- * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
- * ABN 41 687 119 230.
+ * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
  * the BSD 2-Clause license. Note that NO WARRANTY is provided.
  * See "LICENSE_BSD2.txt" for details.
  *
- * @TAG(DATA61_BSD)
+ * @TAG(NICTA_BSD)
  */
 #include <platsupport/plat/sysreg.h>
 #include "../../services.h"
@@ -79,3 +77,5 @@ exynos5_sysreg_usbphy_enable(enum usb_phy_id phy_id, sysreg_t* sysreg)
     }
     return 0;
 }
+
+

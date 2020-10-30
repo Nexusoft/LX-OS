@@ -1,19 +1,33 @@
 /*
- * Copyright 2017, Data61
- * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
- * ABN 41 687 119 230.
+ * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
  * the BSD 2-Clause license. Note that NO WARRANTY is provided.
  * See "LICENSE_BSD2.txt" for details.
  *
- * @TAG(DATA61_BSD)
+ * @TAG(NICTA_BSD)
  */
 
-#pragma once
+#ifndef __PLATSUPPORT_MACH_MUX_H__
+#define __PLATSUPPORT_MACH_MUX_H__
 
 #include <platsupport/mux.h>
-#include <platsupport/plat/mux.h>
+
+//#define MUX_DEBUG
+#ifdef MUX_DEBUG
+#define DMUX(...) printf("MUX: " __VA_ARGS__)
+#else
+#define DMUX(...) do{}while(0)
+#endif
+
+//#define GPIO_DEBUG
+#ifdef GPIO_DEBUG
+#define DGPIO(...) printf("GPIO: " __VA_ARGS__)
+#else
+#define DGPIO(...) do{}while(0)
+#endif
+
+
 
 /* Value encodings */
 #define MUXVALUE_CPD(con, pud, drv) ((con) << 0 | (pud) << 4 | (drv) << 6)
@@ -29,6 +43,7 @@
 #define DRV2X        0x2
 #define DRV3X        0x1
 #define DRV4X        0x3
+
 
 struct mux_cfg {
     uint32_t con;
@@ -70,6 +85,7 @@ struct mux_bank {
     uint32_t res10[44];
 };
 
+
 struct mux_feature_data {
     uint16_t port;
     uint8_t pin;
@@ -78,3 +94,5 @@ struct mux_feature_data {
 
 extern struct mux_feature_data* feature_data[];
 
+
+#endif /* __PLATSUPPORT_MACH_MUX_H__ */

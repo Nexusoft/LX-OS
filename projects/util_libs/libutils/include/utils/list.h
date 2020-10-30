@@ -1,18 +1,17 @@
 /*
- * Copyright 2017, Data61
- * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
- * ABN 41 687 119 230.
+ * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
  * the BSD 2-Clause license. Note that NO WARRANTY is provided.
  * See "LICENSE_BSD2.txt" for details.
  *
- * @TAG(DATA61_BSD)
+ * @TAG(NICTA_BSD)
  */
 
 /* Bog standard singly-linked-list implementation. */
 
-#pragma once
+#ifndef _UTILS_LIST_H
+#define _UTILS_LIST_H
 
 #include <stdbool.h>
 
@@ -20,6 +19,8 @@
 typedef struct {
     struct list_node *head;
 } list_t;
+
+typedef struct list_node * lnode;
 
 /* Create a new linked-list. Returns 0 on success. */
 int list_init(list_t *l);
@@ -39,7 +40,7 @@ bool list_is_empty(list_t *l);
 /* Returns true if the given element is in the list. The third argument is a
  * comparator to determine list element equality.
  */
-bool list_exists(list_t *l, void *data, int(*cmp)(void *, void *));
+bool list_exists(list_t *l, void *data, int(*cmp)(void*, void*));
 
 /* Returns the number of elements in the list. */
 int list_length(list_t *l);
@@ -47,18 +48,24 @@ int list_length(list_t *l);
 /* Returns the index of the given element in the list or -1 if the element is
  * not found.
  */
-int list_index(list_t *l, void *data, int(*cmp)(void *, void *));
+int list_index(list_t *l, void *data, int(*cmp)(void*, void*));
 
 /* Call the given function on every list element. While traversing the list, if
  * the caller's action ever returns non-zero the traversal is aborted and that
  * value is returned. If traversal completes, this function returns 0.
  */
-int list_foreach(list_t *l, int(*action)(void *, void *), void *token);
+int list_foreach(list_t *l, int(*action)(void*));
+
+/* Call the given function on every list element that meets a certain
+ * condition while traversing the list. Will return after it has performed
+ * the action once.
+ */
+int list_action(list_t *l, void *data, int(*cmp)(void*, void*), void(*action)(void*));
 
 /* Remove the given element from the list. Returns non-zero if the element is
  * not found.
  */
-int list_remove(list_t *l, void *data, int(*cmp)(void *, void *));
+int list_remove(list_t *l, void *data, int(*cmp)(void*, void*));
 
 /* Remove all elements from the list. Returns 0 on success. */
 int list_remove_all(list_t *l);
@@ -81,5 +88,13 @@ struct list_node {
 
 int list_prepend_node(list_t *l, struct list_node *node);
 int list_append_node(list_t *l, struct list_node *node);
-int list_remove_node(list_t *l, void *data, int(*cmp)(void *, void *));
+int list_remove_node(list_t *l, void *data, int(*cmp)(void*, void*));
 int list_remove_all_nodes(list_t *l);
+
+static inline
+int list_cmp_equality(void *a, void *b)
+{
+    return !(a == b);
+}
+
+#endif

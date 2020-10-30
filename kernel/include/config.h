@@ -1,10 +1,15 @@
 /*
  * Copyright 2014, General Dynamics C4 Systems
  *
- * SPDX-License-Identifier: GPL-2.0-only
+ * This software may be distributed and modified according to the terms of
+ * the GNU General Public License version 2. Note that NO WARRANTY is provided.
+ * See "LICENSE_GPLv2.txt" for details.
+ *
+ * @TAG(GD_GPL)
  */
 
-#pragma once
+#ifndef __CONFIG_H
+#define __CONFIG_H
 
 /* Compile-time configuration parameters. Might be set by the build system. */
 
@@ -18,20 +23,8 @@
 #endif
 
 /* number of timer ticks until a thread is preempted  */
-#ifndef CONFIG_KERNEL_MCS
 #ifndef CONFIG_TIME_SLICE
 #define CONFIG_TIME_SLICE 5
-#endif
-#endif
-
-#ifdef CONFIG_KERNEL_MCS
-#ifndef CONFIG_BOOT_THREAD_TIME_SLICE
-#define CONFIG_BOOT_THREAD_TIME_SLICE 5
-#endif
-
-#ifndef CONFIG_KERNEL_WCET_SCALE
-#define CONFIG_KERNEL_WCET_SCALE 1
-#endif
 #endif
 
 /* the number of scheduler domains */
@@ -49,11 +42,6 @@
 #define CONFIG_RETYPE_FAN_OUT_LIMIT 256
 #endif
 
-/* chunk size for memory clears during retype, in bits. */
-#ifndef CONFIG_RESET_CHUNK_BITS
-#define CONFIG_RESET_CHUNK_BITS 8
-#endif
-
 /* maximum number of iterations until we preempt a delete/revoke invocation */
 #ifndef CONFIG_MAX_NUM_WORK_UNITS_PER_PREEMPTION
 #define CONFIG_MAX_NUM_WORK_UNITS_PER_PREEMPTION 100
@@ -66,41 +54,32 @@
 
 /* maximum number of untyped caps in bootinfo */
 /* WARNING: must match value in libsel4! */
-/* CONSTRAINT: (16 * CONFIG_MAX_NUM_BOOTINFO_DEVICE_REGIONS) + (5 * CONFIG_MAX_NUM_BOOTINFO_UNTYPED_CAPS) <= 4036 */
+/* CONSTRAINT: (5 * CONFIG_MAX_NUM_BOOTINFO_UNTYPED_CAPS) <= 4036 */
 #ifndef CONFIG_MAX_NUM_BOOTINFO_UNTYPED_CAPS
-#define CONFIG_MAX_NUM_BOOTINFO_UNTYPED_CAPS 166
+#define CONFIG_MAX_NUM_BOOTINFO_UNTYPED_CAPS 800
 #endif
 
-#ifndef CONFIG_KERNEL_MCS
 /* length of a timer tick in ms  */
 #ifndef CONFIG_TIMER_TICK_MS
 #define CONFIG_TIMER_TICK_MS 2
 #endif
+
+/* Configuration parameters below are for IA-32 only. */
+
+/* maximum number of nodes supported (if 1, a uniprocessor version is compiled) */
+#ifndef CONFIG_MAX_NUM_NODES
+#define CONFIG_MAX_NUM_NODES 8 /* must be between 1 and 256 */
 #endif
 
-/* maximum number of different tracepoints which can be placed in the kernel */
-#ifndef CONFIG_MAX_NUM_TRACE_POINTS
-#define CONFIG_MAX_NUM_TRACE_POINTS 0
+/* maximum number of memory regions to report in bootinfo */
+#ifndef CONFIG_MAX_MEM_REGIONS
+#define CONFIG_MAX_MEM_REGIONS 10
 #endif
 
 /* maximum number of IOMMU RMRR entries we can record while ACPI parsing */
+
 #ifndef CONFIG_MAX_RMRR_ENTRIES
 #define CONFIG_MAX_RMRR_ENTRIES 32
 #endif
 
-/* maximum number of IOAPIC supported */
-#ifndef CONFIG_MAX_NUM_IOAPIC
-#define CONFIG_MAX_NUM_IOAPIC  1
-#endif
-
-/* Alias CONFIG_MAX_NUM_NODES > 1 to ENABLE_SMP_SUPPORT */
-#if CONFIG_MAX_NUM_NODES > 1
-#define ENABLE_SMP_SUPPORT
-#endif
-
-#ifdef CONFIG_ARM_HYPERVISOR_SUPPORT
-#ifdef CONFIG_ARM_PA_SIZE_BITS_40
-#define AARCH64_VSPACE_S2_START_L1
-#endif
-#endif
-
+#endif /* __CONFIG_H */

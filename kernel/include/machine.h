@@ -1,46 +1,57 @@
 /*
  * Copyright 2014, General Dynamics C4 Systems
  *
- * SPDX-License-Identifier: GPL-2.0-only
+ * This software may be distributed and modified according to the terms of
+ * the GNU General Public License version 2. Note that NO WARRANTY is provided.
+ * See "LICENSE_GPLv2.txt" for details.
+ *
+ * @TAG(GD_GPL)
  */
 
-#pragma once
+#ifndef __MACHINE_H
+#define __MACHINE_H
 
+#include <arch/machine.h>
 #include <plat/machine.h>
 #include <machine/registerset.h>
-#include <hardware.h>
+#include <machine/hardware.h>
 
-/* When translating a physical address into an address accessible to the
- * kernel via virtual addressing we always use the mapping of the memory
- * into the physical memory window, even if the mapping originally
- * referred to a kernel virtual address. */
-static inline void *CONST ptrFromPAddr(paddr_t paddr)
+/* platform independent functions */
+
+static inline void *CONST
+paddr_to_pptr(paddr_t paddr)
 {
-    return (void *)(paddr + PPTR_BASE_OFFSET);
+    return (void *)(paddr + BASE_OFFSET);
 }
 
-/* When obtaining a physical address from a reference to any object in
- * the physical mapping window, this function must be used. */
-static inline paddr_t CONST addrFromPPtr(void *pptr)
+static inline paddr_t CONST
+pptr_to_paddr(void *pptr)
 {
-    return (paddr_t)pptr - PPTR_BASE_OFFSET;
+    return (paddr_t)pptr - BASE_OFFSET;
 }
 
-static inline region_t CONST paddr_to_pptr_reg(p_region_t p_reg)
+static inline region_t CONST
+paddr_to_pptr_reg(p_region_t p_reg)
 {
     return (region_t) {
-        p_reg.start + PPTR_BASE_OFFSET, p_reg.end + PPTR_BASE_OFFSET
+        p_reg.start + BASE_OFFSET, p_reg.end + BASE_OFFSET
     };
 }
 
-static inline p_region_t CONST pptr_to_paddr_reg(region_t reg)
+static inline p_region_t CONST
+pptr_to_paddr_reg(region_t reg)
 {
     return (p_region_t) {
-        reg.start - PPTR_BASE_OFFSET, reg.end - PPTR_BASE_OFFSET
+        reg.start - BASE_OFFSET, reg.end - BASE_OFFSET
     };
 }
 
-#define paddr_to_pptr ptrFromPAddr
-#define pptr_to_paddr(x) addrFromPPtr(x)
+static inline bool_t CONST
+inKernelWindow(void *pptr)
+{
+    paddr_t paddr = pptr_to_paddr(pptr);
+    return ((paddr >= PADDR_BASE) && (paddr < PADDR_TOP));
+}
 
-#include <mode/machine.h>
+
+#endif

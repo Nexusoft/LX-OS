@@ -1,19 +1,37 @@
 /*
  * Copyright 2014, General Dynamics C4 Systems
  *
- * SPDX-License-Identifier: GPL-2.0-only
+ * This software may be distributed and modified according to the terms of
+ * the GNU General Public License version 2. Note that NO WARRANTY is provided.
+ * See "LICENSE_GPLv2.txt" for details.
+ *
+ * @TAG(GD_GPL)
  */
 
-#pragma once
+#ifndef ARCH_BENCHMARK_H
+#define ARCH_BENCHMARK_H
 
 #include <config.h>
-#ifdef CONFIG_ENABLE_BENCHMARKS
+#include <arch/object/structures.h>
 
-static inline uint64_t timestamp(void)
+#ifdef CONFIG_BENCHMARK
+
+/* we have one large page of word sized entries */
+#define MAX_LOG_SIZE (BIT(LARGE_PAGE_BITS) / sizeof(word_t))
+
+extern uint64_t ksEntry;
+extern uint64_t ksExit;
+extern uint32_t ksLogIndex;
+extern uint32_t *ksLog;
+
+#define IA32_KSLOG_IDX (BIT(PD_BITS + PDPT_BITS) - 2)
+
+static inline uint64_t
+timestamp(void)
 {
     uint32_t low, high;
 
-    asm volatile(
+    asm volatile (
         "movl $0, %%eax \n"
         "movl $0, %%ecx \n"
         "cpuid          \n"
@@ -23,7 +41,7 @@ static inline uint64_t timestamp(void)
         "movl $0, %%eax \n"
         "movl $0, %%ecx \n"
         "cpuid          \n"
-        : "=r"(high), "=r"(low)
+        : "=r" (high), "=r" (low)
         : /* no inputs */
         : "eax", "ebx", "ecx", "edx"
     );
@@ -31,9 +49,5 @@ static inline uint64_t timestamp(void)
     return ((uint64_t) high) << 32llu | (uint64_t) low;
 }
 
-static inline void benchmark_arch_utilisation_reset(void)
-{
-}
-
-#endif /* CONFIG_ENABLE_BENCHMARKS */
-
+#endif /* CONFIG_BENCHMARK */
+#endif /* ARCH_BENCHMARK_H */

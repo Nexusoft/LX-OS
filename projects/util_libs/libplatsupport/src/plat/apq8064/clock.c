@@ -1,17 +1,16 @@
 /*
- * Copyright 2017, Data61
- * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
- * ABN 41 687 119 230.
+ * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
  * the BSD 2-Clause license. Note that NO WARRANTY is provided.
  * See "LICENSE_BSD2.txt" for details.
  *
- * @TAG(DATA61_BSD)
+ * @TAG(NICTA_BSD)
  */
 
 #include "../../arch/arm/clock.h"
 #include "../../common.h"
+
 
 #define MXO_SRC_CLK_INV    (1U << 12)
 #define MXO_SRC_BRANCH_ENA (1U << 11)
@@ -34,6 +33,7 @@ struct clock_sys_regs {
     void* block2;
     void* block3;
 };
+
 
 struct clock_sys_regs clk_sys_regs;
 
@@ -142,6 +142,7 @@ clock_sys_init(ps_io_ops_t* io_ops, clock_sys_t* clk_sys)
     return 0;
 }
 
+
 int
 apq8064_clock_sys_init(void* clk_ctl_base0, void* clk_ctl_base1,
                        void* clk_ctl_base2, void* clk_ctl_base3,
@@ -179,3 +180,6 @@ freq_t ps_freq_default[] = {
     [CLK_TCXO  ]   = 19200 * KHZ,
     [CLK_SLPXO ]   = 32768
 };
+
+
+

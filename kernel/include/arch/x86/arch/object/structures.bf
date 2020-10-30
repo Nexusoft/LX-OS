@@ -1,15 +1,237 @@
 --
 -- Copyright 2014, General Dynamics C4 Systems
 --
--- SPDX-License-Identifier: GPL-2.0-only
+-- This software may be distributed and modified according to the terms of
+-- the GNU General Public License version 2. Note that NO WARRANTY is provided.
+-- See "LICENSE_GPLv2.txt" for details.
+--
+-- @TAG(GD_GPL)
 --
 
-#include <mode/object/structures.bf>
+#include <config.h>
 
-
+---- Default base size: uint32_t
 base 32
 
-block x86_pat_msr {
+-- Including the common structures.bf is neccessary because
+-- we need the structures to be visible here when building
+-- the capType
+#include <object/structures.bf>
+
+---- IA32-specific cap types
+
+block frame_cap {
+    field       capFSize            1
+    padding                         1
+    field_high  capFMappedObject    20
+    field       capFMappedIndex     10
+
+    field       capFMappedType      2
+    padding                         4
+    field       capFVMRights        2
+    field_high  capFBasePtr         20
+    field       capType             4
+}
+
+-- Second-level page table
+block page_table_cap {
+    padding                         2
+    field_high  capPTMappedObject   20
+    field       capPTMappedIndex    10
+
+    padding                         8
+    field_high  capPTBasePtr        20
+    field       capType             4
+}
+
+-- First-level page table (page directory)
+block page_directory_cap {
+    padding                         3
+    field_high  capPDMappedObject   27
+    field       capPDMappedIndex    2
+
+    padding                         8
+    field_high  capPDBasePtr        20
+    field       capType             4
+}
+
+block pdpt_cap {
+    padding                         32
+
+    padding                         1
+    field_high  capPDPTBasePtr      27
+    field       capType             4
+}
+
+
+
+
+
+-- IO Port Cap
+block io_port_cap {
+    field   capIOPortFirstPort 16
+    field   capIOPortLastPort  16
+
+    padding                    24
+    field   capType            8
+}
+
+block io_port_capdata {
+    field   firstPort          16
+    field   lastPort           16
+}
+
+#ifdef CONFIG_IOMMU
+-- IO Space Cap
+block io_space_cap {
+    field       capDomainID     16
+    field       capPCIDevice    16
+
+    padding                     28
+    field       capType         4 
+}
+
+block io_space_capdata {
+    field domainID              16
+    field PCIDevice             16
+}
+
+-- IO Page Table Cap
+block io_page_table_cap {
+    field       capIOPTLevel        3
+    field_high  capIOPTMappedObject 20
+    field       capIOPTMappedIndex  9
+
+    padding                     8
+    field_high  capIOPTBasePtr  20
+    field       capType         4
+}
+#endif
+
+-- IPI cap 
+block ipi_cap {
+    padding 32
+    padding 28
+    field capType 4
+}
+
+#ifdef CONFIG_VTX
+block vcpu_cap {
+    padding              32
+
+    field_high capVCPUPtr 24
+    field capType         8
+}
+
+-- Third-level EPT page table
+block ept_page_table_cap {
+    padding                         3
+    field_high  capPTMappedObject   20
+    field       capPTMappedIndex    9
+
+    padding                         4
+    field_high  capPTBasePtr        20
+    field       capType             8
+}
+
+-- Second-level EPT page table (page directory)
+block ept_page_directory_cap {
+    padding                         3
+    field_high  capPDMappedObject   20
+    field       capPDMappedIndex    9
+
+    padding                         4
+    field_high  capPDBasePtr        20
+    field       capType             8
+}
+
+-- First-level EPT page table (page directory pointer table)
+block ept_page_directory_pointer_table_cap {
+    padding                         32
+     
+    padding                         4
+    field_high  capPDPTBasePtr      20
+    field       capType             8
+}
+
+#endif /* CONFIG_VTX */
+
+-- NB: odd numbers are arch caps (see isArchCap())
+tagged_union cap capType {
+    mask 4 0xe
+    mask 8 0x0e
+
+    -- 4-bit tag caps
+    tag null_cap            0
+    tag untyped_cap         2
+    tag endpoint_cap        4
+    tag async_endpoint_cap  6
+    tag reply_cap           8
+    tag cnode_cap           10
+    tag thread_cap          12
+    -- Do not extend even 4-bit caps types beyond 12, as we use 
+    -- 14 (0xe) to determine which caps are 8-bit.
+
+    -- 4-bit tag arch caps
+    tag frame_cap           1
+    tag page_table_cap      3
+    tag page_directory_cap  5
+    tag pdpt_cap            7
+#ifdef CONFIG_IOMMU
+    tag io_page_table_cap   9
+    tag io_space_cap        11
+#endif /* CONFIG_IOMMU */   
+    tag ipi_cap             13
+
+    -- Do not extend odd 4-bit caps types beyond 13, as we use 
+    -- 15 (0xf) to determine which caps are 8-bit.
+    
+    -- 8-bit tag caps
+    tag irq_control_cap     0x0e
+    tag irq_handler_cap     0x1e
+    tag zombie_cap          0x2e
+    tag domain_cap	        0x3e
+
+    -- 8-bit tag arch caps
+    tag io_port_cap                            0x0f
+#ifdef CONFIG_VTX
+    tag vcpu_cap                               0x1f
+    tag ept_page_table_cap                     0x2f
+    tag ept_page_directory_pointer_table_cap   0x3f
+    tag ept_page_directory_cap                 0x4f
+#endif /* CONFIG_VTX */
+}
+
+
+---- Arch-independent object types
+
+block vm_fault {
+    field     address           32
+    field     FSR               5
+    padding                     7
+    field     instructionFault  1
+    padding                     16
+    field     faultType         3
+}
+
+tagged_union fault faultType {
+    tag null_fault 0
+    tag cap_fault 1
+    tag vm_fault 2
+    tag unknown_syscall 3
+    tag user_exception 4
+}
+
+-- VM attributes
+
+block vm_attributes {
+    padding 29
+    field ia32PATBit 1
+    field ia32PCDBit 1
+    field ia32PWTBit 1
+}
+
+block ia32_pat_msr {
     padding     5
     field pa7   3
     padding     5
@@ -28,13 +250,303 @@ block x86_pat_msr {
     field pa0   3
 }
 
+---- IA32 specific object types
+
+-- GDT entries (Segment Desciptors)
+
+block gdt_null {
+    padding                         19
+    field       desc_type           3
+    padding                         42
+}
+
+block gdt_code {
+    field       base_high           8
+    field       granularity         1
+    field       operation_size      1
+    padding                         1
+    field       avl                 1
+    field       seg_limit_high      4
+    field       present             1
+    field       dpl                 2
+    field       desc_type           3
+    field       readable            1
+    field       accessed            1
+    field       base_mid            8
+    field       base_low            16
+    field       seg_limit_low       16
+}
+
+block gdt_data {
+    field       base_high           8
+    field       granularity         1
+    field       operation_size      1
+    padding                         1
+    field       avl                 1
+    field       seg_limit_high      4
+    field       present             1
+    field       dpl                 2
+    field       desc_type           3
+    field       writable            1
+    field       accessed            1
+    field       base_mid            8
+    field       base_low            16
+    field       seg_limit_low       16
+}
+
+block gdt_tss {
+    field       base_high           8
+    field       granularity         1
+    padding                         2
+    field       avl                 1
+    field       limit_high          4
+    field       present             1
+    field       dpl                 2
+    field       desc_type           3
+    field       busy                1
+    field       always_1            1
+    field       base_mid            8
+    field       base_low            16
+    field       limit_low           16
+}
+
+tagged_union gdt_entry desc_type {
+    tag gdt_null    0
+    tag gdt_tss     2
+    tag gdt_data    4
+    tag gdt_code    6
+}
+
+-- IDT entries (Gate Desciptors)
+
+block task_gate {
+    padding                         16
+    field       present             1
+    field       dpl                 2
+    padding                         2
+    field       type                3
+    padding                         8
+    field       tss_seg_selector    16
+    padding                         16
+}
+
+block interrupt_gate {
+    field       offset_high         16
+    field       present             1
+    field       dpl                 2
+    padding                         1
+    field       gate_size           1
+    field       type                3
+    padding                         8
+    field       seg_selector        16
+    field       offset_low          16
+}
+
+block trap_gate {
+    field       offset_high         16
+    field       present             1
+    field       dpl                 2
+    padding                         1
+    field       gate_size           1
+    field       type                3
+    padding                         8
+    field       seg_selector        16
+    field       offset_low          16
+}
+
+tagged_union idt_entry type {
+    tag task_gate       5
+    tag interrupt_gate  6
+    tag trap_gate       7
+}
+
+-- Task State Segment (TSS)
+
+block tss {
+    field       io_map_base         16
+    padding                         15
+    field       trap                1
+    padding                         16
+    field       sel_ldt             16
+    padding                         16
+    field       gs                  16
+    padding                         16
+    field       fs                  16
+    padding                         16
+    field       ds                  16
+    padding                         16
+    field       ss                  16
+    padding                         16
+    field       cs                  16
+    padding                         16
+    field       es                  16
+    field       edi                 32
+    field       esi                 32
+    field       ebp                 32
+    field       esp                 32
+    field       ebx                 32
+    field       edx                 32
+    field       ecx                 32
+    field       eax                 32
+    field       eflags              32
+    field       eip                 32
+    field       cr3                 32
+    padding                         16
+    field       ss2                 16
+    field       esp2                32
+    padding                         16
+    field       ss1                 16
+    field       esp1                32
+    padding                         16
+    field       ss0                 16
+    field       esp0                32
+    padding                         16
+    field       prev_task           16
+}
+
+-- PDs and PTs
+
+block pdpte {
+    padding 32
+
+    field_high  pd_base_address     20
+    field       avl_cte_depth       3
+    padding                         4
+    field       cache_disabled      1
+    field       write_through       1
+    padding                         2
+    field       present             1
+}
+
+block pde_small {
+#ifdef CONFIG_PAE_PAGING
+    padding                         32
+#endif
+    field_high  pt_base_address     20
+    field       avl_cte_depth       3
+    padding                         1
+    field       page_size           1
+    padding                         1
+    field       accessed            1
+    field       cache_disabled      1
+    field       write_through       1
+    field       super_user          1
+    field       read_write          1
+    field       present             1
+}
+
+block pde_large {
+#ifdef CONFIG_PAE_PAGING
+    padding                         32
+#endif
+    field_high  page_base_address   11
+    padding                         8
+    field       pat                 1
+    field       avl_cte_depth       3
+    field       global              1
+    field       page_size           1
+    field       dirty               1
+    field       accessed            1
+    field       cache_disabled      1
+    field       write_through       1
+    field       super_user          1
+    field       read_write          1
+    field       present             1
+}
+
+tagged_union pde page_size {
+    tag pde_small 0
+    tag pde_large 1
+}
+
+block pte {
+#ifdef CONFIG_PAE_PAGING
+    padding                         32
+#endif
+    field_high  page_base_address   20
+    field       avl_cte_depth       3
+    field       global              1
+    field       pat                 1
+    field       dirty               1
+    field       accessed            1
+    field       cache_disabled      1
+    field       write_through       1
+    field       super_user          1
+    field       read_write          1
+    field       present             1
+}
+
+#ifdef CONFIG_VTX
+block ept_pml4e {
+    padding                         32
+    field_high   pdpt_base_address  20
+    padding                         9
+    field        execute            1
+    field        write              1
+    field        read               1
+}
+
+block ept_pdpte {
+    padding                         32
+    field_high   pd_base_address    20
+    field        avl_cte_depth      3
+    padding                         6
+    field        execute            1
+    field        write              1
+    field        read               1
+}
+
+block ept_pde_2m {
+    padding                         32
+    field_high   page_base_address  12
+    padding                         8
+    field        avl_cte_depth      2
+    padding                         2
+    field        page_size          1
+    field        ignore_pat         1
+    field        type               3
+    field        execute            1
+    field        write              1
+    field        read               1
+}
+
+block ept_pde_4k {
+    padding                         32
+    field_high   pt_base_address    20
+    field        avl_cte_depth      3
+    padding                         1
+    field        page_size          1
+    padding                         4
+    field        execute            1
+    field        write              1
+    field        read               1
+}
+
+tagged_union ept_pde page_size {
+    tag ept_pde_4k 0
+    tag ept_pde_2m 1
+}
+
+
+block ept_pte {
+    padding                         32
+    field_high   page_base_address  20
+    field        avl_cte_depth      2
+    padding                         3
+    field        ignore_pat         1
+    field        type               3
+    field        execute            1
+    field        write              1
+    field        read               1
+}
+#endif
+
 -- Local APIC
 
 block apic_base_msr {
     field_high  base_addr           20
     field       enabled             1
-    field       x2apic              1
-    padding                         1
+    padding                         2
     field       is_bsp              1
     padding                         8
 }
@@ -82,192 +594,4 @@ block apic_icr1 {
 block apic_icr2 {
     field       dest                8
     padding                         24
-}
-
-block x2apic_icr1 {
-    padding                         12
-    field       dest_shorthand      2
-    padding                         2
-    field       trigger_mode        1
-    field       level               1
-    padding                         2
-    field       dest_mode           1
-    field       delivery_mode       3
-    field       vector              8
-}
-
-block x2apic_icr2 {
-    field       dest                32
-}
-
--- x86-specific IRQ state structure
-
-block irq_ioapic {
-    field   irqType         4
-    field   id              5
-    field   pin             5
-    field   level           1
-    field   polarity_low    1
-    field   masked          1
-    padding                 15
-    padding                 32
-}
-
-block irq_msi {
-    field   irqType     4
-    field   bus         8
-    field   dev         5
-    field   func        3
-    padding             12
-
-    field   handle      32
-}
-
-block irq_free {
-    field   irqType     4
-    padding             28
-    padding             32
-}
-
-block irq_reserved {
-    field   irqType     4
-    padding             28
-    padding             32
-}
-
-tagged_union x86_irq_state irqType {
-    tag irq_free        0
-    tag irq_ioapic      1
-    tag irq_msi         2
-    tag irq_reserved    3
-}
-
--- CPUID bitfields. Same on 32 and 64 bit.
-
-block cpuid_001h_eax {
-    padding                 4
-    field extended_family   8
-    field extended_model    4
-    padding                 2
-    field type              2
-    field family            4
-    field model             4
-    field stepping          4
-}
-
-block cpuid_001h_ebx {
-    padding                 24
-    field brand             8
-}
-
-block cpuid_007h_ebx {
-    padding                     2
-    field sha                   1
-    padding                     3
-    field intel_processor_trace 1
-    padding                     1
-    field clfushopt             1
-    padding                     2
-    field smap                  1
-    field adx                   1
-    field rdseed                1
-    padding                     2
-    field rdt_a                 1
-    field mpx                   1
-    field deprecate_fpu_cs_ds   1
-    field rdt_m                 1
-    field rtm                   1
-    field invpcid               1
-    field enhanced_rep_mov      1
-    field bmi2                  1
-    field smep                  1
-    field fdp_excptn_only       1
-    field avx2                  1
-    field hle                   1
-    field bmi1                  1
-    field sgx                   1
-    field ia32_tsc_adjust       1
-    field fsgsbase              1
-}
-
-block cpuid_007h_edx {
-    padding                 2
-    field ia32_arch_cap_msr 1
-    padding                 1
-    field stibp             1
-    field ibrs_ibpb         1
-    padding                 26
-}
-
-#ifdef CONFIG_VTX
-
-block vmx_basic_msr {
-    padding                 8
-    field true_msrs         1
-    field in_out_exit_info  1
-    field memory_type       4
-    field monitor_smm_int   1
-    field physical_address_limit 1
-    padding                 3
-    field vmxon_size        13
-    padding                 1
-    field vmcs_revision     31
-}
-
-block feature_control_msr {
-    padding                 16
-    field senter            1
-    field senter_functions  7
-    padding                 5
-    field vmx_outside_smx   1
-    field vmx_in_smx        1
-    field lock              1
-}
-
-block vmx_ept_vpid_cap_msr {
-    padding                         20
-    field invvpid_single_context_ng 1
-    field invvpid_all_context       1
-    field invvpid_single_context    1
-    field invvpid_single_address    1
-    padding                         7
-    field invvpid                   1
-    padding                         5
-    field invept_all_context        1
-    field invept_single_context     1
-    padding                         3
-    field ept_flags                 1
-    field invept                    1
-    padding                         2
-    field ept_1g                    1
-    field ept_2m                    1
-    padding                         1
-    field ept_wb                    1
-    padding                         5
-    field ept_uc                    1
-    padding                         1
-    field ept_depth_4               1
-    padding                         5
-    field ept_exec_only             1
-}
-
--- This is the layout of the data exit qualification register
--- when the exit reason (as read from the data exit reason)
--- register is 'control register'
-block vmx_data_exit_qualification_control_regster {
-    field data          16
-    padding             4
-    field reg           4
-    padding             1
-    field msw_type      1
-    field access_type   2
-    field cr            4
-}
-
-#endif
-
-block ia32_arch_capabilities_msr {
-    padding             30
-    field ibrs_all      1
-    field rdcl_no       1
 }

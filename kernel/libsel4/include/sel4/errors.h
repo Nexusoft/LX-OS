@@ -1,10 +1,15 @@
 /*
- * Copyright 2020, Data61, CSIRO (ABN 41 687 119 230)
+ * Copyright 2014, NICTA
  *
- * SPDX-License-Identifier: BSD-2-Clause
+ * This software may be distributed and modified according to the terms of
+ * the BSD 2-Clause license. Note that NO WARRANTY is provided.
+ * See "LICENSE_BSD2.txt" for details.
+ *
+ * @TAG(NICTA_BSD)
  */
 
-#pragma once
+#ifndef __ERRORS_H
+#define __ERRORS_H
 
 typedef enum {
     seL4_NoError = 0,
@@ -18,10 +23,6 @@ typedef enum {
     seL4_DeleteFirst,
     seL4_RevokeFirst,
     seL4_NotEnoughMemory,
-
-    /* This should always be the last item in the list
-     * so it gives a count of the number of errors in the
-     * enum.
-     */
-    seL4_NumErrors
 } seL4_Error;
+
+#endif

@@ -1,17 +1,24 @@
 /*
- * Copyright 2019, Data61
- * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
- * ABN 41 687 119 230.
+ * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
  * the BSD 2-Clause license. Note that NO WARRANTY is provided.
  * See "LICENSE_BSD2.txt" for details.
  *
- * @TAG(DATA61_BSD)
+ * @TAG(NICTA_BSD)
  */
 
-#pragma once
+#ifndef __PLAT_SUPPORT_IMX31_H
+#define __PLAT_SUPPORT_IMX31_H
 
-#define GPT_PRESCALER (1)
+/**
+ * Address at which the GPT should be in the initial
+ * device space. Map a frame, uncached, to this address
+ * to access the gpt. Pass the virtual address of
+ * this frame onto timer_init to use the gpt.
+ */
+#define GPT1_DEVICE_PADDR 0x02098000
+#define GPT1_INTERRUPT 87
 
-#define GPT_PATH "/soc/aips-bus@2000000/gpt@2098000"
+#endif /* __PLAT_SUPPORT_IMX31_H */
+

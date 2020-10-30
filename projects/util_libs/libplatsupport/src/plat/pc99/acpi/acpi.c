@@ -1,23 +1,34 @@
 /*
- * Copyright 2017, Data61
- * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
- * ABN 41 687 119 230.
+ * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
  * the BSD 2-Clause license. Note that NO WARRANTY is provided.
  * See "LICENSE_BSD2.txt" for details.
  *
- * @TAG(DATA61_BSD)
+ * @TAG(NICTA_BSD)
  */
 
 #include <platsupport/plat/acpi/acpi.h>
 #include <stdlib.h>
 #include <string.h>
-#include <utils/util.h>
 #include <assert.h>
 
 #include "walker.h"
 #include "acpi.h"
+
+#undef DEBUG
+#define DEBUG 4
+
+#ifdef DEBUG
+#  include <stdio.h>
+#  define DPRINTF(lvl, ...) do{ if(lvl < DEBUG){printf(__VA_ARGS__);fflush(stdout);}}while(0)
+#else
+#  define DPRINTF() do{ /* nothing */ }while(0)
+#  if DEBUG < 5
+#    error NO DEBUG
+#  endif
+#endif
+
 
 
 // sum bytes at the given location
@@ -31,11 +42,13 @@ acpi_calc_checksum(const char* start, int length)
     return checksum;
 }
 
-size_t
+
+
+uint32_t
 acpi_table_length(const void* tbl)
 {
     const char* table = (const char*)tbl;
-    size_t length;
+    uint32_t length;
 
     if (HAS_GENERIC_HEADER(table)) {
         length = ((acpi_header_t*)table)->length;
@@ -54,6 +67,7 @@ acpi_table_length(const void* tbl)
     return length;
 }
 
+
 /*
  * Split an available memory region and return the index of the
  * new region
@@ -62,11 +76,11 @@ acpi_table_length(const void* tbl)
  * region, the root pointer region will be used
  */
 static int
-split_available(RegionList_t* dst, size_t size, int force_ptr)
+split_available(RegionList_t* dst, uint32_t size, int force_ptr)
 {
     /* default: no region found */
     int index = -1;
-    ZF_LOGD("Region 0/%d: size = %zu/%zu\n", dst->region_count, dst->regions[0].size, size);
+    DPRINTF(1, "Region 0/%d: size = %d/%d\n", dst->region_count, dst->regions[0].size, size);
     /* Find region to split */
     if (!force_ptr) { /* first preference if permitted */
         index = find_space(dst, size, ACPI_AVAILABLE);
@@ -75,7 +89,7 @@ split_available(RegionList_t* dst, size_t size, int force_ptr)
         index = find_space(dst, size, ACPI_AVAILABLE_PTR);
     }
 
-    ZF_LOGD("found index %d\n", index);
+    DPRINTF(1, "found index %d\n", index);
 
     /* split the region */
     if (index >= 0) {
@@ -84,6 +98,7 @@ split_available(RegionList_t* dst, size_t size, int force_ptr)
 
     return index;
 }
+
 
 static int
 create_copy_region(const Region_t* src, RegionList_t* dlist,
@@ -97,11 +112,14 @@ create_copy_region(const Region_t* src, RegionList_t* dlist,
         memcpy(dst->start, src->start, src->size);
         return index;
     } else {
-        ZF_LOGD("err: could not split region\n");
+        DPRINTF(1, "err: could not split region\n");
         /* Error */
         return -1;
     }
 }
+
+
+
 
 /*
  * copy table and return relative address ready for linking
@@ -115,14 +133,14 @@ _acpi_copy_tables(const RegionList_t* slist, RegionList_t* dlist,
     int index;
     const Region_t *src;
 
-    ZF_LOGD("ti %d, pi %d\n", table_index, parent);
+    DPRINTF(1, "ti %d, pi %d\n", table_index, parent);
 
     /* hold the index of the newly created dlist region */
     index = -1;
 
     /* table specific generation */
     src = &slist->regions[table_index];
-    ZF_LOGD("copy -> %s\n", acpi_sig_str(src->type));
+    DPRINTF(1, "copy -> %s\n", acpi_sig_str(src->type));
     switch (src->type) {
     case ACPI_RSDP:
         /* Split region */
@@ -140,11 +158,10 @@ _acpi_copy_tables(const RegionList_t* slist, RegionList_t* dlist,
             if (child >= 0) {
                 void* p = _acpi_copy_tables(slist, dlist,
                                             child, index);
-                /* This downcast is correct as an RSDP is defined as being in the bottom 4G of memory */
-                dst_tbl->rsdt_address = (uint32_t)(uintptr_t)p;
-                ZF_LOGD("Got address %p\n", p);
+                dst_tbl->rsdt_address = (uint32_t)p;
+                DPRINTF(1, "Got address %p\n", p);
             } else {
-                ZF_LOGD("err: unable to find rsdt\n");
+                DPRINTF(1, "err: unable to find rsdt\n");
             }
 
             /* find and copy XSDT */
@@ -153,10 +170,10 @@ _acpi_copy_tables(const RegionList_t* slist, RegionList_t* dlist,
                 /* PRE: RSDT must be found in dlist */
                 void* p = _acpi_copy_tables(slist, dlist,
                                             child, index);
-                dst_tbl->xsdt_address = (uint64_t)(uintptr_t)p;
-                ZF_LOGD("Got address %p\n", p);
+                dst_tbl->xsdt_address = (uint64_t)(uint32_t)p;
+                DPRINTF(1, "Got address %p\n", p);
             } else {
-                ZF_LOGD("err: unable to find xsdt\n");
+                DPRINTF(1, "err: unable to find xsdt\n");
             }
 
             /* recompute checksums */
@@ -165,7 +182,7 @@ _acpi_copy_tables(const RegionList_t* slist, RegionList_t* dlist,
             dst_tbl->extended_checksum -=
                 acpi_calc_checksum(dst->start, dst->size);
         } else {
-            ZF_LOGD("err: unable to copy region\n");
+            DPRINTF(1, "err: unable to copy region\n");
         }
         break;
 
@@ -176,7 +193,8 @@ _acpi_copy_tables(const RegionList_t* slist, RegionList_t* dlist,
         int child[MAX_REGIONS];
         int children = 0;
 
-        for (int i = 0; i < slist->region_count; i++) {
+        int i;
+        for (i = 0; i < slist->region_count; i++) {
             if (slist->regions[i].parent == table_index) {
                 child[children++] = i;
                 sub_size += sizeof(uint32_t);
@@ -188,6 +206,7 @@ _acpi_copy_tables(const RegionList_t* slist, RegionList_t* dlist,
         if (index >= 0) {
             acpi_rsdt_t *dst_tbl;
             uint32_t *subtables;
+            int i;
             Region_t* dst = &dlist->regions[index];
             dst->type = src->type;
             dst->parent = parent;
@@ -198,10 +217,10 @@ _acpi_copy_tables(const RegionList_t* slist, RegionList_t* dlist,
 
             /* copy subtable */
             subtables = acpi_rsdt_first(dst_tbl);
-            for (int i = 0; i < children; i++) {
+            for (i = 0; i < children; i++) {
                 void* p;
                 p = _acpi_copy_tables(slist, dlist, child[i], index);
-                ZF_LOGD("Got address %p\n", p);
+                DPRINTF(1, "Got address %p\n", p);
                 if (p == NULL) {
                     /*
                      * we tolerate a little wasted space to recover
@@ -209,7 +228,7 @@ _acpi_copy_tables(const RegionList_t* slist, RegionList_t* dlist,
                      */
                     sub_size -= sizeof(uint32_t);
                 } else {
-                    *subtables++ = (uint32_t)(uintptr_t)p;
+                    *subtables++ = (uint32_t)p;
                 }
             }
 
@@ -238,7 +257,7 @@ _acpi_copy_tables(const RegionList_t* slist, RegionList_t* dlist,
 
         /* calculate sizes */
         entries = acpi_rsdt_entry_count(rsdt);
-        ZF_LOGD("Found rsdt with %d entries\n", entries);
+        DPRINTF(1, "Found rsdt with %d entries\n", entries);
         sub_size = entries * sizeof(uint64_t);
         hdr_size = sizeof(acpi_xsdt_t);
 
@@ -310,15 +329,18 @@ acpi_copy_tables(const RegionList_t* slist, RegionList_t* dlist)
     return 0;
 }
 
-/* only need to parse the tables once */
-static acpi_t *acpi_singleton = NULL;
 
 acpi_t *
-create_acpi(ps_io_mapper_t io_mapper)
+acpi_init(ps_io_mapper_t io_mapper)
 {
+
+#ifndef CONFIG_KERNEL_STABLE
+    LOG_ERROR("Warning: acpi tables are not exported on the master kernel\n");
+#endif
+
     acpi_t *acpi = (acpi_t *) malloc(sizeof(acpi_t));
     if (acpi == NULL) {
-        ZF_LOGE("Failed to allocate memory of size %zu\n", sizeof(acpi));
+        fprintf(stderr, "Failed to allocate memory of size %u\n", sizeof(acpi));
         assert(acpi != NULL);
         return NULL;
     }
@@ -326,7 +348,7 @@ create_acpi(ps_io_mapper_t io_mapper)
     acpi->regions = (RegionList_t *) malloc(sizeof(RegionList_t));
 
     if (acpi->regions == NULL) {
-        ZF_LOGE("Failed to allocate memory of size %zu\n", sizeof(acpi));
+        fprintf(stderr, "Failed to allocate memory of size %u\n", sizeof(acpi));
         assert(acpi->regions != NULL);
         free(acpi);
         return NULL;
@@ -334,79 +356,24 @@ create_acpi(ps_io_mapper_t io_mapper)
 
     acpi->io_mapper = io_mapper;
 
-    return acpi;
-}
-
-acpi_t *
-acpi_init_with_rsdp(ps_io_mapper_t io_mapper, acpi_rsdp_t rsdp)
-{
-    if (acpi_singleton != NULL) {
-        /* acpi already initialised */
-        return acpi_singleton;
-    }
-
-    acpi_t *acpi = create_acpi(io_mapper);
-    if(acpi == NULL) {
-        ZF_LOGE("Failed to create acpi object");
-        return NULL;
-    }
-    acpi->rsdp = rsdp;
-
-    ZF_LOGV("Parsing ACPI tables\n");
-    int error = acpi_parse_tables(acpi);
-    if(error) {
-        ZF_LOGE("Failed to parse acpi tables\n");
-        free(acpi->regions);
-        free(acpi);
-        return NULL;
-    }
-
-    acpi_singleton = acpi;
-    return acpi;
-}
-
-acpi_t *
-acpi_init(ps_io_mapper_t io_mapper)
-{
-    if (acpi_singleton != NULL) {
-        /* acpi already initialised */
-        return acpi_singleton;
-    }
-
-    acpi_t *acpi = create_acpi(io_mapper);
-    if(acpi == NULL) {
-        ZF_LOGE("Failed to create acpi object");
-        return NULL;
-    }
-
-    acpi_rsdp_t *rsdp_paddr;
-    rsdp_paddr = acpi_sig_search(acpi, ACPI_SIG_RSDP, strlen(ACPI_SIG_RSDP),
+    /* locate the acpi root system descriptor pointer */
+    printf("Searching for ACPI_SIG_RSDP\n");
+    acpi->rsdp = acpi_sig_search(acpi, ACPI_SIG_RSDP, strlen(ACPI_SIG_RSDP),
                                  (void *) BIOS_PADDR_START, (void *) BIOS_PADDR_END);
-    if (rsdp_paddr == NULL) {
-        ZF_LOGW("Failed to find rsdp\n");
-        return NULL;
-    }
-
-    acpi_rsdp_t *rsdp = (acpi_rsdp_t *) acpi_parse_table(acpi, rsdp_paddr);
-    if (rsdp == NULL) {
-        ZF_LOGE("Failed to parse rsdp\n");
-        return NULL;
-    }
-    /* Copy rsdp object into acpi struct */
-    memcpy(&(acpi->rsdp), rsdp, sizeof(acpi_rsdp_t));
-
-    /*rsdp was dynamically allocated. No longer require the memory*/
-    free(rsdp);
-
-    ZF_LOGV("Parsing ACPI tables\n");
-    int error = acpi_parse_tables(acpi);
-    if(error) {
-        ZF_LOGE("Failed to parse acpi tables\n");
+    if (acpi->rsdp == NULL) {
+        fprintf(stderr, "Failed to find rsdp\n");
         free(acpi->regions);
         free(acpi);
+        assert(acpi->rsdp != NULL);
         return NULL;
     }
 
-    acpi_singleton = acpi;
+    printf("Parsing ACPI tables\n");
+    /* now parse the acpi tables */
+    acpi_parse_tables(acpi);
+
     return acpi;
 }
+
+
+

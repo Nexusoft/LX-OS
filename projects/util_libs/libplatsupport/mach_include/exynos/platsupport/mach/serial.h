@@ -1,18 +1,16 @@
 /*
- * Copyright 2017, Data61
- * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
- * ABN 41 687 119 230.
+ * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
  * the BSD 2-Clause license. Note that NO WARRANTY is provided.
  * See "LICENSE_BSD2.txt" for details.
  *
- * @TAG(DATA61_BSD)
+ * @TAG(NICTA_BSD)
  */
 
-#pragma once
+#ifndef __MACHSUPPORT_MACH_SERIAL_H__
+#define __MACHSUPPORT_MACH_SERIAL_H__
 
-#include <platsupport/chardev.h>
 #include <platsupport/mux.h>
 #include <platsupport/clock.h>
 
@@ -23,12 +21,6 @@
 #define INT_RX    BIT(0)
 #define EXYNOS_UART_RX_IRQ INT_RX
 #define EXYNOS_UART_TX_IRQ INT_TX
-
-typedef struct {
-    void *vaddr;
-    enum clk_id clock_id;
-    mux_feature_t uart_mux_feature;
-} static_serial_params_t;
 
 /*
  * Initialiase an exynos serial device
@@ -62,3 +54,4 @@ void exynos_handle_tx_irq(ps_chardevice_t *d);
  */
 int exynos_check_irq(ps_chardevice_t *d);
 
+#endif /* __MACHSUPPORT_MACH_SERIAL_H__ */

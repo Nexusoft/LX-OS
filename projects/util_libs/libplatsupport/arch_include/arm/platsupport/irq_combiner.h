@@ -1,16 +1,15 @@
 /*
- * Copyright 2017, Data61
- * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
- * ABN 41 687 119 230.
+ * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
  * the BSD 2-Clause license. Note that NO WARRANTY is provided.
  * See "LICENSE_BSD2.txt" for details.
  *
- * @TAG(DATA61_BSD)
+ * @TAG(NICTA_BSD)
  */
 
-#pragma once
+#ifndef _PLATSUPPORT_IRQ_COMBINER_H_
+#define _PLATSUPPORT_IRQ_COMBINER_H_
 
 #include <platsupport/io.h>
 
@@ -102,6 +101,7 @@ static inline int irq_combiner_enable_irq(irq_combiner_t* combiner, combiner_irq
     return combiner->set_enabled(combiner, cirq, 1);
 }
 
+
 /**
  * Disable a combiner IRQ within a group. Does not disable the entire group
  * at the primary interrupt controller.
@@ -129,3 +129,4 @@ static inline uint32_t irq_combiner_group_pending(irq_combiner_t* combiner, int 
     return combiner->grp_pending(combiner, group);
 }
 
+#endif /* _PLATSUPPORT_IRQ_COMBINER_H_ */

@@ -1,13 +1,11 @@
 /*
- * Copyright 2017, Data61
- * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
- * ABN 41 687 119 230.
+ * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
  * the BSD 2-Clause license. Note that NO WARRANTY is provided.
  * See "LICENSE_BSD2.txt" for details.
  *
- * @TAG(DATA61_BSD)
+ * @TAG(NICTA_BSD)
  */
 #include <platsupport/i2c.h>
 
@@ -188,7 +186,9 @@ struct pll2_regs {
     uint32_t res2[3];
 };
 
+
 static struct clock master_clk = { CLK_OPS_DEFAULT(MASTER) };
+
 
 /* ARM_CLK */
 static freq_t
@@ -226,6 +226,7 @@ _arm_set_freq(clk_t* clk, freq_t hz)
     return clk_get_freq(clk);
 }
 
+
 static void
 _arm_recal(clk_t* clk UNUSED)
 {
@@ -245,6 +246,7 @@ _arm_init(clk_t* clk)
 }
 
 static struct clock arm_clk = { CLK_OPS(ARM, arm, NULL) };
+
 
 /* ENET_CLK */
 
@@ -270,6 +272,7 @@ _enet_get_freq(clk_t* clk)
         return 0 * fin;
     }
 }
+
 
 static freq_t
 _enet_set_freq(clk_t* clk, freq_t hz)
@@ -302,7 +305,7 @@ _enet_set_freq(clk_t* clk, freq_t hz)
     while (!(clk_regs.alg->pll_enet.val & PLL_LOCK));
     /* bypass off */
     clk_regs.alg->pll_enet.clr = PLL_BYPASS;
-    printf("Set ENET frequency to %ld Mhz... ", (long int)clk_get_freq(clk) / MHZ);
+    _printf("Set ENET frequency to %ld Mhz... ", (long int)clk_get_freq(clk) / MHZ);
     return clk_get_freq(clk);
 }
 
@@ -324,6 +327,8 @@ _enet_init(clk_t* clk)
 }
 
 static struct clock enet_clk = { CLK_OPS(ENET, enet, NULL) };
+
+
 
 /* PLL2_CLK */
 static freq_t
@@ -521,10 +526,6 @@ _usb_init(clk_t* clk)
         clk_register_child(parent, clk);
         clk->priv = (void*)&clk_regs;
     }
-    if (clk_regs.alg == NULL) {
-        ZF_LOGF("clk_regs.alg is NULL: Clocks likely not initialised properly");
-        return NULL;
-    }
     /* While we are here, gate the clocks */
     pll_usb = clk_regs.alg->pll_usb;
     if (clk->id == CLK_USB2) {
@@ -541,6 +542,7 @@ _usb_init(clk_t* clk)
 
 static struct clock usb1_clk = { CLK_OPS(USB1, usb, NULL) };
 static struct clock usb2_clk = { CLK_OPS(USB2, usb, NULL) };
+
 
 /* clkox */
 static freq_t
@@ -670,6 +672,9 @@ clk_print_clock_tree(clock_sys_t* sys)
     clk_print_tree(clk, "");
 }
 
+
+
+
 clk_t* ps_clocks[] = {
     [CLK_MASTER]   = &master_clk,
     [CLK_PLL2  ]   = &pll2_clk,
@@ -701,3 +706,5 @@ freq_t ps_freq_default[] = {
     [CLK_CLKO1]    =  66 * MHZ,
     [CLK_CLKO2]    = 528 * MHZ,
 };
+
+

@@ -1,16 +1,15 @@
 /*
- * Copyright 2017, Data61
- * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
- * ABN 41 687 119 230.
+ * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
  * the BSD 2-Clause license. Note that NO WARRANTY is provided.
  * See "LICENSE_BSD2.txt" for details.
  *
- * @TAG(DATA61_BSD)
+ * @TAG(NICTA_BSD)
  */
 
-#pragma once
+#ifndef __ACPI_H__
+#define __ACPI_H__
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -51,6 +50,7 @@ typedef struct acpi_header {
     uint32_t     creator_revision;
 } acpi_header_t;
 
+
 /* Generic Address Structure Format */
 typedef struct acpi_gastruct {
     uint8_t      space_id;
@@ -84,7 +84,7 @@ typedef struct acpi_gastruct {
 /* acpi struct */
 typedef struct acpi {
     void *regions;
-    acpi_rsdp_t rsdp;
+    acpi_rsdp_t *rsdp;
     ps_io_mapper_t io_mapper;
 } acpi_t;
 
@@ -103,16 +103,6 @@ typedef struct acpi {
  */
 acpi_t *acpi_init(ps_io_mapper_t io_mapper);
 
-/**
- * Initiliase the ACPI library with given RSDP.
- *
- * @param io_mapper Interface for mapping physical addresses. see io.h
- * @param rsdp RSDP object to parse the ACPI tables with
- *
- * returns: an acpi handle to call other function with.
- */
-acpi_t * acpi_init_with_rsdp(ps_io_mapper_t io_mapper, acpi_rsdp_t rsdp);
-
 /*
  * Find a specific acpi table.
  *
@@ -122,3 +112,4 @@ acpi_t * acpi_init_with_rsdp(ps_io_mapper_t io_mapper, acpi_rsdp_t rsdp);
  */
 acpi_header_t *acpi_find_region(acpi_t *acpi, region_type_t region);
 
+#endif /* __ACPI_H__ */

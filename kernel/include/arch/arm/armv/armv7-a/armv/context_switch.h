@@ -1,16 +1,19 @@
 /*
  * Copyright 2014, General Dynamics C4 Systems
  *
- * SPDX-License-Identifier: GPL-2.0-only
+ * This software may be distributed and modified according to the terms of
+ * the GNU General Public License version 2. Note that NO WARRANTY is provided.
+ * See "LICENSE_GPLv2.txt" for details.
+ *
+ * @TAG(GD_GPL)
  */
+#ifndef __ARMV_CONTEXT_SWITCH_H__
+#define __ARMV_CONTEXT_SWITCH_H__
 
-#pragma once
-
-#include <config.h>
 #include <arch/object/structures.h>
 #include <arch/api/types.h>
-#include <mode/model/statedata.h>
 
+/** MODIFIES: [*] */
 static inline void setHardwareASID(hw_asid_t hw_asid)
 {
 #if defined(CONFIG_ARM_ERRATA_430973)
@@ -21,9 +24,6 @@ static inline void setHardwareASID(hw_asid_t hw_asid)
 
 static inline void armv_contextSwitch_HWASID(pde_t *cap_pd, hw_asid_t hw_asid)
 {
-#ifdef CONFIG_ARM_HYPERVISOR_SUPPORT
-    writeContextIDAndPD(hw_asid, addrFromPPtr(cap_pd));
-#else
     /*
      * On ARMv7, speculative refills that complete between switching
      * ASID and PD can cause TLB entries to be Tagged with the wrong
@@ -38,16 +38,16 @@ static inline void armv_contextSwitch_HWASID(pde_t *cap_pd, hw_asid_t hw_asid)
      * do does not need a DSB
      */
     dsb();
-    writeTTBR0Ptr(addrFromPPtr(armKSGlobalPD));
+    writeTTBR0(addrFromPPtr(armKSGlobalPD));
     isb();
     setHardwareASID(hw_asid);
-    writeTTBR0Ptr(addrFromPPtr(cap_pd));
+    writeTTBR0(addrFromPPtr(cap_pd));
     isb();
-#endif
 }
 
-static inline void armv_contextSwitch(pde_t *cap_pd, asid_t asid)
+static inline void armv_contextSwitch(pde_t* pd)
 {
-    armv_contextSwitch_HWASID(cap_pd, getHWASID(asid));
+    armv_contextSwitch_HWASID(pd, getHWASID(pd));
 }
 
+#endif /* __ARMV_CONTEXT_SWITCH_H__ */

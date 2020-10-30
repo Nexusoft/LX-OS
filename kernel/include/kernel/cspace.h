@@ -1,10 +1,15 @@
 /*
  * Copyright 2014, General Dynamics C4 Systems
  *
- * SPDX-License-Identifier: GPL-2.0-only
+ * This software may be distributed and modified according to the terms of
+ * the GNU General Public License version 2. Note that NO WARRANTY is provided.
+ * See "LICENSE_GPLv2.txt" for details.
+ *
+ * @TAG(GD_GPL)
  */
 
-#pragma once
+#ifndef __KERNEL_CSPACE_H
+#define __KERNEL_CSPACE_H
 
 #include <types.h>
 #include <api/failures.h>
@@ -39,7 +44,7 @@ typedef struct lookupSlot_ret lookupSlot_ret_t;
 struct resolveAddressBits_ret {
     exception_t status;
     cte_t *slot;
-    word_t bitsRemaining;
+    unsigned int bitsRemaining;
 };
 typedef struct resolveAddressBits_ret resolveAddressBits_ret_t;
 
@@ -48,14 +53,15 @@ lookupCapAndSlot_ret_t lookupCapAndSlot(tcb_t *thread, cptr_t cPtr);
 lookupSlot_raw_ret_t lookupSlot(tcb_t *thread, cptr_t capptr);
 lookupSlot_ret_t lookupSlotForCNodeOp(bool_t isSource,
                                       cap_t root, cptr_t capptr,
-                                      word_t depth);
+                                      unsigned int depth);
 lookupSlot_ret_t lookupSourceSlot(cap_t root, cptr_t capptr,
-                                  word_t depth);
+                                  unsigned int depth);
 lookupSlot_ret_t lookupTargetSlot(cap_t root, cptr_t capptr,
-                                  word_t depth);
+                                  unsigned int depth);
 lookupSlot_ret_t lookupPivotSlot(cap_t root, cptr_t capptr,
-                                 word_t depth);
+                                 unsigned int depth);
 resolveAddressBits_ret_t resolveAddressBits(cap_t nodeCap,
                                             cptr_t capptr,
-                                            word_t n_bits);
+                                            unsigned int n_bits);
 
+#endif

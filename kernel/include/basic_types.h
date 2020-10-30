@@ -1,10 +1,15 @@
 /*
  * Copyright 2014, General Dynamics C4 Systems
  *
- * SPDX-License-Identifier: GPL-2.0-only
+ * This software may be distributed and modified according to the terms of
+ * the GNU General Public License version 2. Note that NO WARRANTY is provided.
+ * See "LICENSE_GPLv2.txt" for details.
+ *
+ * @TAG(GD_GPL)
  */
 
-#pragma once
+#ifndef __BASIC_TYPES_H
+#define __BASIC_TYPES_H
 
 #include <stdint.h>
 #include <arch/types.h>
@@ -13,7 +18,7 @@ enum _bool {
     false = 0,
     true  = 1
 };
-typedef word_t bool_t;
+typedef uint32_t bool_t;
 
 typedef struct region {
     pptr_t start;
@@ -33,6 +38,4 @@ typedef struct v_region {
 #define REG_EMPTY (region_t){ .start = 0, .end = 0 }
 #define P_REG_EMPTY (p_region_t){ .start = 0, .end = 0 }
 
-/* equivalent to a word_t except that we tell the compiler that we may alias with
- * any other type (similar to a char pointer) */
-typedef word_t __attribute__((__may_alias__)) word_t_may_alias;
+#endif /* __BASIC_TYPES_H */

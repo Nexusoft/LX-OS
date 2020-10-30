@@ -1,17 +1,15 @@
 /*
- * Copyright 2017, Data61
- * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
- * ABN 41 687 119 230.
+ * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
  * the BSD 2-Clause license. Note that NO WARRANTY is provided.
  * See "LICENSE_BSD2.txt" for details.
  *
- * @TAG(DATA61_BSD)
+ * @TAG(NICTA_BSD)
  */
 
-#pragma once
-
+#ifndef _UTILS_MATH_H
+#define _UTILS_MATH_H
 /* macros for doing basic math */
 
 #include <stdint.h>
@@ -37,7 +35,7 @@ static inline uint64_t muldivu64(uint64_t a, uint64_t b, uint64_t c)
     uint64_t cur_remainder = b % c;
     /* we will iterate through all the bits of a from least to most
      * significant, we can stop early once there are no set bits though */
-    while (a) {
+    while(a) {
         /* If this bit is set then the power of two is part of the
          * construction of a */
         if (a & 1) {
@@ -63,3 +61,23 @@ static inline uint64_t muldivu64(uint64_t a, uint64_t b, uint64_t c)
     }
     return quotient;
 }
+
+/* 
+ * Rounds a value up to the next value of two
+ * @param value to round
+ * @returns the provided value rounded 
+ */
+static inline uint32_t nearest_power_of_two(uint32_t v)
+{
+    v--;
+    v |= v >> 1;
+    v |= v >> 2;
+    v |= v >> 4;
+    v |= v >> 8;
+    v |= v >> 16;
+    v++;
+    return v;
+}
+
+#endif /* _UTILS_MATH_H */
+

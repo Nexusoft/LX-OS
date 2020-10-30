@@ -1,22 +1,23 @@
 /*
- * Copyright 2017, Data61
- * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
- * ABN 41 687 119 230.
+ * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
  * the BSD 2-Clause license. Note that NO WARRANTY is provided.
  * See "LICENSE_BSD2.txt" for details.
  *
- * @TAG(DATA61_BSD)
+ * @TAG(NICTA_BSD)
  */
 
-#pragma once
+#ifndef __PLAT_SUPPORT_PLAT_TMU_H
+#define __PLAT_SUPPORT_PLAT_TMU_H
+
 
 #define TMU_IRQ0 COMBINER_IRQ(-1, -1)
 #define TMU_IRQ1 COMBINER_IRQ(-1, -1)
 
 #define EXYNOS_TMU_PADDR  0x0
 #define EXYNOS_TMU_SIZE   0x0
+
 
 enum tmu_id {
     TMU_CORE0_CLUSTER0,
@@ -47,4 +48,9 @@ enum tmu_id {
  * @return           0 on success
  */
 int exynos4_tmu_init(enum tmu_id id, void* vaddr, tmu_t* tmu);
+
+
+
+#endif /* __PLAT_SUPPORT_PLAT_TMU_H */
+
 

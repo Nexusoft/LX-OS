@@ -1,16 +1,16 @@
 /*
- * Copyright 2017, Data61
- * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
- * ABN 41 687 119 230.
+ * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
  * the BSD 2-Clause license. Note that NO WARRANTY is provided.
  * See "LICENSE_BSD2.txt" for details.
  *
- * @TAG(DATA61_BSD)
+ * @TAG(NICTA_BSD)
  */
 
-#pragma once
+#ifndef ARCH_CLOCK_H
+#define ARCH_CLOCK_H
+
 
 #include <assert.h>
 #include <platsupport/clock.h>
@@ -31,6 +31,7 @@
 #define CLK_OPS(name, ops, data)        _CLK_OPS(CLK_##name, #name, ops, data)
 #define CLK_OPS_CUSTOM(name, ops, data) _CLK_OPS(CLK_CUSTOM, name, ops, data)
 #define CLK_OPS_DEFAULT(clk_id)         CLK_OPS(clk_id, default_clk, NULL)
+
 
 /* Array of default frequencies */
 extern freq_t ps_freq_default[];
@@ -62,6 +63,7 @@ clk_recal(clk_t* clk)
     clk->recal(clk);
 }
 
+
 /**
  * Prints a clock tree.
  * The prefix should be based on the depth of the current root. When calling this
@@ -70,7 +72,8 @@ clk_recal(clk_t* clk)
  * @param[in] clk     The root of the tree
  * @param[in] prefix  A string prefix to print before each line
  */
-void clk_print_tree(clk_t* clk, const char* prefix);
+void clk_print_tree(clk_t* clk, char* prefix);
+
 
 /* Default clocks - Frequency must be defined in freq_default */
 freq_t _default_clk_get_freq(clk_t* clk);
@@ -81,3 +84,4 @@ clk_t* _default_clk_init(clk_t* clk);
 /* Generic clock acquisition for all platforms */
 clk_t* ps_get_clock(clock_sys_t* sys, enum clk_id id);
 
+#endif /* ARCH_CLOCK_H */

@@ -1,54 +1,24 @@
 /*
- * Copyright 2017, Data61
- * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
- * ABN 41 687 119 230.
+ * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
  * the BSD 2-Clause license. Note that NO WARRANTY is provided.
  * See "LICENSE_BSD2.txt" for details.
  *
- * @TAG(DATA61_BSD)
+ * @TAG(NICTA_BSD)
  */
 
-#pragma once
+#ifndef _PLATSUPPORT_SPI_H_
+#define _PLATSUPPORT_SPI_H_
 
 #include <platsupport/io.h>
-#include <platsupport/clock.h>
-#include <platsupport/gpio.h>
 
 typedef struct spi_bus spi_bus_t;
-typedef struct spi_slave_config spi_slave_config_t;
-
-struct spi_slave_config {
-    int id;
-    /// Device operation speed
-    freq_t   speed_hz;
-    /// Slave selection signal delay in microseconds
-    uint32_t nss_udelay;
-    /// Feedback/propagation delay in clock phases
-    uint32_t fb_delay;
-};
-
-enum spi_cs_state {
-    SPI_CS_ASSERT,
-    SPI_CS_RELAX
-};
-
-/**
- * Function pointer to override chip select function.
- *
- * It is sometimes necessary to override the chip select functionality such
- * as when GPIO pins are used for chipselect.  This function pointer is passed
- * in when a SPI driver is initialised.  If NULL is passed then the driver's
- * default chip select behavior will occur.
- * @param  config  A pointer to the slave struct
- * @param  state   The release or assert cs state
- */
-typedef void (*spi_chipselect_fn)(const spi_slave_config_t* cfg, int state);
 
 #include <platsupport/plat/spi.h>
 
 typedef void (*spi_callback_fn)(spi_bus_t* spi_bus, int status, void* token);
+
 
 /**
  * Initialise an SPI bus
@@ -74,14 +44,8 @@ long spi_set_speed(spi_bus_t* spi_bus, long bps);
  */
 void spi_handle_irq(spi_bus_t* dev);
 
-/**
- * Configure the SPI bus to meet the slave device's requirement
- * @param[in] spi_bus  A handle to an SPI bus
- * @param[in] cfg      Slave configuration
- */
-void spi_prepare_transfer(spi_bus_t* spi_bus, const spi_slave_config_t* cfg);
 
-/**
+/*
  * Write and read data to and from the SPI bus.
  * txdata will be sent from byte position 0 until txcnt bytes have been sent.
  * rxdata will be read once txcnt bytes have been sent and until rxcnt bytes have
@@ -103,4 +67,6 @@ void spi_prepare_transfer(spi_bus_t* spi_bus, const spi_slave_config_t* cfg);
  */
 int spi_xfer(spi_bus_t* spi_bus, const void* txdata, size_t txcnt,
              void* rxdata, size_t rxcnt, spi_callback_fn cb, void* token);
+
+#endif /* _PLATSUPPORT_SPI_H_ */
 

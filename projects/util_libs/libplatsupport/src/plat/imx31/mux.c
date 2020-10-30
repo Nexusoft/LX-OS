@@ -1,18 +1,16 @@
 /*
- * Copyright 2017, Data61
- * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
- * ABN 41 687 119 230.
+ * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
  * the BSD 2-Clause license. Note that NO WARRANTY is provided.
  * See "LICENSE_BSD2.txt" for details.
  *
- * @TAG(DATA61_BSD)
+ * @TAG(NICTA_BSD)
  */
 #include <stdint.h>
-#include <utils/attribute.h>
 #include <platsupport/mux.h>
 #include "../../services.h"
+
 
 struct imx31_mux_regs {
     int dummy;
@@ -33,8 +31,9 @@ static inline void set_mux_priv(mux_sys_t* mux, struct imx31_mux* imx31_mux)
     mux->priv = imx31_mux;
 }
 
+
 static int
-imx31_mux_feature_enable(mux_sys_t* mux, mux_feature_t mux_feature, UNUSED enum mux_gpio_dir mgd)
+imx31_mux_feature_enable(mux_sys_t* mux, enum mux_feature mux_feature)
 {
     struct imx31_mux* m;
     if (mux == NULL || mux->priv == NULL) {
@@ -49,6 +48,7 @@ imx31_mux_feature_enable(mux_sys_t* mux, mux_feature_t mux_feature, UNUSED enum 
     }
 }
 
+
 static int
 imx31_mux_init_common(mux_sys_t* mux)
 {
@@ -56,6 +56,7 @@ imx31_mux_init_common(mux_sys_t* mux)
     mux->feature_enable = &imx31_mux_feature_enable;
     return 0;
 }
+
 
 int
 imx31_mux_init(void* bank1,
@@ -65,8 +66,9 @@ imx31_mux_init(void* bank1,
     return imx31_mux_init_common(mux);
 }
 
+
 int
-mux_sys_init(ps_io_ops_t* io_ops, UNUSED void *dependencies, mux_sys_t* mux)
+mux_sys_init(ps_io_ops_t* io_ops, mux_sys_t* mux)
 {
     (void)io_ops;
     return imx31_mux_init_common(mux);

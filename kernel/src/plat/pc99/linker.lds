@@ -1,36 +1,27 @@
 /*
  * Copyright 2014, General Dynamics C4 Systems
  *
- * SPDX-License-Identifier: GPL-2.0-only
+ * This software may be distributed and modified according to the terms of
+ * the GNU General Public License version 2. Note that NO WARRANTY is provided.
+ * See "LICENSE_GPLv2.txt" for details.
+ *
+ * @TAG(GD_GPL)
  */
 
-#define __ASSEMBLER__
 #include <config.h>
-#include <hardware.h>
 
 ENTRY(_start)
 
-KLOAD_PADDR = KERNEL_ELF_PADDR_BASE;
-KLOAD_VADDR = KERNEL_ELF_BASE;
-
 /* WARNING: constants also defined in plat/machine/hardware.h */
-#if defined(CONFIG_ARCH_IA32)
-#undef i386
-OUTPUT_ARCH(i386)
-OUTPUT_FORMAT(elf32-i386)
-#elif defined(CONFIG_ARCH_X86_64)
-OUTPUT_FORMAT(elf64-x86-64)
-#if defined(ENABLE_SMP_SUPPORT) && defined(CONFIG_KERNEL_SKIM_WINDOW)
-nodeSkimScratchOffset = nodeSkimScratch - node_info;
-#endif
-#endif
-
-KERNEL_OFFSET = KLOAD_VADDR - KLOAD_PADDR;
+PADDR_BASE = 0x00000000;
+PADDR_LOAD = 0x00100000;
+PPTR_BASE  = 0xe0000000;
+BASE_OFFSET = PPTR_BASE - PADDR_BASE;
 
 SECTIONS
 {
     /* load kernel to 1M to avoid the famous IA-32 memory holes below */
-    . = KLOAD_PADDR;
+    . = PADDR_LOAD;
 
     /* code/data only needed during bootstrapping, linked to physical addresses */
 
@@ -38,106 +29,76 @@ SECTIONS
     {
         *(.mbh)
         *(.phys.text)
-        *(.phys.data)
-        . = ALIGN(4K);
-    }
-
-    .phys.bss ADDR(.phys) + SIZEOF(.phys) (NOLOAD) :
-    {
-        boot_stack_bottom = .;
+        _boot_stack_bottom = .;
         . = . + 2K;
         . = ALIGN(4K);
-        boot_stack_top = .;
-        *(.phys.bss)
+        _boot_stack_top = .;
+        *(.phys)
+        *(.phys.*)
     }
 
-    . = . + KERNEL_OFFSET;
+    . = . + BASE_OFFSET;
 
-    .boot . : AT(ADDR(.boot) - KERNEL_OFFSET)
+    .boot . : AT(ADDR(.boot) - BASE_OFFSET)
     {
         *(.boot.text)
-        *(.boot.data)
-    }
-
-    .boot.bss . (NOLOAD) : AT(ADDR(.boot.bss) - KERNEL_OFFSET)
-    {
-        *(.boot.bss)
+        *(.boot.glob)
         . = ALIGN(4K);
     }
-#ifdef CONFIG_KERNEL_SKIM_WINDOW
-    /* Align up so that the SKIM portion of the kernel is by itself
-       on large pages */
-#ifdef CONFIG_ARCH_IA32
-    . = ALIGN(4M);
-#else
-    . = ALIGN(2M);
-#endif
-#endif
 
     ki_boot_end = .;
-    ki_skim_start = .;
 
-    .text . : AT(ADDR(.text) - KERNEL_OFFSET)
+    .text . : AT(ADDR(.text) - BASE_OFFSET)
     {
         *(.text)
     }
 
-    .rodata . : AT(ADDR(.rodata) - KERNEL_OFFSET)
+    .rodata . : AT(ADDR(.rodata) - BASE_OFFSET)
     {
         *(.rodata)
         *(.rodata.*)
     }
 
-    .skim_data . : AT(ADDR(.skim_data) - KERNEL_OFFSET)
+    .glob . : AT(ADDR(.glob) - BASE_OFFSET)
     {
-        *(.skim.data)
-        *(.skim.data.*)
+        *(.glob)
     }
-
-    .skim_bss . : AT(ADDR(.skim_bss) - KERNEL_OFFSET)
-    {
-        *(.skim.bss)
-        *(.skim.bss.*)
-    }
-
-#ifdef CONFIG_KERNEL_SKIM_WINDOW
-    /* Align up so that the SKIM portion of the kernel is by itself
-       on large pages */
-#ifdef CONFIG_ARCH_IA32
-    . = ALIGN(4M);
-#else
-    . = ALIGN(2M);
-#endif
-#endif
-    ki_skim_end = .;
-
-    .data . : AT(ADDR(.data) - KERNEL_OFFSET)
+    
+    .data . : AT(ADDR(.data) - BASE_OFFSET)
     {
         *(.data)
     }
 
-    .bss . : AT(ADDR(.bss) - KERNEL_OFFSET)
-    {
-        *(.bss)
-        *(COMMON)
-    }
-
-    .ehframe : AT(ADDR(.ehframe) - KERNEL_OFFSET)
-    {
-        _ehframe = .;
-        *(.eh_frame)
-        . = ALIGN(4K);
-    }
-
-    ._idle_thread . : AT(ADDR(._idle_thread) - KERNEL_OFFSET)
-    {
-	__idle_thread_start = .;
-        *(._idle_thread)
-	__idle_thread_end = .;
-    }
-
     . = ALIGN(4K);
     ki_end = .;
+
+    /* The NDKS section is allocated and mapped per node in boot_sys.c */
+
+#ifdef CONFIG_PAE_PAGING
+    .ndks 0xffe01000 (DSECT) :
+#else
+    .ndks 0xffc01000 (DSECT) :
+#endif
+    {
+        _ndks_start = .;
+
+        /*
+         * Due to stupid ld behaviour, we can't simply allocate the stack here
+         * using ". = . + ALIGN(4K)" because that makes .ndks appear in the
+         * program headers of the ELF file (which is wrong).
+         *
+         * Instead, we define the stack in C in the .ndks.stack section, which
+         * makes it appear here.
+         */
+        _kernel_stack_bottom = .;
+        *(.ndks.stack)
+        _kernel_stack_top = .;
+
+        *(.boot.node)
+        *(.bss)
+        *(COMMON)
+        _ndks_end = .;
+    }
 
     /DISCARD/ :
     {

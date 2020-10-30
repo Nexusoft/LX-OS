@@ -1,13 +1,11 @@
 /*
- * Copyright 2017, Data61
- * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
- * ABN 41 687 119 230.
+ * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
  * the BSD 2-Clause license. Note that NO WARRANTY is provided.
  * See "LICENSE_BSD2.txt" for details.
  *
- * @TAG(DATA61_BSD)
+ * @TAG(NICTA_BSD)
  */
 #include <stdint.h>
 #include <stdio.h>
@@ -44,8 +42,8 @@ struct intctl {
     uint32_t polariy[2];      /* +0x050 */
     uint32_t res5[2];
     uint32_t no_pend_val;     /* +0x060 */
-#define INTMASTER_IRQEN  (BIT(0))
-#define INTMASTER_FIQEN  (BIT(1))
+#define INTMASTER_IRQEN  (0x1 << 0)
+#define INTMASTER_FIQEN  (0x1 << 1)
     uint32_t master_enable;   /* +0x064 */
 #define INTVIC_VECTOR_MODE 0x1
     uint32_t vic_config;      /* +0x068 */
@@ -128,3 +126,5 @@ test_intc(ps_io_ops_t* o)
         printf("irq: 0x%x 0x%x 0x%x 0x%x 0x%x\n", irq->stat, irq->rawstat, irq->seten, irq->clren, irq->soft);
     }
 };
+
+

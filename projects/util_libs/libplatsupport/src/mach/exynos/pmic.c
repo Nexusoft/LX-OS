@@ -1,20 +1,26 @@
 /*
- * Copyright 2017, Data61
- * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
- * ABN 41 687 119 230.
+ * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
  * the BSD 2-Clause license. Note that NO WARRANTY is provided.
  * See "LICENSE_BSD2.txt" for details.
  *
- * @TAG(DATA61_BSD)
+ * @TAG(NICTA_BSD)
  */
 
-#include <utils/util.h>
+
 #include <platsupport/mach/pmic.h>
 #include <string.h>
 
 #define mV
+
+//#define PMIC_DEBUG
+#ifdef PMIC_DEBUG
+#define dprintf(...) printf("PMIC:" __VA_ARGS__)
+#else
+#define dprintf(...) do{}while(0)
+#endif
+
 
 #define REG_CHIPID        0x00
 #define REG_RESET_DELAY   0x0A
@@ -30,7 +36,7 @@
 #define LDO_MV(mv)        (( ((mv) + LDO_VSTEP / 2) - LDO_VMIN) / LDO_VSTEP)
 #define LDO_GET_MV(reg)   (((reg) & LDO_VMASK) * LDO_VSTEP + LDO_VMIN)
 #define LDOMODE_OFF       (0x0 << 6)
-#define LDOMODE_STANDBY   (BIT(6))
+#define LDOMODE_STANDBY   (0x1 << 6)
 #define LDOMODE_LOWPWR    (0x2 << 6)
 #define LDOMODE_ON        (0x3 << 6)
 #define LDOMODE_MASK      (0x3 << 6)
@@ -61,13 +67,13 @@ pmic_get_priv(pmic_t* pmic) {
 static int
 pmic_reg_read(pmic_t* pmic, uint8_t reg, void* data, int count)
 {
-    return !(i2c_kvslave_read(&pmic->kvslave, reg, data, count) == count);
+    return !(i2c_kvslave_read(&pmic->i2c_slave, reg, data, count) == count);
 }
 
 static int
 pmic_reg_write(pmic_t* pmic, uint8_t reg, const void* data, int count)
 {
-    return !(i2c_kvslave_write(&pmic->kvslave, reg, data, count) == count);
+    return !(i2c_kvslave_write(&pmic->i2c_slave, reg, data, count) == count);
 }
 
 static int
@@ -77,28 +83,20 @@ ldo_valid(pmic_t* pmic, int ldo)
     return !(nldo < 0 || ldo <= 0 || ldo > nldo);
 }
 
+
 int
 pmic_init(i2c_bus_t* i2c, int addr, pmic_t* pmic)
 {
     uint16_t chip_id;
     int ret;
-    ret = i2c_slave_init(i2c, addr,
-                         I2C_SLAVE_ADDR_7BIT, I2C_SLAVE_SPEED_FAST,
-                         0, &pmic->i2c_slave);
+    ret = i2c_kvslave_init(i2c, addr, LITTLE8, LITTLE8, &pmic->i2c_slave);
     if (ret) {
-        ZF_LOGE("Failed to register I2C slave");
+        dprintf("Failed to register I2C slave\n");
         return -1;
     }
-
-    ret = i2c_kvslave_init(&pmic->i2c_slave, LITTLE8, LITTLE8, &pmic->kvslave);
-    if (ret) {
-        ZF_LOGE("Failed to initialize I2C KV-slave lib instance.");
-        return -1;
-    }
-
     /* Read the chip ID */
     if (pmic_reg_read(pmic, REG_CHIPID, &chip_id, 2)) {
-        ZF_LOGE("Bus error");
+        dprintf("Bus error\n");
         return -1;
     }
     /* Check the chip ID */
@@ -111,11 +109,11 @@ pmic_init(i2c_bus_t* i2c, int addr, pmic_t* pmic)
         pmic->priv = (void*)&max77802_cfg;
         break;
     default:
-        ZF_LOGE("Unidentified chip 0x%02x", chip_id);
+        dprintf("Unidentified chip 0x%02x\n", chip_id);
         return -1;
     }
 
-    ZF_LOGE("found chip ID 0x%x", chip_id);
+    dprintf("found chip ID 0x%x\n", chip_id);
     return 0;
 }
 
@@ -126,6 +124,7 @@ pmic_nldo(pmic_t* pmic)
     assert(cfg);
     return cfg->nldo;
 }
+
 
 int
 pmic_ldo_cfg(pmic_t* pmic, int ldo, enum ldo_mode ldo_mode, int milli_volt)
@@ -203,6 +202,7 @@ pmic_ldo_get_cfg(pmic_t* pmic, int ldo, enum ldo_mode* ldo_mode)
     }
 }
 
+
 int
 pmic_get_reset_delay(pmic_t* pmic)
 {
@@ -232,6 +232,7 @@ pmic_set_reset_delay(pmic_t* pmic, int ms)
         return data;
     }
 }
+
 
 void
 pmic_print_status(pmic_t* pmic)
@@ -288,3 +289,4 @@ pmic_print_status(pmic_t* pmic)
     }
     printf("Reset delay: %d ms\n", pmic_get_reset_delay(pmic));
 }
+

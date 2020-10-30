@@ -1,13 +1,11 @@
 /*
- * Copyright 2017, Data61
- * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
- * ABN 41 687 119 230.
+ * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
  * the BSD 2-Clause license. Note that NO WARRANTY is provided.
  * See "LICENSE_BSD2.txt" for details.
  *
- * @TAG(DATA61_BSD)
+ * @TAG(NICTA_BSD)
  */
 
 #include <platsupport/mach/tmu.h>
@@ -32,7 +30,7 @@
 #define INTEN_FALL1            (1<<20)
 #define INTEN_FALL2            (1<<24)
 
-#define INT_RISE(x)            (BIT(((x) * 4)))
+#define INT_RISE(x)            (1 << ((x) * 4))
 #define INT_FALL(x)            INT_RISE(3 + (x))
 
 #define TRIM_INFO_MASK         (0xFF)
@@ -47,6 +45,7 @@
 #define EFUSE_MAX_VALUE        100
 #define EFUSE_INIT_VALUE       55
 
+
 #define TMU_SAVE_NUM           10
 #define TMU_DC_OFFSET          25
 
@@ -56,6 +55,7 @@
 
 /* Device access macros. */
 #define TMU_REG(vbase, offset)    (*(volatile unsigned int *)(vbase + offset))
+
 
 struct tmu_regs {
     uint32_t res0[5];           /* 0x00 */
@@ -89,6 +89,7 @@ tmu_priv_get_regs(tmu_t* tmu)
 {
     return (tmu_regs_t*)tmu->priv;
 }
+
 
 static int
 do_exynos_tmu_init(enum tmu_id id, void* vaddr, tmu_t* tmu)
@@ -299,3 +300,6 @@ exynos_tmu_set_alarms_falling(tmu_t* tmu,
     regs->int_enable = int_enable;
     return 0;
 }
+
+
+

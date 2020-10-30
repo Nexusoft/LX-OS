@@ -1,16 +1,15 @@
 /*
- * Copyright 2017, Data61
- * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
- * ABN 41 687 119 230.
+ * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
  * the BSD 2-Clause license. Note that NO WARRANTY is provided.
  * See "LICENSE_BSD2.txt" for details.
  *
- * @TAG(DATA61_BSD)
+ * @TAG(NICTA_BSD)
  */
 
-#pragma once
+#ifndef _PLATSUPPORT_PLAT_CLOCK_H_
+#define _PLATSUPPORT_PLAT_CLOCK_H_
 
 enum clk_id {
     CLK_MASTER, /* The input clock PS_CLK */
@@ -78,17 +77,5 @@ enum clock_gate {
     NCLKGATES
 };
 
-/**
- * Select 621 CPU clock ratio
- * @param[in] cpu_clk  One of the CPU clocks
- * @return             0 on success
- */
-int clk_cpu_clk_select_621(clk_t* cpu_clk);
 
-/**
- * Select 421 CPU clock ratio
- * @param[in] cpu_clk  One of the CPU clocks
- * @return             0 on success
- */
-int clk_cpu_clk_select_421(clk_t* cpu_clk);
-
+#endif /* _PLATSUPPORT_PLAT_CLOCK_H_ */

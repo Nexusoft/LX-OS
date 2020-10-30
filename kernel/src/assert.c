@@ -1,19 +1,23 @@
 /*
  * Copyright 2014, General Dynamics C4 Systems
  *
- * SPDX-License-Identifier: GPL-2.0-only
+ * This software may be distributed and modified according to the terms of
+ * the GNU General Public License version 2. Note that NO WARRANTY is provided.
+ * See "LICENSE_GPLv2.txt" for details.
+ *
+ * @TAG(GD_GPL)
  */
 
 #include <assert.h>
 #include <machine/io.h>
 
-#ifdef CONFIG_DEBUG_BUILD
+#ifdef DEBUG
 
 void _fail(
-    const char  *s,
-    const char  *file,
+    const char*  s,
+    const char*  file,
     unsigned int line,
-    const char  *function)
+    const char*  function)
 {
     printf(
         "seL4 called fail at %s:%u in function %s, saying \"%s\"\n",
@@ -26,10 +30,10 @@ void _fail(
 }
 
 void _assert_fail(
-    const char  *assertion,
-    const char  *file,
+    const char*  assertion,
+    const char*  file,
     unsigned int line,
-    const char  *function)
+    const char*  function)
 {
     printf("seL4 failed assertion '%s' at %s:%u in function %s\n",
            assertion,

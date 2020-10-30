@@ -1,24 +1,27 @@
 /*
- * Copyright 2017, Data61
- * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
- * ABN 41 687 119 230.
+ * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
  * the BSD 2-Clause license. Note that NO WARRANTY is provided.
  * See "LICENSE_BSD2.txt" for details.
  *
- * @TAG(DATA61_BSD)
+ * @TAG(NICTA_BSD)
  */
 
+#ifndef __PLATSUPPORT_TIMERDEV_H__
+#define __PLATSUPPORT_TIMERDEV_H__
+
 #include <errno.h>
+
+#include <platsupport/timer.h>
 #include <platsupport/io.h>
 #include <platsupport/plat/pit.h>
 
-#include <inttypes.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <utils/util.h>
 #include <utils/util.h>
 
 #define PIT_IOPORT_CHANNEL(x) (0x40 + x) /* valid channels are 0, 1, 2. we'll be using 0 exclusively, though */
@@ -41,6 +44,13 @@
 #define PITCR_MODE_SQUARE    0x3
 #define PITCR_MODE_SWSTROBE  0x4
 
+#define TICKS_PER_SECOND 1193182
+#define PIT_PERIODIC_MAX 54925000
+
+typedef struct {
+    ps_io_port_ops_t *ops;
+} pit_data_t;
+
 /* helper functions */
 static inline int
 set_pit_mode(ps_io_port_ops_t *ops, uint8_t channel, uint8_t mode)
@@ -50,55 +60,82 @@ set_pit_mode(ps_io_port_ops_t *ops, uint8_t channel, uint8_t mode)
 }
 
 static inline int
-configure_pit(pit_t *pit, uint8_t mode, uint64_t ns)
+configure_pit(const pstimer_t *timer, uint8_t mode, uint64_t ns)
 {
 
     int error;
 
-    if (ns > PIT_MAX_NS || ns < PIT_MIN_NS) {
-        ZF_LOGV("ns invalid for programming PIT %"PRIu64" <= %"PRIu64" <= %"PRIu64"\n",
-                (uint64_t)PIT_MIN_NS, ns, (uint64_t)PIT_MAX_NS);
+    if (ns > (0xFFFFFFFFFFFFFFFFllu / TICKS_PER_SECOND)) {
+        /* ns will overflow out calculation, but also way too high for pit */
         return EINVAL;
     }
 
-    uint64_t ticks = PIT_NS_TO_TICKS(ns);
+    uint64_t ticks = ns * TICKS_PER_SECOND / NS_IN_S;
+    if (ticks < 2) {
+        /* ns is too low */
+        fprintf(stderr, "Ticks too low\n");
+        return ETIME;
+    }
+
+    /* pit is only 16 bits */
+    if (ticks > 0xFFFF) {
+        /* ticks too high */
+        fprintf(stderr, "Ticks too high\n");
+        return EINVAL;
+    }
+
+    ps_io_port_ops_t *ops = ((pit_data_t *) timer->data)->ops;
 
     /* configure correct mode */
-    error = set_pit_mode(&pit->ops, 0, mode);
+    error = set_pit_mode(ops, 0, mode);
     if (error) {
-        ZF_LOGE("ps_io_port_out failed on channel %u\n", PIT_IOPORT_CHANNEL(0));
+        fprintf(stderr, "ps_io_port_out failed on channel %u\n", PIT_IOPORT_CHANNEL(0));
         return EIO;
     }
 
     /* program timeout */
-    error = ps_io_port_out(&pit->ops, PIT_IOPORT_CHANNEL(0), 1, (uint8_t) (ticks & 0xFF));
+    error = ps_io_port_out(ops, PIT_IOPORT_CHANNEL(0), 1, (uint8_t) (ticks & 0xFF));
     if (error) {
-        ZF_LOGE("ps_io_port_out failed on channel %u\n", PIT_IOPORT_CHANNEL(0));
+        fprintf(stderr, "ps_io_port_out failed on channel %u\n", PIT_IOPORT_CHANNEL(0));
         return EIO;
     }
 
-    error = ps_io_port_out(&pit->ops, PIT_IOPORT_CHANNEL(0), 1, (uint8_t) (ticks >> 8) & 0xFF);
+    error = ps_io_port_out(ops, PIT_IOPORT_CHANNEL(0), 1, (uint8_t) (ticks >> 8) & 0xFF);
     if (error) {
-        ZF_LOGE("ps_io_port_out failed on channel %u\n", PIT_IOPORT_CHANNEL(0));
+        fprintf(stderr, "ps_io_port_out failed on channel %u\n", PIT_IOPORT_CHANNEL(0));
         return EIO;
     }
 
     return 0;
 }
 
+
 /* interface functions */
 
-int pit_cancel_timeout(pit_t *pit)
+static int
+pit_start(const pstimer_t* device)
+{
+    /* we don't need to do anything to start the pit */
+    return 0;
+}
+
+
+static int
+pit_stop(const pstimer_t* device)
 {
     /* There's no way to disable the PIT, so we set it up in mode 0 and don't
      * start it
      */
-    return set_pit_mode(&pit->ops, 0, PITCR_MODE_ONESHOT);
+    ps_io_port_ops_t *ops = ((pit_data_t *) device->data)->ops;
+    return set_pit_mode(ops, 0, PITCR_MODE_ONESHOT);
 }
 
-uint64_t pit_get_time(pit_t *pit)
+
+static uint64_t
+pit_get_time(const pstimer_t* device)
 {
-    int error = ps_io_port_out(&pit->ops, PIT_IOPORT_CHANNEL(3), 1, 0);
+    ps_io_port_ops_t *ops = ((pit_data_t *) device->data)->ops;
+    int error = ps_io_port_out(ops, PIT_IOPORT_CHANNEL(3), 1, 0);
     if (error) {
         return 0;
     }
@@ -106,13 +143,13 @@ uint64_t pit_get_time(pit_t *pit)
     uint32_t low, high;
 
     /* Read the low 8 bits of the current timer value. */
-    error = ps_io_port_in(&pit->ops, PIT_IOPORT_CHANNEL(0), 1, &low);
+    error = ps_io_port_in(ops, PIT_IOPORT_CHANNEL(0), 1, &low);
     if (error) {
         return 0;
     }
 
     /* Read the high 8 bits of the current timer value. */
-    error = ps_io_port_in(&pit->ops, PIT_IOPORT_CHANNEL(0), 1, &high);
+    error = ps_io_port_in(ops, PIT_IOPORT_CHANNEL(0), 1, &high);
     if (error) {
         return 0;
     }
@@ -121,24 +158,82 @@ uint64_t pit_get_time(pit_t *pit)
     return ((high << 8) + low) * NS_IN_S / TICKS_PER_SECOND;
 }
 
-int pit_set_timeout(pit_t *pit, uint64_t ns, bool periodic)
+int
+pit_oneshot_absolute(const pstimer_t *device, uint64_t absolute_ns)
 {
-    uint32_t mode = periodic ? PITCR_MODE_PERIODIC : PITCR_MODE_ONESHOT;
-    return configure_pit(pit, mode, ns);
+    /* pit cannot do absolute timeouts */
+    return ENOSYS;
 }
+
+
+static int
+pit_oneshot_relative(const pstimer_t* device, uint64_t relative_ns)
+{
+    return configure_pit(device, PITCR_MODE_ONESHOT, relative_ns);
+}
+
+
+static int
+pit_periodic(const pstimer_t* device, uint64_t ns)
+{
+    return configure_pit(device, PITCR_MODE_PERIODIC, ns);
+}
+
+static void
+pit_handle_irq(const pstimer_t* device, uint32_t irq)
+{
+    /* do nothing */
+}
+
+static uint32_t
+pit_get_nth_irq(const pstimer_t *device, uint32_t n)
+{
+    uint32_t irq = 0;
+
+    if (n == 0) {
+        irq = PIT_INTERRUPT;
+    }
+
+    assert(n == 0);
+    return irq;
+}
+
+/* static global vars */
+static pstimer_t pit_timer = {
+    .properties = {
+        .upcounter = false,
+        .timeouts = true,
+        .bit_width = 16,
+        .irqs = 1
+    },
+    .start = pit_start,
+    .stop = pit_stop,
+    .get_time = pit_get_time,
+    .oneshot_absolute = pit_oneshot_absolute,
+    .oneshot_relative = pit_oneshot_relative,
+    .periodic = pit_periodic,
+    .handle_irq = pit_handle_irq,
+    .get_nth_irq = pit_get_nth_irq,
+    /* data is set to null originally to prevent double initilisation */
+    .data = NULL
+};
+
+static pit_data_t pit_data;
 
 /* initialisation function */
-int pit_init(pit_t *pit, ps_io_port_ops_t io_port_ops)
+pstimer_t *
+pit_get_timer(ps_io_port_ops_t *io_port_ops)
 {
-    if (pit == NULL) {
-        return EINVAL;
+
+    /* timer already initialised */
+    if (pit_timer.data != NULL) {
+        return &pit_timer;
     }
 
-    /* check that the io port ops are at least implemented as these are absolutely required */
-    if (!io_port_ops.io_port_in_fn || !io_port_ops.io_port_out_fn) {
-        return EINVAL;
-    }
+    pit_timer.data = &pit_data;
+    pit_data.ops = io_port_ops;
 
-    pit->ops = io_port_ops;
-    return 0;
+    return &pit_timer;
 }
+
+#endif /* __PLATSUPPORT_TIMER_H__ */

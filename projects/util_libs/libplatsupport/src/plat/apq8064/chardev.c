@@ -1,13 +1,11 @@
 /*
- * Copyright 2017, Data61
- * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
- * ABN 41 687 119 230.
+ * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
  * the BSD 2-Clause license. Note that NO WARRANTY is provided.
  * See "LICENSE_BSD2.txt" for details.
  *
- * @TAG(DATA61_BSD)
+ * @TAG(NICTA_BSD)
  */
 
 /**
@@ -18,12 +16,14 @@
 #include "../../chardev.h"
 #include "../../common.h"
 #include <utils/util.h>
+#include "serial.h"
 
 static const int gsbi3_uart_irqs[] = {GSBI3_UART_IRQ, -1};
 static const int gsbi4_uart_irqs[] = {GSBI4_UART_IRQ, -1};
 static const int gsbi5_uart_irqs[] = {GSBI5_UART_IRQ, -1};
 static const int gsbi6_uart_irqs[] = {GSBI6_UART_IRQ, -1};
 static const int gsbi7_uart_irqs[] = {GSBI7_UART_IRQ, -1};
+
 
 #define GSBI_UART_DEFN(devid) {          \
     .id      = GSBI##devid##_UART,       \
@@ -32,6 +32,8 @@ static const int gsbi7_uart_irqs[] = {GSBI7_UART_IRQ, -1};
     .irqs    = gsbi##devid##_uart_irqs,  \
     .init_fn = &uart_init                \
 }
+
+
 
 static const struct dev_defn dev_defn[] = {
     GSBI_UART_DEFN(3),

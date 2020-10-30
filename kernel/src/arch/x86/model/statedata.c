@@ -1,7 +1,11 @@
 /*
  * Copyright 2014, General Dynamics C4 Systems
  *
- * SPDX-License-Identifier: GPL-2.0-only
+ * This software may be distributed and modified according to the terms of
+ * the GNU General Public License version 2. Note that NO WARRANTY is provided.
+ * See "LICENSE_GPLv2.txt" for details.
+ *
+ * @TAG(GD_GPL)
  */
 
 #include <config.h>
@@ -14,62 +18,57 @@
 /* ==== read/write kernel state not preserved across kernel entries ==== */
 
 /* Interrupt currently being handled */
-UP_STATE_DEFINE(interrupt_t, x86KScurInterrupt VISIBLE);
-
-UP_STATE_DEFINE(interrupt_t, x86KSPendingInterrupt);
+interrupt_t ia32KScurInterrupt VISIBLE;
 
 /* ==== proper read/write kernel state ==== */
 
-x86_arch_global_state_t x86KSGlobalState[CONFIG_MAX_NUM_NODES] ALIGN(L1_CACHE_LINE_SIZE) SKIM_BSS;
+/* Task State Segment (TSS), contains currently running TCB in ESP0 */
+tss_t ia32KStss VISIBLE;
 
-/* The top level ASID table */
-asid_pool_t *x86KSASIDTable[BIT(asidHighBits)];
+/* Global Descriptor Table (GDT) */
+gdt_entry_t ia32KSgdt[GDT_ENTRIES];
 
-/* Current user value of the fs/gs base */
-UP_STATE_DEFINE(word_t, x86KSCurrentFSBase);
-UP_STATE_DEFINE(word_t, x86KSCurrentGSBase);
-
-UP_STATE_DEFINE(word_t, x86KSGPExceptReturnTo);
+/*
+ * Current thread whose state is installed in the FPU, or NULL if
+ * the FPU is currently invalid.
+ */
+tcb_t *ia32KSfpuOwner VISIBLE;
 
 /* ==== read-only kernel state (only written during bootstrapping) ==== */
 
-/* Defines a translation of cpu ids from an index of our actual CPUs */
-SMP_STATE_DEFINE(cpu_id_mapping_t, cpu_mapping);
+/* The privileged kernel mapping PD & PT */
+pdpte_t* ia32KSkernelPDPT;
+pde_t* ia32KSkernelPD;
+pte_t* ia32KSkernelPT;
 
 /* CPU Cache Line Size */
-uint32_t x86KScacheLineSizeBits;
+uint32_t ia32KScacheLineSizeBits;
+
+/* Interrupt Descriptor Table (IDT) */
+idt_entry_t ia32KSidt[IDT_ENTRIES];
 
 /* A valid initial FPU state, copied to every new thread. */
-user_fpu_state_t x86KSnullFpuState ALIGN(MIN_FPU_ALIGNMENT);
+user_fpu_state_t ia32KSnullFpuState ALIGN(MIN_FPU_ALIGNMENT);
 
-/* Number of IOMMUs (DMA Remapping Hardware Units) */
-uint32_t x86KSnumDrhu;
+/* Current active page directory. This is really just a shadow of CR3 */
+paddr_t ia32KSCurrentPD VISIBLE;
 
 #ifdef CONFIG_IOMMU
+/* Number of IOMMUs (DMA Remapping Hardware Units) */
+uint32_t ia32KSnumDrhu;
+
 /* Intel VT-d Root Entry Table */
-vtd_rte_t *x86KSvtdRootTable;
-uint32_t x86KSnumIOPTLevels;
-uint32_t x86KSnumIODomainIDBits;
-uint32_t x86KSFirstValidIODomain;
+vtd_rte_t* ia32KSvtdRootTable;
+uint32_t ia32KSnumIOPTLevels;
+uint32_t ia32KSnumIODomainIDBits;
+int ia32KSFirstValidIODomain;
 #endif
 
-#ifdef CONFIG_VTX
-UP_STATE_DEFINE(vcpu_t *, x86KSCurrentVCPU);
+#if defined DEBUG || defined RELEASE_PRINTF
+uint16_t ia32KSconsolePort;
+uint16_t ia32KSdebugPort;
 #endif
 
-#ifdef CONFIG_PRINTING
-uint16_t x86KSconsolePort;
-#endif
-#ifdef CONFIG_DEBUG_BUILD
-uint16_t x86KSdebugPort;
-#endif
-
-/* State data tracking what IRQ source is related to each
- * CPU vector */
-x86_irq_state_t x86KSIRQState[maxIRQ + 1];
-
-word_t x86KSAllocatedIOPorts[NUM_IO_PORTS / CONFIG_WORD_SIZE];
-#ifdef CONFIG_KERNEL_MCS
-uint32_t x86KStscMhz;
-uint32_t x86KSapicRatio;
-#endif
+node_id_t ia32KSNodeID;
+uint32_t ia32KSNumNodes;
+cpu_id_t* ia32KSCPUList;

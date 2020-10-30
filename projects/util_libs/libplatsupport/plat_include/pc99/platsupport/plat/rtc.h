@@ -1,15 +1,14 @@
 /*
- * Copyright 2017, Data61
- * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
- * ABN 41 687 119 230.
+ * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
  * the BSD 2-Clause license. Note that NO WARRANTY is provided.
  * See "LICENSE_BSD2.txt" for details.
  *
- * @TAG(DATA61_BSD)
+ * @TAG(NICTA_BSD)
  */
-#pragma once
+#ifndef _PLATSUPPORT_RTC_H
+#define _PLATSUPPORT_RTC_H
 
 #include <platsupport/io.h>
 #include <platsupport/plat/acpi/acpi.h>
@@ -57,4 +56,6 @@ static inline int rtc_get_time_date(ps_io_port_ops_t *io_port_ops, acpi_t *acpi,
 {
     return rtc_get_time_date_reg(io_port_ops, rtc_get_century_register(acpi), time_date);
 }
+
+#endif /* _PLATSUPPORT_RTC_H */
 

@@ -1,16 +1,15 @@
 /*
- * Copyright 2017, Data61
- * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
- * ABN 41 687 119 230.
+ * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
  * the BSD 2-Clause license. Note that NO WARRANTY is provided.
  * See "LICENSE_BSD2.txt" for details.
  *
- * @TAG(DATA61_BSD)
+ * @TAG(NICTA_BSD)
  */
 
-#pragma once
+#ifndef __PLATSUPPORT_CHARDEV_H__
+#define __PLATSUPPORT_CHARDEV_H__
 
 #include <platsupport/io.h>
 
@@ -18,6 +17,7 @@ struct ps_clk;
 typedef struct ps_chardevice ps_chardevice_t;
 
 #include <platsupport/plat/serial.h>
+
 
 enum chardev_status {
 /// Transfer completed successfully
@@ -40,7 +40,7 @@ struct chardev_xmit_descriptor {
     /// The number of bytes transfered thus far
     size_t bytes_transfered;
     /// The total number of bytes to transfer
-    volatile size_t bytes_requested;
+    size_t bytes_requested;
     /// The source or destination for the data
     void* data;
 };
@@ -79,17 +79,6 @@ ps_chardevice_t* ps_cdev_init(enum chardev_id id,
                               ps_chardevice_t* dev);
 
 /*
- * Statically initialise a device
- * @param ops: a structure containing OS specific operations for memory access
- * @param dev: a character device structure to populate
- * @param params: a pointer generally used to pass machine or platform
- *  specific parameters
- */
-ps_chardevice_t* ps_cdev_static_init(const ps_io_ops_t *ops,
-                                     ps_chardevice_t* dev,
-                                     void *params);
-
-/*
  * Create a pseudo device: initialise with nop function pointers
  * @param o: a structure containing OS specific operations for memory access
  * @param d: a character device structure to populate
@@ -97,6 +86,7 @@ ps_chardevice_t* ps_cdev_static_init(const ps_io_ops_t *ops,
  */
 ps_chardevice_t* ps_cdev_new(const ps_io_ops_t* o,
                              ps_chardevice_t* d);
+
 
 /**
  * Send a character to the device. New lines will be automatically be chased
@@ -211,3 +201,4 @@ static inline void ps_cdev_set_flags(ps_chardevice_t* d, int flags)
     d->flags = flags;
 }
 
+#endif /* __PLATSUPPORT_CHARDEV_H__ */

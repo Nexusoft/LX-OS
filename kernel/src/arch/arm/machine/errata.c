@@ -1,14 +1,17 @@
 /*
  * Copyright 2014, General Dynamics C4 Systems
  *
- * SPDX-License-Identifier: GPL-2.0-only
+ * This software may be distributed and modified according to the terms of
+ * the GNU General Public License version 2. Note that NO WARRANTY is provided.
+ * See "LICENSE_GPLv2.txt" for details.
+ *
+ * @TAG(GD_GPL)
  */
 
 #include <config.h>
 #include <api/types.h>
 #include <arch/machine.h>
 #include <arch/machine/hardware.h>
-#include <util.h>
 
 /* Prototyped here as this is referenced from assembly */
 void arm_errata(void);
@@ -24,7 +27,8 @@ void arm_errata(void);
  * interrupts to *not* be enabled, but hit-under-miss to be disabled. We
  * only need to do this for a particular revision of the ARM1136.
  */
-BOOT_CODE static void errata_arm1136(void)
+BOOT_CODE static void
+errata_arm1136(void)
 {
     /* See if we are affected by the errata. */
     if ((getProcessorID() & ~0xf) == ARM1136_R0PX) {
@@ -63,12 +67,13 @@ BOOT_CODE static void errata_armA15_773022(void)
 }
 #endif
 
-BOOT_CODE void VISIBLE arm_errata(void)
+BOOT_CODE void  __attribute__((externally_visible)) arm_errata(void)
 {
 #ifdef ARM1136_WORKAROUND
     errata_arm1136();
 #endif
 #ifdef CONFIG_ARM_ERRATA_773022
+    (void)errata_armA15_773022;
     errata_armA15_773022();
 #endif
 }

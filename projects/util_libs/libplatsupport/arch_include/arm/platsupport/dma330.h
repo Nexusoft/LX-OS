@@ -1,16 +1,16 @@
 /*
- * Copyright 2017, Data61
- * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
- * ABN 41 687 119 230.
+ * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
  * the BSD 2-Clause license. Note that NO WARRANTY is provided.
  * See "LICENSE_BSD2.txt" for details.
  *
- * @TAG(DATA61_BSD)
+ * @TAG(NICTA_BSD)
  */
 
-#pragma once
+#ifndef _PLATSUPPORT_ARCH_DMA330_H
+#define _PLATSUPPORT_ARCH_DMA330_H
+
 
 #include <platsupport/io.h>
 #include <stdint.h>
@@ -19,8 +19,11 @@
 
 /* ARM PL-330 (DMA-330) DMA controller */
 
+
+
 struct dma330_dev;
 typedef struct dma330_dev* dma330_t;
+
 
 /**
  * Callback for signal handling
@@ -53,6 +56,7 @@ int dma330_init(enum dma330_id id, struct ps_io_ops* ops, dma330_t* dma330);
 int dma330_init_base(enum dma330_id id, void* dma330_base, clock_sys_t* clk_sys,
                      dma330_t* dma330);
 
+
 /**
  * Initiates a DMA transfer
  * @param[in] dma330  a handle to the dma device
@@ -84,6 +88,7 @@ int dma330_handle_irq(dma330_t* dma330);
  */
 int dma330_compile(char* source_code, void* bin);
 
+
 /**
  * Loads a preset micro code for a copy program
  * The copy program sends signal #0 + channel when complete
@@ -102,4 +107,7 @@ void dma330_copy_compile(int channel, void* bin);
  * @param[inout] vbin  The virtual address of a compiled copy program binary
  */
 int dma330_copy_configure(uintptr_t psrc, uintptr_t pdst, size_t len, void* vbin);
+
+
+#endif /* _PLATSUPPORT_ARCH_DMA330_H */
 

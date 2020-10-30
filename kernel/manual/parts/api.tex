@@ -1,106 +1,106 @@
 %
 % Copyright 2014, General Dynamics C4 Systems
 %
-% SPDX-License-Identifier: GPL-2.0-only
+% This software may be distributed and modified according to the terms of
+% the GNU General Public License version 2. Note that NO WARRANTY is provided.
+% See "LICENSE_GPLv2.txt" for details.
+%
+% @TAG(GD_GPL)
 %
 
 %macros for API documentation
 \newcommand{\param}[3]{\texttt{#1}&\texttt{#2}&#3\\ }
 
 \newcommand{\inputapidoc}[1] {\input{parts/api/#1.tex}}
-\newcommand{\inputgeneratedapidoc}[1] {\input{generated/#1.tex}}
 
-\newcommand{\apidoc}[8][subsection]
+\newcommand{\apidoc}[7]
 {
-    \ifthenelse{\equal{#1}{subsection}}{
-        \subsection{\label{api:#2}#3}
-    }{}
-    \ifthenelse{\equal{#1}{subsubsection}}{
-        \subsubsection{\label{api:#2}#3}
-    }{}
+    \subsection{\label{api:#1}#2}
 
-    \texttt{#5}
+    \texttt{#4}
     \vspace*{6pt}
 
-    #4
+    #3
 
     \begin{center}
     \begin{minipage}{0.95\textwidth}
     \begin{tabularx}{\textwidth}{llX}
     \toprule
-    \textbf{Type} & \textbf{Name} & \textbf{Description} \\
+    \textbf{Type} & \textbf{Name} & \textbf{Description} \\ 
     \midrule
-    #6
+    #5
     \bottomrule
     \end{tabularx}
     \end{minipage}
     \end{center}
 
-    \textit{Return value:} #7 \par
+    \textit{Return value:} #6 \par
 
-    \textit{Description:} #8 \par
+    \textit{Description:} #7 \par
 
     \vfill
 }
 
 %Common parameter descriptions
+\newcommand{\destcspacedesc}{CPTR to the CNode that forms the root of the destination CSpace. Must be at a depth of 32.}
+\newcommand{\destindexdesc}{CPTR to the destination slot. Resolved from the root of the destination CSpace.}
+\newcommand{\destdepthdesc}{Number of bits of dest\_index to resolve to find the destination slot.}
+\newcommand{\srccspacedesc}{CPTR to the CNode that forms the root of the source CSpace. Must be at a depth of 32.}
+\newcommand{\srcindexdesc}{CPTR to the source slot. Resolved from the root of the source CSpace.}
+\newcommand{\srcdepthdesc}{Number of bits of src\_index to resolve to find the source slot.}
+\newcommand{\rightsdesc}{The rights inherited by the new capability. Possible values for this type are given in \autoref{sec:cap_rights}.}
+\newcommand{\badgedesc}{Badge to be applied to the new capability.}
 
-\newcommand{\debugargbpnumshortdesc}{
-The API-ID of a target breakpoint. This ID will be a positive integer, with
-values ranging from \texttt{0} to \texttt{seL4\_NumHWBreakpoints - 1}.
-}
+\newcommand{\cspacedesc}{CPTR to the CNode at the root of the CSpace where the capability will be found. Must be at a depth of 32.}
+\newcommand{\indexdesc}{CPTR to the capability. Resolved from the root of the \_service parameter.}
+\newcommand{\depthdesc}{Number of bits of index to resolve to find the capability being operated on.}
 
-\newcommand{\debugargvaddrshortdesc}{A virtual address which forms part of the
-match conditions for the triggering of the breakpoint.
-}
+\newcommand{\ioportcapdesc}{An IO port capability.}
+\newcommand{\ioportdescread}{The port to read from.}
+\newcommand{\ioportdescwrite}{The port to write to.}
+\newcommand{\ioportdatadesc}{Data to write to the IO port.}
 
-\newcommand{\debugargtypeshortdesc}{One of: \texttt{seL4\_InstructionBreakpoint}, which specifies
-that the breakpoint should occur on instruction execution at the specified
-\texttt{vaddr} or \texttt{seL4\_DataBreakpoint}, which states that the breakpoint
-should occur on data access at the specified \texttt{vaddr}.
-}
-
-\newcommand{\debugargsizeshortdesc}{A positive integer indicating the
-trigger-span of the watchpoint. Must be zero when 'type' is \texttt{seL4\_InstructionBreakpoint}.
-}
-
-\newcommand{\debugargrwshortdesc}{One of \texttt{seL4\_BreakOnRead}, meaning the breakpoint will only be
-triggered on read-access; \texttt{seL4\_BreakOnWrite} meaning the
-breakpoint will only be triggered on write-access, and
-\texttt{seL4\_BreakOnReadWrite} meaning the breakpoint will be triggered on
-any access.
-}
+\newcommand{\pagecapdesc}{Capability to the page to map.}
+\newcommand{\pdcapdesc}{Capability to the VSpace which will contain the mapping.}
+\newcommand{\vaddrdesc}{Virtual address to map the page into.}
+\newcommand{\vmcaprightsdesc}{Rights for the mapping. Possible values for this type are given in \autoref{sec:cap_rights}.}
+\newcommand{\vmattribsdescarm}{VM Attributes for the mapping. Possible values for this type are given in \autoref{ch:vspace}.}
 
 \ifxeightsix
 \newcommand{\vmattribsdescintel}{VM Attributes for the
   mapping. Possible values for this type are given in \autoref{ch:vspace}. }
 \fi
 
+\newcommand{\tcbcapdesc}{Capability to the TCB which is being operated on.}
+
+\newcommand{\irqhandlercapdesc}{The IRQ handler capability.}
+
+\newcommand{\invokedcapdesc}{The capability to be invoked.}
+\newcommand{\messageinfodesc}{The messageinfo structure for the IPC.}
+\newcommand{\senderdesc}{The badge of the endpoint capability that was invoked by the sender is written to this address. This parameter is ignored if \texttt{NULL}.}
+\newcommand{\resumetargetdesc}{The invocation should also resume the destination thread.}
+\newcommand{\suspendsourcedesc}{The invocation should also suspend the source thread.}
+\newcommand{\archflagsdesc}{Architecture dependent flags. These have no meaning on \ifxeightsix{either IA-32 or}\fi{} ARM.}
+
+\newcommand{\threadpriodesc}{The thread's new priority.}
+\newcommand{\threadcspacerootdesc}{The new CSpace root.}
+\newcommand{\threadcspacedatadesc}{Optionally set the guard and guard size of the new root CNode. If set to zero, this parameter has no effect.}
+\newcommand{\threadvspacerootdesc}{The new VSpace root.}
+\newcommand{\threadvspacedatadesc}{Has no effect on \ifxeightsix{IA-32 or}\fi{} ARM processors.}
+\newcommand{\threadbufferdesc}{Location of the thread's IPC buffer. Must be 512-byte aligned. The IPC buffer may not cross a page boundary.}
+\newcommand{\threadbufferpagedesc}{Capability to a page containing the thread's IPC buffer.}
+\newcommand{\excepthanddesc}{CPTR to the endpoint which receives IPCs when this thread faults. This capability is in the CSpace of the thread being configured.}
+
+\newcommand{\asidassignpooldesc}{The ASID pool which is being assigned to. Must not be full. Each ASID pool can contain 1024 entries.}
+\newcommand{\asidassignpddesc}{The page directory that is being assigned to an ASID pool. Must not already be assigned to an ASID pool.}
+
+%Return value descriptions
+\newcommand{\messageinforetdesc}{A \texttt{seL4\_MessageInfo\_t} structure as described in \autoref{sec:messageinfo}.}
 \newcommand{\noret}{This method does not return anything.}
 \newcommand{\errorenumdesc}{A return value of \texttt{0} indicates success. A non-zero value indicates that an error occurred. See \autoref{sec:errors} for a description of the message register and tag contents upon error.}
-\newcommand{\tcbgetbreakpointtdesc}{Struct that contains
-'\texttt{seL4\_Error error}', an seL4 API error value,
-'\texttt{seL4\_Word vaddr}', the virtual address at which the breakpoint will currently
-be triggered;
-'\texttt{seL4\_Word type}', the type of operation which will currently trigger the
-breakpoint, whether instruction execution, or data access;
-'\texttt{seL4\_Word size}', integer value for the span-size of the breakpoint.
-Usually a multiple of two (1, 2, 4, etc.);
-'\texttt{seL4\_Word rw}', the access direction that will currently trigger the breakpoint,
-whether read, write, or both and
-'\texttt{seL4\_Bool is\_enabled}', which indicates whether or not the breakpoint
-will currently be triggered if the match conditions are met.
-}
-\newcommand{\tcbconfiguresinglesteppingtdesc}{Struct that contains
-'\texttt{seL4\_Error error}', an seL4 API error value,
-'\texttt{seL4\_Bool bp\_was\_consumed}', a boolean which indicates whether or not the \texttt{bp\_num}
-breakpoint ID that was passed to the function, was consumed in the setup of the single-stepping
-functionality: if this is \texttt{true}, the caller should not attempt to re-use \texttt{bp\_num}
-until it has disabled the single-stepping functionality via a subsequent call to
-seL4\_TCB\_ConfigureSingleStepping with an \texttt{nun\_instructions} argument of 0.
-}
 
-\newcommand{\todo}{TODO}
+\newcommand{\domcapdesc}{Capability allowing domain configuration.}
+\newcommand{\domargdesc}{The thread's new domain.}
 
 \section{Error Codes}
 \label{sec:errors}
@@ -195,19 +195,6 @@ A capability could not be looked up.
 \end{tabularx}
 \vfill
 
-\subsection{Truncated Message}
-
-Too few message words or capabilities were sent in the message.
-
-\begin{tabularx}{\textwidth}{p{0.25\textwidth}X}
-\toprule
-    Field & Meaning \\
-\midrule
-    \ipcbloc{Label} & \enummem{seL4\_TruncatedMessage} \\
-\bottomrule
-\end{tabularx}
-\vfill
-
 \subsection{Delete First}
 
 A destination slot specified in the syscall arguments is occupied.
@@ -252,64 +239,79 @@ complete the \apifunc{seL4\_Untyped\_Retype}{untyped_retype} request.
 \vfill
 
 \section{System Calls}
-
-\subsection{General System Calls}
-This section provides the system call API for non-MCS kernel configurations.
-\inputgeneratedapidoc{GeneralSystemCalls}
-\clearpage
-\subsection{General System Calls (MCS) }
-This section provides the system call API for MCS kernel configurations.
-\inputgeneratedapidoc{MCSSystemCalls}
-\clearpage
-
-\subsection{Debugging System Calls}
-\inputgeneratedapidoc{DebuggingSystemCalls}
-\clearpage
-
-\subsection{Benchmarking System Calls}
-\inputgeneratedapidoc{BenchmarkingSystemCalls}
-\clearpage
-
-\subsection{X86 System Calls}
-\inputgeneratedapidoc{X86SystemCalls}
+\inputapidoc{sel4_send}
+\inputapidoc{sel4_wait}
+\inputapidoc{sel4_call}
+\inputapidoc{sel4_reply}
+\inputapidoc{sel4_nbsend}
+\inputapidoc{sel4_replywait}
+\inputapidoc{sel4_poll}
+\inputapidoc{sel4_yield}
+\inputapidoc{sel4_notify}
 \clearpage
 
 \section{Architecture-Independent Object Methods}
 \label{sec:kobj_api}
-\inputgeneratedapidoc{ObjectApi}
+\inputapidoc{cnode_copy}
+\inputapidoc{cnode_delete}
+\inputapidoc{cnode_mint}
+\inputapidoc{cnode_move}
+\inputapidoc{cnode_mutate}
+\inputapidoc{cnode_recycle}
+\inputapidoc{cnode_revoke}
+\inputapidoc{cnode_rotate}
+\inputapidoc{cnode_savecaller}
+\inputapidoc{debug_halt}
+\inputapidoc{debug_putchar}
+\inputapidoc{domainset_set}
+\inputapidoc{irq_controlget}
+\inputapidoc{irq_handleracknowledge}
+\inputapidoc{irq_handlerclear}
+\inputapidoc{irq_handlersetendpoint}
+\inputapidoc{tcb_bindaep}
+\inputapidoc{tcb_unbindaep}
+\inputapidoc{tcb_configure}
+\inputapidoc{tcb_copyregisters}
+\inputapidoc{tcb_readregisters}
+\inputapidoc{tcb_resume}
+\inputapidoc{tcb_setipcbuffer}
+\inputapidoc{tcb_setpriority}
+\inputapidoc{tcb_setspace}
+\inputapidoc{tcb_suspend}
+\inputapidoc{tcb_writeregisters}
+\inputapidoc{untyped_retype}
 
 \ifxeightsix
-
 \clearpage
 
-\section{x86-Specific Object Methods}
-\inputgeneratedapidoc{ObjectApiX86}
-\clearpage
-
-\section{IA32-Specific Object Methods}
-\inputgeneratedapidoc{ObjectApiIa32}
-\clearpage
-
-\section{x86\_64-Specific Object Methods}
-\inputgeneratedapidoc{ObjectApiX64}
-
+\section{IA-32-Specific Object Methods}
+\label{sec:kobj_api_intel}
+\inputapidoc{ia32_ASID_controlmakepool}
+\inputapidoc{ia32_ASID_poolassign}
+\inputapidoc{ia32_IO_portin8}
+\inputapidoc{ia32_IO_portin16}
+\inputapidoc{ia32_IO_portin32}
+\inputapidoc{ia32_IO_portout8}
+\inputapidoc{ia32_IO_portout16}
+\inputapidoc{ia32_IO_portout32}
+\inputapidoc{ia32_io_pagetable_map}
+\inputapidoc{ia32_page_mapio}
+\inputapidoc{ia32_page_map}
+\inputapidoc{ia32_page_unmap}
+\inputapidoc{ia32_page_getaddress}
+\inputapidoc{ia32_pagetable_map}
+\inputapidoc{ia32_pagetable_unmap}
 \fi
 
 \clearpage
 
 \section{ARM-Specific Object Methods}
-
-\inputgeneratedapidoc{ObjectApiArm}
-\clearpage
-
-\section{Aarch32-Specific Object Methods}
-\inputgeneratedapidoc{ObjectApiAarch32}
-\clearpage
-
-\section{Aarch64-Specific Object Methods}
-\inputgeneratedapidoc{ObjectApiAarch64}
-\clearpage
-
-\section{RISCV-Specific Object Methods}
-\subsection{General RISCV Object Methods}
-\inputgeneratedapidoc{ObjectApiRISCV}
+\label{sec:kobj_api_arm}
+\inputapidoc{arm_asidcontrol_makepool}
+\inputapidoc{arm_asidpool_assign}
+\inputapidoc{arm_page_flushcaches}
+\inputapidoc{arm_page_map}
+\inputapidoc{arm_page_unmap}
+\inputapidoc{arm_page_getaddress}
+\inputapidoc{arm_pagetable_map}
+\inputapidoc{arm_pagetable_unmap}

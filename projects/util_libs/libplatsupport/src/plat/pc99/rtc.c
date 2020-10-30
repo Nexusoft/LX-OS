@@ -1,13 +1,11 @@
 /*
- * Copyright 2017, Data61
- * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
- * ABN 41 687 119 230.
+ * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
  * the BSD 2-Clause license. Note that NO WARRANTY is provided.
  * See "LICENSE_BSD2.txt" for details.
  *
- * @TAG(DATA61_BSD)
+ * @TAG(NICTA_BSD)
  */
 
 /* Some code from here was taken from http://wiki.osdev.org/CMOS
@@ -141,9 +139,10 @@ unsigned int rtc_get_century_register(acpi_t *acpi)
 {
     acpi_header_t *header = acpi_find_region(acpi, ACPI_FADT);
     if (!header) {
-        ZF_LOGE("ACPI has no FADT header. Your BIOS is broken");
+        LOG_ERROR("ACPI has no FADT header. Your BIOS is broken");
         return 0;
     }
     acpi_fadt_t *fadt = (acpi_fadt_t*)header;
     return fadt->century;
 }
+

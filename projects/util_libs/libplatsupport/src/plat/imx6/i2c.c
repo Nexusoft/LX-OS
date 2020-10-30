@@ -1,24 +1,27 @@
 /*
- * Copyright 2017, Data61
- * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
- * ABN 41 687 119 230.
+ * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
  * the BSD 2-Clause license. Note that NO WARRANTY is provided.
  * See "LICENSE_BSD2.txt" for details.
  *
- * @TAG(DATA61_BSD)
+ * @TAG(NICTA_BSD)
  */
 
 #include <platsupport/i2c.h>
 #include <platsupport/mux.h>
-#include <platsupport/plat/mux.h>
 #include <platsupport/clock.h>
-#include <utils/util.h>
 #include "../../services.h"
 #include "../../arch/arm/clock.h"
 
 #include <string.h>
+
+//#define I2C_DEBUG
+#ifdef I2C_DEBUG
+#define dprintf(...) printf("I2C: " __VA_ARGS__)
+#else
+#define dprintf(...) do{}while(0)
+#endif
 
 #define IMX6_I2C_DEFAULT_FREQ (400 * KHZ)
 
@@ -77,10 +80,12 @@ struct i2c_bus_priv {
     i2c_callback_fn cb;
     void* token;
 
-    mux_feature_t mux;
+    enum mux_feature mux;
     enum clock_gate clk_gate;
     struct clock clock;
 };
+
+
 
 /********************
  *** I2C clocking ***
@@ -143,6 +148,7 @@ _i2c_clk_init(clk_t* clk)
     return clk;
 }
 
+
 static freq_t
 _i2c_clk_get_freq(clk_t* clk)
 {
@@ -168,6 +174,7 @@ _i2c_clk_recal(clk_t* clk)
 {
     assert(!"IMPLEMENT ME");
 }
+
 
 /***********************
  **** Device config ****
@@ -245,6 +252,7 @@ master_stop(struct i2c_bus_priv* dev)
                             I2CCON_ENABLE | I2CCON_IRQ_ENABLE);
 }
 
+
 static void
 master_start(struct i2c_bus_priv* dev, char addr)
 {
@@ -260,7 +268,7 @@ master_start(struct i2c_bus_priv* dev, char addr)
 }
 
 static void
-internal_slave_init(struct i2c_bus_priv* dev, char addr)
+slave_init(struct i2c_bus_priv* dev, char addr)
 {
     dev->regs->address = addr;
     /* Enable the bus */
@@ -269,6 +277,7 @@ internal_slave_init(struct i2c_bus_priv* dev, char addr)
     /* Enter slave mode TX mode */
     dev->regs->control &= ~I2CCON_MASTER;
 }
+
 
 static void
 imx6_i2c_handle_irq(i2c_bus_t* i2c_bus)
@@ -284,7 +293,7 @@ imx6_i2c_handle_irq(i2c_bus_t* i2c_bus)
                 /** Master TX **/
                 if (!acked(dev)) {
                     /* RXAK != 0 */
-                    ZF_LOGD("NACK from slave");
+                    dprintf("NACK from slave\n");
                     master_stop(dev);
                 } else if (dev->mode_tx && dev->tx_count == dev->tx_len) {
                     /* Last byte transmitted successfully */
@@ -317,7 +326,7 @@ imx6_i2c_handle_irq(i2c_bus_t* i2c_bus)
                         master_stop(dev);
                     }
                 } else {
-                    ZF_LOGD("Master RX IRQ but RX complete!");
+                    printf("Master RX IRQ but RX complete!\n");
                 }
             }
         } else {
@@ -339,39 +348,35 @@ master_rxstart(struct i2c_bus_priv* dev, int slave)
 }
 
 static int
-imx6_i2c_read(i2c_bus_t* i2c_bus, void* data, size_t len, UNUSED bool send_stop, i2c_callback_fn cb, void* token)
+imx6_i2c_read(i2c_bus_t* i2c_bus, void* data, size_t len, i2c_callback_fn cb, void* token)
 {
-    ZF_LOGF("Not implemented");
+    assert(!"Not implemented\n");
     return -1;
 }
 
 static int
-imx6_i2c_write(i2c_bus_t* i2c_bus, const void* data, size_t len, UNUSED bool send_stop, i2c_callback_fn cb, void* token)
+imx6_i2c_write(i2c_bus_t* i2c_bus, const void* data, size_t len, i2c_callback_fn cb, void* token)
 {
-    ZF_LOGF("Not implemented");
+    assert(!"Not implemented\n");
     return -1;
 }
 
 static int
 imx6_i2c_master_stop(i2c_bus_t* i2c_bus)
 {
-    ZF_LOGF("Not implemented");
+    assert(!"Not implemented\n");
     return -1;
 }
 
+
+
 static int
-imx6_i2c_start_write(i2c_slave_t* sl,
-                     const void* vdata, size_t len,
-                     UNUSED bool end_with_repeat_start,
-                     i2c_callback_fn cb, void* token)
+imx6_i2c_start_write(i2c_bus_t* i2c_bus, int slave, const void* vdata, size_t len, i2c_callback_fn cb, void* token)
 {
     struct i2c_bus_priv* dev;
-
-    assert(sl != NULL && sl->bus != NULL);
-
-    dev = i2c_bus_get_priv(sl->bus);
-    ZF_LOGD("Writing %d bytes to slave@0x%02x", len, sl->address);
-    master_txstart(dev, sl->address);
+    dev = i2c_bus_get_priv(i2c_bus);
+    dprintf("Writing %d bytes to slave@0x%02x\n", len, slave);
+    master_txstart(dev, slave);
 
     dev->tx_count = 0;
     dev->tx_buf = (const char*)vdata;
@@ -382,7 +387,7 @@ imx6_i2c_start_write(i2c_slave_t* sl,
 
     if (cb == NULL) {
         while (busy(dev)) {
-            i2c_handle_irq(sl->bus);
+            i2c_handle_irq(i2c_bus);
         }
         return dev->tx_count;
     } else {
@@ -390,22 +395,18 @@ imx6_i2c_start_write(i2c_slave_t* sl,
     }
 }
 
+
+
 static int
-imx6_i2c_start_read(i2c_slave_t* sl,
-                    void* vdata, size_t len,
-                    UNUSED bool end_with_repeat_start,
-                    i2c_callback_fn cb, void* token)
+imx6_i2c_start_read(i2c_bus_t* i2c_bus, int slave, void* vdata, size_t len, i2c_callback_fn cb, void* token)
 {
     struct i2c_bus_priv* dev;
-
-    assert(sl != NULL && sl->bus != NULL);
-
-    dev = i2c_bus_get_priv(sl->bus);
-    ZF_LOGD("Reading %d bytes from slave@0x%02x", len, sl->address);
-    if (sl->address == dev->regs->address) {
+    dev = i2c_bus_get_priv(i2c_bus);
+    dprintf("Reading %d bytes from slave@0x%02x\n", len, slave);
+    if (slave == dev->regs->address) {
         return -1;
     }
-    master_rxstart(dev, sl->address);
+    master_rxstart(dev, slave);
 
     dev->rx_count = -1;
     dev->rx_buf = (char*)vdata;
@@ -416,7 +417,7 @@ imx6_i2c_start_read(i2c_slave_t* sl,
 
     if (cb == NULL) {
         while (busy(dev)) {
-            i2c_handle_irq(sl->bus);
+            i2c_handle_irq(i2c_bus);
         }
         return dev->rx_count;
     } else {
@@ -424,70 +425,26 @@ imx6_i2c_start_read(i2c_slave_t* sl,
     }
 }
 
+
+
 static int
-imx6_i2c_set_address(i2c_bus_t* i2c_bus, int addr)
+imx6_i2c_set_address(i2c_bus_t* i2c_bus, int addr, i2c_aas_callback_fn aas_cb, void* aas_token)
 {
     struct i2c_bus_priv* dev;
     dev = i2c_bus_get_priv(i2c_bus);
+    i2c_bus->aas_cb = aas_cb;
+    i2c_bus->aas_token = aas_token;
 
-    internal_slave_init(dev, addr);
+    slave_init(dev, addr);
     return 0;
 }
-
-void
-imx6_i2c_register_slave_event_handler(i2c_bus_t *bus,
-                                      i2c_aas_callback_fn cb, void *token)
-{
-    assert(bus != NULL);
-    bus->aas_cb = cb;
-    bus->aas_token = token;
-}
-
-static const uint32_t i2c_speed_freqs[] = {
-    [I2C_SLAVE_SPEED_STANDARD] = 100000,
-    [I2C_SLAVE_SPEED_FAST] = 400000,
-    [I2C_SLAVE_SPEED_FASTPLUS] = 1000000,
-    [I2C_SLAVE_SPEED_HIGHSPEED] = 3400000
-};
 
 static long
-imx6_i2c_set_speed(i2c_bus_t* i2c_bus, enum i2c_slave_speed speed)
+imx6_i2c_set_speed(i2c_bus_t* i2c_bus, long bps)
 {
     struct i2c_bus_priv* dev;
-
-    if (speed < I2C_SLAVE_SPEED_STANDARD || speed > I2C_SLAVE_SPEED_HIGHSPEED) {
-        ZF_LOGE("imx6: I2C: Unsupported speed %d.", speed);
-        return -1;
-    }
-
     dev = i2c_bus_get_priv(i2c_bus);
-    /* "speed" is validated in the library code in arch_include/i2c.h. */
-    return clk_set_freq(&dev->clock, i2c_speed_freqs[speed]);
-}
-
-int
-imx6_i2c_slave_init(i2c_bus_t* i2c_bus, int address,
-                    enum i2c_slave_address_size address_size,
-                    enum i2c_slave_speed max_speed,
-                    uint32_t flags,
-                    i2c_slave_t* sl)
-{
-    assert(sl != NULL);
-
-    if (address_size == I2C_SLAVE_ADDR_7BIT) {
-        address = i2c_extract_address(address);
-    }
-
-    sl->address = address;
-    sl->address_size = address_size;
-    sl->max_speed = max_speed;
-    sl->i2c_opts = flags;
-    sl->bus = i2c_bus;
-
-    sl->slave_read      = &imx6_i2c_start_read;
-    sl->slave_write     = &imx6_i2c_start_write;
-
-    return 0;
+    return clk_set_freq(&dev->clock, bps);
 }
 
 int
@@ -497,7 +454,7 @@ i2c_init(enum i2c_id id, ps_io_ops_t* io_ops, i2c_bus_t* i2c)
     int err;
     clk_t* i2c_clk;
     /* Map memory */
-    ZF_LOGD("Mapping i2c %d\n", id);
+    dprintf("Mapping i2c %d\n", id);
     switch (id) {
     case I2C1:
         MAP_IF_NULL(io_ops, IMX6_I2C1, dev->regs);
@@ -517,7 +474,7 @@ i2c_init(enum i2c_id id, ps_io_ops_t* io_ops, i2c_bus_t* i2c)
     }
 
     /* Configure MUX */
-    err = mux_feature_enable(&io_ops->mux_sys, dev->mux, MUX_DIR_NOT_A_GPIO);
+    err = mux_feature_enable(&io_ops->mux_sys, dev->mux);
     if (err) {
         assert(!"Failed to configure I2C mux");
         return -1;
@@ -535,14 +492,15 @@ i2c_init(enum i2c_id id, ps_io_ops_t* io_ops, i2c_bus_t* i2c)
     dev->regs->address = 0x00;
     dev->regs->control = I2CCON_ACK_EN;
 
+    i2c->start_read  = imx6_i2c_start_read;
+    i2c->start_write = imx6_i2c_start_write;
     i2c->read        = imx6_i2c_read;
     i2c->write       = imx6_i2c_write;
     i2c->set_speed   = imx6_i2c_set_speed;
-    i2c->set_self_slave_address = imx6_i2c_set_address;
-    i2c->register_slave_event_handler = imx6_i2c_register_slave_event_handler;
+    i2c->set_address = imx6_i2c_set_address;
     i2c->master_stop = imx6_i2c_master_stop;
     i2c->handle_irq  = imx6_i2c_handle_irq;
     i2c->priv        = (void*)dev;
-    i2c->slave_init  = imx6_i2c_slave_init;
     return 0;
 }
+

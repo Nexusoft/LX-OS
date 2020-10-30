@@ -1,19 +1,24 @@
 /*
- * Copyright 2017, Data61
- * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
- * ABN 41 687 119 230.
+ * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
  * the BSD 2-Clause license. Note that NO WARRANTY is provided.
  * See "LICENSE_BSD2.txt" for details.
  *
- * @TAG(DATA61_BSD)
+ * @TAG(NICTA_BSD)
  */
+
 
 #include <platsupport/mach/pmic_rtc.h>
 #include <platsupport/delay.h>
 #include "../../services.h"
-#include <utils/util.h>
+
+#define PMICRTC_DEBUG
+#ifdef PMICRTC_DEBUG
+#define dprintf(...) printf("PMIC RTC:" __VA_ARGS__)
+#else
+#define dprintf(...) do{}while(0)
+#endif
 
 #define RTCREG_INTSTAT    0x00
 #define RTCREG_INTMASK    0x01
@@ -56,13 +61,13 @@ id_valid(pmic_rtc_t* dev, int id)
 static int
 pmic_rtc_reg_read(pmic_rtc_t* dev, uint8_t reg, void* data, int count)
 {
-    return i2c_kvslave_read(&dev->kvslave, reg, data, count);
+    return i2c_kvslave_read(&dev->i2c_slave, reg, data, count);
 }
 
 static int
 pmic_rtc_reg_write(pmic_rtc_t* dev, uint8_t reg, const void* data, int count)
 {
-    return i2c_kvslave_write(&dev->kvslave, reg, data, count);
+    return i2c_kvslave_write(&dev->i2c_slave, reg, data, count);
 }
 
 static int
@@ -73,7 +78,7 @@ pmic_rtc_update(pmic_rtc_t* dev, uint8_t flag)
     /* Write to the update register */
     ret = pmic_rtc_reg_write(dev, RTCREG_UPDATE, &flag, 1);
     if (ret != 1) {
-        ZF_LOGD("Bus error");
+        dprintf("Bus error\n");
         return -1;
     }
     /* Wait for completion */
@@ -103,19 +108,10 @@ pmic_rtc_init(i2c_bus_t* i2c, pmic_rtc_t* pmic_rtc)
 {
     uint8_t data[7];
     int ret;
-    ret = i2c_slave_init(i2c, MAX77686RTC_BUSADDR,
-                           I2C_SLAVE_ADDR_7BIT, I2C_SLAVE_SPEED_FAST,
-                           0, &pmic_rtc->i2c_slave);
+    ret = i2c_kvslave_init(i2c, MAX77686RTC_BUSADDR, LITTLE8, LITTLE8,
+                           &pmic_rtc->i2c_slave);
     if (ret) {
-        ZF_LOGD("Failed to register I2C slave");
-        return -1;
-    }
-
-    ret = i2c_kvslave_init(&pmic_rtc->i2c_slave,
-                           LITTLE8, LITTLE8,
-                           &pmic_rtc->kvslave);
-    if (ret) {
-        ZF_LOGD("Failed to initialize I2C KV-slave lib instance.");
+        dprintf("Failed to register I2C slave\n");
         return -1;
     }
 
@@ -127,7 +123,7 @@ pmic_rtc_init(i2c_bus_t* i2c, pmic_rtc_t* pmic_rtc)
     data[RTCREG_WATCHDOG ] = 0x00;
     ret = pmic_rtc_reg_write(pmic_rtc, RTCREG_INTSTAT, data, sizeof(data));
     if (ret != sizeof(data)) {
-        ZF_LOGD("Bus error");
+        dprintf("Bus error\n");
         return -1;
     }
 
@@ -170,6 +166,7 @@ pmic_rtc_get_alarm(pmic_rtc_t* pmic_rtc, int id, struct rtc_time* alarm)
     return pmic_rtc_get_tval(pmic_rtc, RTCREG_ALARM(id), alarm);
 }
 
+
 int
 pmic_rtc_set_alarm(pmic_rtc_t* pmic_rtc, int id, const struct rtc_time* alarm)
 {
@@ -181,3 +178,7 @@ pmic_rtc_set_alarm(pmic_rtc_t* pmic_rtc, int id, const struct rtc_time* alarm)
     }
     return pmic_rtc_update(pmic_rtc, RTCUPDATE_WRITE);
 }
+
+
+
+

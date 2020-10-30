@@ -1,16 +1,15 @@
 /*
- * Copyright 2017, Data61
- * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
- * ABN 41 687 119 230.
+ * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
  * the BSD 2-Clause license. Note that NO WARRANTY is provided.
  * See "LICENSE_BSD2.txt" for details.
  *
- * @TAG(DATA61_BSD)
+ * @TAG(NICTA_BSD)
  */
 
-#pragma once
+#ifndef __PLATSUPPORT_PLAT_MUX_H__
+#define __PLATSUPPORT_PLAT_MUX_H__
 
 #define EXYNOS_GPIOLEFT_PADDR    0x11400000
 #define EXYNOS_GPIORIGHT_PADDR   0x11000000
@@ -63,3 +62,5 @@ int exynos_mux_init(void* bank1,
                     void* bank4,
                     mux_sys_t* mux);
 
+
+#endif /* __PLATSUPPORT_PLAT_MUX_H__ */

@@ -1,92 +1,143 @@
 /*
- * Copyright 2020, Data61, CSIRO (ABN 41 687 119 230)
+ * Copyright 2014, General Dynamics C4 Systems
  *
- * SPDX-License-Identifier: GPL-2.0-only
+ * This software may be distributed and modified according to the terms of
+ * the GNU General Public License version 2. Note that NO WARRANTY is provided.
+ * See "LICENSE_GPLv2.txt" for details.
+ *
+ * @TAG(GD_GPL)
  */
 
 #include <types.h>
+#include <object.h>
 #include <machine/io.h>
+#include <kernel/vspace.h>
 #include <api/faults.h>
 #include <api/syscall.h>
 #include <util.h>
 
-bool_t Arch_handleFaultReply(tcb_t *receiver, tcb_t *sender, word_t faultType)
+bool_t handleFaultReply(tcb_t *receiver, tcb_t *sender)
 {
-    switch (faultType) {
-    case seL4_Fault_VMFault:
+    message_info_t tag;
+    word_t         label;
+    fault_t        fault;
+    unsigned int   length;
+
+    /* These lookups are moved inward from doReplyTransfer */
+    tag = messageInfoFromWord(getRegister(sender, msgInfoRegister));
+    label = message_info_get_msgLabel(tag);
+    length = message_info_get_msgLength(tag);
+    fault = receiver->tcbFault;
+
+    switch (fault_get_faultType(fault)) {
+    case fault_cap_fault:
         return true;
 
+    case fault_vm_fault:
+        return true;
+
+    case fault_unknown_syscall: {
+        unsigned int i;
+        register_t   r;
+        word_t       v;
+        word_t*      sendBuf;
+
+        sendBuf = lookupIPCBuffer(false, sender);
+
+        /* Assumes n_syscallMessage > n_msgRegisters */
+        for (i = 0; i < length && i < n_msgRegisters; i++) {
+            r = syscallMessage[i];
+            v = getRegister(sender, msgRegisters[i]);
+            setRegister(receiver, r, sanitiseRegister(r, v));
+        }
+
+        if (sendBuf) {
+            for (; i < length && i < n_syscallMessage; i++) {
+                r = syscallMessage[i];
+                v = sendBuf[i + 1];
+                setRegister(receiver, r, sanitiseRegister(r, v));
+            }
+        }
+        /* HACK: Copy NextEIP to FaultEIP because FaultEIP will be copied */
+        /* back to NextEIP later on (and we don't wanna lose NextEIP)     */
+        setRegister(receiver, FaultEIP, getRegister(receiver, NextEIP));
+    }
+    return (label == 0);
+
+    case fault_user_exception: {
+        unsigned int i;
+        register_t   r;
+        word_t       v;
+        word_t*      sendBuf;
+
+        sendBuf = lookupIPCBuffer(false, sender);
+
+        /* Assumes n_exceptionMessage > n_msgRegisters */
+        for (i = 0; i < length && i < n_msgRegisters; i++) {
+            r = exceptionMessage[i];
+            v = getRegister(sender, msgRegisters[i]);
+            setRegister(receiver, r, sanitiseRegister(r, v));
+        }
+
+        if (sendBuf) {
+            for (; i < length && i < n_exceptionMessage; i++) {
+                r = exceptionMessage[i];
+                v = sendBuf[i + 1];
+                setRegister(receiver, r, sanitiseRegister(r, v));
+            }
+        }
+    }
+    return (label == 0);
+
     default:
         fail("Invalid fault");
     }
 }
 
-word_t Arch_setMRs_fault(tcb_t *sender, tcb_t *receiver, word_t *receiveIPCBuffer, word_t faultType)
-{
-    switch (faultType) {
-    case seL4_Fault_VMFault: {
-        setMR(receiver, receiveIPCBuffer, seL4_VMFault_IP, getRestartPC(sender));
-        setMR(receiver, receiveIPCBuffer, seL4_VMFault_Addr,
-              seL4_Fault_VMFault_get_address(sender->tcbFault));
-        setMR(receiver, receiveIPCBuffer, seL4_VMFault_PrefetchFault,
-              seL4_Fault_VMFault_get_instructionFault(sender->tcbFault));
-        return setMR(receiver, receiveIPCBuffer, seL4_VMFault_FSR,
-                     seL4_Fault_VMFault_get_FSR(sender->tcbFault));
-    }
-    default:
-        fail("Invalid fault");
-    }
-}
+#ifdef DEBUG
 
-word_t handleKernelException(
-    word_t vector,
-    word_t errcode,
-    word_t ip,
-    word_t sp,
-    word_t flags,
-    word_t cr0,
-    word_t cr2,
-    word_t cr3,
-    word_t cr4
+void handleKernelException(
+    uint32_t vector,
+    uint32_t errcode,
+    uint32_t eip,
+    uint32_t esp,
+    uint32_t eflags,
+    uint32_t cr0,
+    uint32_t cr2,
+    uint32_t cr3,
+    uint32_t cr4
 );
 
 VISIBLE
-word_t handleKernelException(
-    word_t vector,
-    word_t errcode,
-    word_t ip,
-    word_t sp,
-    word_t flags,
-    word_t cr0,
-    word_t cr2,
-    word_t cr3,
-    word_t cr4
+void handleKernelException(
+    uint32_t vector,
+    uint32_t errcode,
+    uint32_t eip,
+    uint32_t esp,
+    uint32_t eflags,
+    uint32_t cr0,
+    uint32_t cr2,
+    uint32_t cr3,
+    uint32_t cr4
 )
 {
-    word_t i;
+    unsigned int i;
 
-    /* Check if we are in a state where we expect a GP fault, if so record it and return */
-    if (vector == int_gp_fault && ARCH_NODE_STATE(x86KSGPExceptReturnTo) != 0) {
-        word_t ret = ARCH_NODE_STATE(x86KSGPExceptReturnTo);
-        ARCH_NODE_STATE(x86KSGPExceptReturnTo) = 0;
-        return ret;
-    }
     printf("\n========== KERNEL EXCEPTION ==========\n");
-    printf("Vector:  0x%lx\n", vector);
-    printf("ErrCode: 0x%lx\n", errcode);
-    printf("IP:      0x%lx\n", ip);
-    printf("SP:      0x%lx\n", sp);
-    printf("FLAGS:   0x%lx\n", flags);
-    printf("CR0:     0x%lx\n", cr0);
-    printf("CR2:     0x%lx (page-fault address)\n", cr2);
-    printf("CR3:     0x%lx (page-directory physical address)\n", cr3);
-    printf("CR4:     0x%lx\n", cr4);
+    printf("Vector:  0x%x\n", vector);
+    printf("ErrCode: 0x%x\n", errcode);
+    printf("EIP:     0x%x\n", eip);
+    printf("ESP:     0x%x\n", esp);
+    printf("EFLAGS:  0x%x\n", eflags);
+    printf("CR0:     0x%x\n", cr0);
+    printf("CR2:     0x%x (page-fault address)\n", cr2);
+    printf("CR3:     0x%x (page-directory physical address)\n", cr3);
+    printf("CR4:     0x%x\n", cr4);
     printf("\nStack Dump:\n");
     for (i = 0; i < 20; i++) {
-        word_t UNUSED stack = sp + i * sizeof(word_t);
-        printf("*0x%lx == 0x%lx\n", stack, *(word_t *)stack);
+        printf("*0x%x == 0x%x\n", esp + i * 4, *(uint32_t*)(esp + i * 4));
     }
     printf("\nHalting...\n");
-    halt();
-    UNREACHABLE();
 }
+
+#endif

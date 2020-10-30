@@ -1,7 +1,11 @@
 /*
  * Copyright 2014, General Dynamics C4 Systems
  *
- * SPDX-License-Identifier: GPL-2.0-only
+ * This software may be distributed and modified according to the terms of
+ * the GNU General Public License version 2. Note that NO WARRANTY is provided.
+ * See "LICENSE_GPLv2.txt" for details.
+ *
+ * @TAG(GD_GPL)
  */
 
 #include <config.h>
@@ -221,26 +225,33 @@ struct l2cc_map {
 #ifndef L2CC_L2C310_PPTR
 #error L2CC_L2C310_PPTR must be defined for virtual memory access to the L2 cache controller
 #else  /* L2CC_PPTR */
-volatile struct l2cc_map *const l2cc
-    = (volatile struct l2cc_map *)L2CC_L2C310_PPTR;
+volatile struct l2cc_map *l2cc = (volatile struct l2cc_map*)L2CC_L2C310_PPTR;
 #endif /* !L2CC_PPTR */
 
 
 #ifdef TI_MSHIELD
-BOOT_CODE static void mshield_smc(uint32_t callid, uint32_t arg1, uint32_t arg2)
+/**
+   DONT_TRANSLATE
+ */
+BOOT_CODE static void
+mshield_smc(uint32_t callid, uint32_t arg1, uint32_t arg2)
 {
-    register uint32_t _arg1 asm("r0") = arg1;
-    register uint32_t _arg2 asm("r1") = arg2;
-    register uint32_t _callid asm("r12") = callid;
-    asm volatile("push {r2-r12, lr}\n"
-                 "dsb\n"
-                 "smc #0\n"
-                 "pop {r2-r12, lr}"
-                 :: "r"(_callid), "r"(_arg1), "r"(_arg2));
+    register uint32_t _arg1 asm ("r0") = arg1;
+    register uint32_t _arg2 asm ("r1") = arg2;
+    register uint32_t _callid asm ("r12") = callid;
+    asm volatile ("push {r2-r12, lr}\n"
+                  "dsb\n"
+                  "smc #0\n"
+                  "pop {r2-r12, lr}"
+                  :: "r"(_callid), "r"(_arg1), "r"(_arg2));
 }
 #endif /* TI_MSHIELD */
 
-BOOT_CODE void initL2Cache(void)
+/**
+   DONT_TRANSLATE
+ */
+BOOT_CODE void
+initL2Cache(void)
 {
 #ifndef CONFIG_DEBUG_DISABLE_L2_CACHE
     uint32_t aux;
@@ -248,13 +259,8 @@ BOOT_CODE void initL2Cache(void)
     uint32_t data_ram;
     uint32_t prefetch;
 
-    /* L2 cache must be disabled during initialisation */
-#ifndef TI_MSHIELD
-    l2cc->control.control &= ~CTRL_CTRL_EN;
-#endif
-
     prefetch = CTRL2_PFET_INST_PREFETCH_EN | CTRL2_PFET_DATA_PREFETCH_EN;
-#if defined(CONFIG_PLAT_IMX6)
+#if defined(IMX6)
     tag_ram  = CTRL_RAM_LATENCY(1, 2, 1);
     data_ram = CTRL_RAM_LATENCY(1, 2, 1);
 #else
@@ -270,7 +276,7 @@ BOOT_CODE void initL2Cache(void)
                | CTRL_AUX_ASSOCIATIVITY_16WAY
                | CTRL_AUS_REPLPOLICY_RROBIN;
 
-#if defined(CONFIG_PLAT_EXYNOS4) || defined(CONFIG_PLAT_IMX6) || defined(CONFIG_PLAT_ZYNQ7000) || defined(CONFIG_PLAT_ALLWINNERA20)
+#if defined(EXYNOS4) || defined(IMX6) || defined(PLAT_ZYNQ7000) || defined(PLAT_ALLWINNERA20)
     aux |= CTRL_AUX_WAYSIZE_64K;
 #elif defined(OMAP4)
     aux |= CTRL_AUX_WAYSIZE_32K;
@@ -282,7 +288,7 @@ BOOT_CODE void initL2Cache(void)
     /* Access secure registers through Security Middleware Call */
     /* 1: Write to aux Tag RAM latentcy, Data RAM latency, prefect, power control registers  */
     mshield_smc(MSHIELD_SMC_ROM_CTRL_CTRL, 0, 0);
-    mshield_smc(MSHIELD_SMC_ROM_CTRL_AUX, aux, 0);
+    mshield_smc(MSHIELD_SMC_ROM_CTRL_AUX , aux, 0);
     mshield_smc(MSHIELD_SMC_ROM_CTRL_LATENCY, tag_ram, data_ram);
 
 #else /* !TI_MSHIELD */
@@ -297,10 +303,10 @@ BOOT_CODE void initL2Cache(void)
 
     /* 2: Invalidate by way. */
     l2cc->maintenance.inv_way = 0xffff;
-    while (l2cc->maintenance.inv_way & 0xffff);
+    while ( l2cc->maintenance.inv_way & MAINTENANCE_PENDING );
 
     /* 3: write to lockdown D & I reg9 if required  */
-    if ((l2cc->id.cache_type & PL310_LOCKDOWN_BY_MASK) == PL310_LOCKDOWN_BY_MASTER) {
+    if ( (l2cc->id.cache_type & PL310_LOCKDOWN_BY_MASK) == PL310_LOCKDOWN_BY_MASTER) {
         /* disable lockdown */
         l2cc->lockdown.d_lockdown0 = 0;
         l2cc->lockdown.i_lockdown0 = 0;
@@ -319,7 +325,7 @@ BOOT_CODE void initL2Cache(void)
         l2cc->lockdown.d_lockdown7 = 0;
         l2cc->lockdown.i_lockdown7 = 0;
     }
-    if ((l2cc->id.cache_type & PL310_LOCKDOWN_BY_MASK) == PL310_LOCKDOWN_BY_LINE) {
+    if ( (l2cc->id.cache_type & PL310_LOCKDOWN_BY_MASK) == PL310_LOCKDOWN_BY_LINE) {
         /* disable lockdown */
         l2cc->lockdown.lock_line_eng = 0;
     }
@@ -338,12 +344,6 @@ BOOT_CODE void initL2Cache(void)
     l2cc->control.control |= CTRL_CTRL_EN;
 #endif /* TI_MSHIELD */
 
-#if defined(CONFIG_ARM_CORTEX_A9) && defined(CONFIG_ENABLE_A9_PREFETCHER)
-    /* Set bit 1 in the ACTLR, which on the cortex-a9 is the l2 prefetch enable
-     * bit. See section 4.3.10 of the Cortex-A9 Technical Reference Manual */
-    setACTLR(getACTLR() | BIT(1));
-#endif
-
 #endif /* !CONFIG_DEBUG_DISABLE_L2_CACHE */
 }
 
@@ -354,24 +354,12 @@ static inline void L2_cacheSync(void)
     while (l2cc->maintenance.cache_sync & MAINTENANCE_PENDING);
 }
 
-void plat_cleanInvalidateL2Cache(void)
-{
-    if (!config_set(CONFIG_DEBUG_DISABLE_L2_CACHE)) {
-        l2cc->maintenance.clean_way = 0xffff;
-        while (l2cc->maintenance.clean_way);
-        L2_cacheSync();
-        l2cc->maintenance.inv_way = 0xffff;
-        while (l2cc->maintenance.inv_way);
-        L2_cacheSync();
-    }
-}
-
 void plat_cleanCache(void)
 {
 #ifndef CONFIG_DEBUG_DISABLE_L2_CACHE
     /* Clean by way. */
     l2cc->maintenance.clean_way = 0xffff;
-    while (l2cc->maintenance.clean_way & 0xffff);
+    while ( l2cc->maintenance.clean_way & MAINTENANCE_PENDING );
     L2_cacheSync();
 #endif /* !CONFIG_DEBUG_DISABLE_L2_CACHE */
 }
@@ -383,8 +371,8 @@ void plat_cleanL2Range(paddr_t start, paddr_t end)
     assert(((l2cc->id.cache_type >> 12) & 0x3) == 0x0);
 
     for (start = L2_LINE_START(start);
-         start != L2_LINE_START(end + L2_LINE_SIZE);
-         start += L2_LINE_SIZE) {
+            start != L2_LINE_START(end + L2_LINE_SIZE);
+            start += L2_LINE_SIZE) {
         l2cc->maintenance.clean_pa = start;
         /* do not need to wait for every invalidate as 310 is atomic */
     }
@@ -402,8 +390,8 @@ void plat_invalidateL2Range(paddr_t start, paddr_t end)
      * has already done the clean, so we just blindly invalidate all the lines */
 
     for (start = L2_LINE_START(start);
-         start != L2_LINE_START(end + L2_LINE_SIZE);
-         start += L2_LINE_SIZE) {
+            start != L2_LINE_START(end + L2_LINE_SIZE);
+            start += L2_LINE_SIZE) {
         l2cc->maintenance.inv_pa = start;
         /* do not need to wait for every invalidate as 310 is atomic */
     }
@@ -418,8 +406,8 @@ void plat_cleanInvalidateL2Range(paddr_t start, paddr_t end)
     assert(((l2cc->id.cache_type >> 12) & 0x3) == 0x0);
 
     for (start = L2_LINE_START(start);
-         start != L2_LINE_START(end + L2_LINE_SIZE);
-         start += L2_LINE_SIZE) {
+            start != L2_LINE_START(end + L2_LINE_SIZE);
+            start += L2_LINE_SIZE) {
         /* Work around an errata and call the clean and invalidate separately */
         l2cc->maintenance.clean_pa = start;
         dmb();

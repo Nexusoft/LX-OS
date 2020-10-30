@@ -1,14 +1,18 @@
 /*
  * Copyright 2014, General Dynamics C4 Systems
  *
- * SPDX-License-Identifier: GPL-2.0-only
+ * This software may be distributed and modified according to the terms of
+ * the GNU General Public License version 2. Note that NO WARRANTY is provided.
+ * See "LICENSE_GPLv2.txt" for details.
+ *
+ * @TAG(GD_GPL)
  */
 
-#pragma once
+#ifndef __FAILURES_H
+#define __FAILURES_H
 
 #include <types.h>
-#include <sel4/errors.h>
-#include <sel4/constants.h>
+#include <api/errors.h>
 /* These datatypes differ markedly from haskell, due to the
  * different implementation of the various fault monads */
 
@@ -20,13 +24,13 @@ enum exception {
     EXCEPTION_SYSCALL_ERROR,
     EXCEPTION_PREEMPTED
 };
-typedef word_t exception_t;
+typedef uint32_t exception_t;
 
-typedef word_t syscall_error_type_t;
+typedef uint32_t syscall_error_type_t;
 
 struct syscall_error {
-    word_t invalidArgumentNumber;
-    word_t  invalidCapNumber;
+    unsigned int invalidArgumentNumber;
+    unsigned int invalidCapNumber;
     word_t rangeErrorMin;
     word_t rangeErrorMax;
     word_t memoryLeft;
@@ -36,15 +40,8 @@ struct syscall_error {
 };
 typedef struct syscall_error syscall_error_t;
 
-#ifdef CONFIG_KERNEL_INVOCATION_REPORT_ERROR_IPC
-struct debug_syscall_error {
-    word_t errorMessage[DEBUG_MESSAGE_MAXLEN];
-};
-typedef struct debug_syscall_error debug_syscall_error_t;
-
-extern debug_syscall_error_t current_debug_error;
-#endif
 extern lookup_fault_t current_lookup_fault;
-extern seL4_Fault_t current_fault;
+extern fault_t current_fault;
 extern syscall_error_t current_syscall_error;
 
+#endif

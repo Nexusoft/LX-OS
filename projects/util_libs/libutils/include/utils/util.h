@@ -1,69 +1,46 @@
 /*
- * Copyright 2017, Data61
- * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
- * ABN 41 687 119 230.
+ * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
  * the BSD 2-Clause license. Note that NO WARRANTY is provided.
  * See "LICENSE_BSD2.txt" for details.
  *
- * @TAG(DATA61_BSD)
+ * @TAG(NICTA_BSD)
  */
 
-#pragma once
+#ifndef __UTILS_H
+#define __UTILS_H
 
 #include <assert.h>
-#include <autoconf.h>
-#include <utils/gen_config.h>
-#include <stdbool.h>
 
-#include <utils/ansi.h>
 #include <utils/arith.h>
 #include <utils/assume.h>
 #include <utils/attribute.h>
-#include <utils/auto.h>
 #include <utils/builtin.h>
 #include <utils/compile_time.h>
-#include <utils/config.h>
 #include <utils/debug.h>
-#include <utils/fence.h>
-#include <utils/force.h>
 #include <utils/formats.h>
-#include <utils/frequency.h>
+#include <utils/kconfig.h>
 #include <utils/list.h>
-#include <utils/math.h>
 #include <utils/page.h>
-#include <utils/print.h>
-#include <utils/sglib.h>
 #include <utils/stringify.h>
 #include <utils/stack.h>
 #include <utils/time.h>
-#include <utils/ud.h>
-#include <utils/xml.h>
+#include <utils/math.h>
 
-#ifndef ZF_LOG_LEVEL
-#ifdef _ZF_LOG_LEVEL
-#warning "Attempted to set ZF_LOG_LEVEL but _ZF_LOG_LEVEL has already been defined." \
-"Check that <utils/zf_log.h> hasn't been imported before this file, or define ZF_LOG_LEVEL explicitly before including <utils/zf_log.h>."
-#endif
-#define ZF_LOG_LEVEL CONFIG_LIB_UTILS_DEFAULT_ZF_LOG_LEVEL
-#endif /* ZF_LOG_LEVEL */
+#define TRUE 1
+#define FALSE 0
 
-#include <utils/zf_log.h>
-#include <utils/zf_log_if.h>
+#define NDEBUG
 
-/* deprecated, use the following instead:
- *
- * ZF_LOGV -- verbose
- * ZF_LOGD -- debug
- * ZF_LOGI -- info
- * ZF_LOGW -- warning
- * ZF_LOGE -- error
- * ZF_LOGF -- fatal
- *
- * setting ZF_LOG_LEVEL to ZF_LOG_VERBOSE will display
- * all ZF_LOG output, settings it to ZF_LOG_FATAL will
- * only display fatal outputs.
- */
-#define LOG_ERROR(args...) ZF_LOGE(args)
-#define LOG_INFO(args...) ZF_LOGI(args)
+#ifdef NDEBUG
+#define LOG_ERROR(format, ...)
+#define LOG_INFO(format, ...)
+#define LOG_SYSCALL(pid, format, ...)
+#else
+#define LOG_ERROR(format, ...) printf("ERROR:%s:%d: "format"\n", __func__, __LINE__, ##__VA_ARGS__)
+#define LOG_INFO(format, ...)  printf("INFO:%s:%d: "format"\n", __func__, __LINE__, ##__VA_ARGS__)
+#define LOG_SYSCALL(pid, format, ...)  printf("SYSCALL: pid %d called "format"\n", pid, ##__VA_ARGS__)
+#endif /* NDEBUG */
+
+#endif /* __UTILS_H */

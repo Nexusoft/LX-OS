@@ -1,7 +1,11 @@
 "
-" Copyright 2020, Data61, CSIRO (ABN 41 687 119 230)
+" Copyright 2014, NICTA
 "
-" SPDX-License-Identifier: BSD-2-Clause
+" This software may be distributed and modified according to the terms of
+" the BSD 2-Clause license. Note that NO WARRANTY is provided.
+" See "LICENSE_BSD2.txt" for details.
+"
+" @TAG(NICTA_BSD)
 "
 
 " Vim syntax for .bf/.pbf files. Where relevant, comments below refer to the

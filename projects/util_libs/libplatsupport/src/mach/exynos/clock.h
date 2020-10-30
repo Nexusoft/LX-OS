@@ -1,32 +1,16 @@
 /*
- * Copyright 2017, Data61
- * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
- * ABN 41 687 119 230.
+ * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
  * the BSD 2-Clause license. Note that NO WARRANTY is provided.
  * See "LICENSE_BSD2.txt" for details.
  *
- * @TAG(DATA61_BSD)
+ * @TAG(NICTA_BSD)
  */
-#pragma once
+#ifndef MACH_CLOCK_H
+#define MACH_CLOCK_H
 
 #include "../../arch/arm/clock.h"
-#if defined(CONFIG_PLAT_EXYNOS5422)
-#include "clock/exynos_5422_clock.h"
-#else
-#include "clock/exynos_common_clock.h"
-#endif
-
-#define DIV_SEP_BITS 4
-#define DIV_VAL_BITS 4
-
-/* CON 0 */
-#define PLL_MPS_MASK    PLL_MPS(0x1ff, 0x3f, 0x7)
-#define PLL_ENABLE      BIT(31)
-#define PLL_LOCKED      BIT(29)
-/* CON 1*/
-#define PLL_K_MASK      MASK(16)
 
 /* CLKID is used to decode the register bank and offset of a particular generic clock */
 #define CLKID(cmu, reg, offset)  ((CLKREGS_##cmu) << 10 | (reg) << 3 | (offset) << 0)
@@ -41,6 +25,7 @@
             .pll_offset = OFFSET_##pll,         \
             .clkid = CLKID_##pll                \
         }
+
 
 #define CLK_SRC_BITS         4
 #define CLK_SRCSTAT_BITS     4
@@ -59,6 +44,7 @@
 #define CLK_GATE_SKIP        0x0
 #define CLK_GATE_PASS        0x1
 
+
 #define PLL_MPS(m,p,s)       (((m) << 16) | ((p) << 8) | ((s) << 0))
 
 struct pll_regs {
@@ -69,6 +55,18 @@ struct pll_regs {
     uint32_t con2;
 };
 
+struct clk_regs {
+    volatile uint32_t pll_lock[64];   /* 0x000 */
+    volatile uint32_t pll_con[64];    /* 0x100 */
+    volatile uint32_t src[64];        /* 0x200 */
+    volatile uint32_t srcmask[64];    /* 0x300 */
+    volatile uint32_t srcstat[64];    /* 0x400 */
+    volatile uint32_t div[64];        /* 0x500 */
+    volatile uint32_t divstat[128];   /* 0x600 */
+    volatile uint32_t gate[64];       /* 0x800 */
+    volatile uint32_t clkout;         /* 0xA00 */
+    volatile uint32_t clkout_divstat; /* 0xA04 */
+};
 typedef volatile struct clk_regs clk_regs_io_t;
 
 struct mpsk_tbl {
@@ -90,6 +88,7 @@ struct pll_priv {
     int clkid;
 };
 
+
 static inline clk_regs_io_t**
 clk_sys_get_clk_regs(clock_sys_t* clock_sys)
 {
@@ -102,6 +101,7 @@ clk_get_clk_regs(clk_t* clk)
 {
     return clk_sys_get_clk_regs(clk->clk_sys);
 };
+
 
 static inline const struct pll_priv*
 exynos_clk_get_priv_pll(clk_t* clk) {
@@ -123,8 +123,7 @@ freq_t _pll_get_freq(clk_t* clk);
 freq_t _pll_set_freq(clk_t* clk, freq_t hz);
 void   _pll_recal(clk_t* clk);
 clk_t* _pll_init(clk_t* clk);
-/* PLL get_freq */
-uint32_t exynos_pll_get_freq(clk_t* clk, int clkid, uint32_t pll_idx);
+
 
 /**** helpers ****/
 static inline void
@@ -147,6 +146,7 @@ clkid_change_reg(int clkid, int change)
     return clkid | ((r & 0x3f) << 3);
 }
 
+
 static inline int
 clkbf_get(volatile uint32_t* reg, int start_bit, int nbits)
 {
@@ -164,6 +164,7 @@ clkbf_set(volatile uint32_t* reg, int start_bit, int nbits, int v)
     *reg = o | v;
 }
 
+
 static inline int
 exynos_cmu_get_src(clk_regs_io_t** regs, int clkid)
 {
@@ -179,6 +180,7 @@ exynos_cmu_get_srcstat(clk_regs_io_t** regs, int clkid)
     clkid_decode(clkid, &c, &r, &o);
     return clkbf_get(&regs[c]->srcstat[r], o * CLK_SRC_BITS, CLK_SRC_BITS);
 }
+
 
 static inline void
 exynos_cmu_set_src(clk_regs_io_t** regs, int clkid, int src)
@@ -216,6 +218,7 @@ exynos_cmu_set_div(clk_regs_io_t** regs, int clkid, int span, int div)
     while (clkbf_get(&regs[c]->divstat[r], o * CLK_DIVSTAT_BITS, CLK_DIVSTAT_BIT));
 }
 
+
 static inline int
 exynos_cmu_get_gate(clk_regs_io_t** regs, int clkid)
 {
@@ -232,15 +235,4 @@ exynos_cmu_set_gate(clk_regs_io_t** regs, int clkid, int v)
     clkbf_set(&regs[c]->gate[r], o * CLK_GATE_BITS, CLK_GATE_BITS, v);
 }
 
-static inline void
-exynos_mpll_get_pms(int v, uint32_t* p, uint32_t* m, uint32_t* s)
-{
-    *m = (v >> 16) & 0x1ff;
-    *p = (v >>  8) &  0x3f;
-    *s = (v >>  0) &   0x7;
-}
-
-static inline uint32_t
-exynos_pll_calc_freq(uint64_t fin, uint32_t p, uint32_t m, uint32_t s) {
-    return (fin * m / p) >> s;
-}
+#endif /* MACH_CLOCK_H */

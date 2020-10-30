@@ -1,21 +1,21 @@
 /*
- * Copyright 2017, Data61
- * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
- * ABN 41 687 119 230.
+ * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
  * the BSD 2-Clause license. Note that NO WARRANTY is provided.
  * See "LICENSE_BSD2.txt" for details.
  *
- * @TAG(DATA61_BSD)
+ * @TAG(NICTA_BSD)
  */
 
-#pragma once
+#ifndef _PLATSUPPORT_PLAT_IRQ_COMBINER_H_
+#define _PLATSUPPORT_PLAT_IRQ_COMBINER_H_
 
 enum irq_combiner_id {
     IRQ_COMBINER0,
     NIRQ_COMBINERS
 };
+
 
 #define EXYNOS4_IRQ_COMBINER_PADDR 0x10440000
 #define EXYNOS4_IRQ_COMBINER_SIZE  0x1000
@@ -31,3 +31,4 @@ enum irq_combiner_id {
  */
 int exynos_irq_combiner_init(void* base, irq_combiner_t* combiner);
 
+#endif /* _PLATSUPPORT_PLAT_IRQ_COMBINER_H_ */

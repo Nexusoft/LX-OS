@@ -1,16 +1,20 @@
 /*
- * Copyright 2017, Data61
- * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
- * ABN 41 687 119 230.
+ * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
  * the BSD 2-Clause license. Note that NO WARRANTY is provided.
  * See "LICENSE_BSD2.txt" for details.
  *
- * @TAG(DATA61_BSD)
+ * @TAG(NICTA_BSD)
  */
 
-#pragma once
+
+#ifndef _PLATSUPPORT_PLAT_SPI_H_
+#define _PLATSUPPORT_PLAT_SPI_H_
+
+#ifndef _PLATSUPPORT_SPI_H_
+#error This file should not be included directly
+#endif
 
 /* IRQS */
 #define EXYNOS_SPI0_IRQ        98
@@ -44,4 +48,7 @@ enum spi_id {
 int exynos_spi_init(enum spi_id id, void* base,
                     mux_sys_t* mux_sys, clock_sys_t* clock_sys,
                     spi_bus_t** spi_bus);
+
+
+#endif /* _PLATSUPPORT_PLAT_SPI_H_ */
 

@@ -1,7 +1,11 @@
 /*
  * Copyright 2014, General Dynamics C4 Systems
  *
- * SPDX-License-Identifier: GPL-2.0-only
+ * This software may be distributed and modified according to the terms of
+ * the GNU General Public License version 2. Note that NO WARRANTY is provided.
+ * See "LICENSE_GPLv2.txt" for details.
+ *
+ * @TAG(GD_GPL)
  */
 
 #include <types.h>
@@ -12,7 +16,8 @@
 #include <model/statedata.h>
 #include <arch/machine.h>
 
-lookupCap_ret_t lookupCap(tcb_t *thread, cptr_t cPtr)
+lookupCap_ret_t
+lookupCap(tcb_t *thread, cptr_t cPtr)
 {
     lookupSlot_raw_ret_t lu_ret;
     lookupCap_ret_t ret;
@@ -29,7 +34,8 @@ lookupCap_ret_t lookupCap(tcb_t *thread, cptr_t cPtr)
     return ret;
 }
 
-lookupCapAndSlot_ret_t lookupCapAndSlot(tcb_t *thread, cptr_t cPtr)
+lookupCapAndSlot_ret_t
+lookupCapAndSlot(tcb_t *thread, cptr_t cPtr)
 {
     lookupSlot_raw_ret_t lu_ret;
     lookupCapAndSlot_ret_t ret;
@@ -48,7 +54,8 @@ lookupCapAndSlot_ret_t lookupCapAndSlot(tcb_t *thread, cptr_t cPtr)
     return ret;
 }
 
-lookupSlot_raw_ret_t lookupSlot(tcb_t *thread, cptr_t capptr)
+lookupSlot_raw_ret_t
+lookupSlot(tcb_t *thread, cptr_t capptr)
 {
     cap_t threadRoot;
     resolveAddressBits_ret_t res_ret;
@@ -62,8 +69,9 @@ lookupSlot_raw_ret_t lookupSlot(tcb_t *thread, cptr_t capptr)
     return ret;
 }
 
-lookupSlot_ret_t lookupSlotForCNodeOp(bool_t isSource, cap_t root, cptr_t capptr,
-                                      word_t depth)
+lookupSlot_ret_t
+lookupSlotForCNodeOp(bool_t isSource, cap_t root, cptr_t capptr,
+                     unsigned int depth)
 {
     resolveAddressBits_ret_t res_ret;
     lookupSlot_ret_t ret;
@@ -85,6 +93,7 @@ lookupSlot_ret_t lookupSlotForCNodeOp(bool_t isSource, cap_t root, cptr_t capptr
         ret.status = EXCEPTION_SYSCALL_ERROR;
         return ret;
     }
+
     res_ret = resolveAddressBits(root, capptr, depth);
     if (unlikely(res_ret.status != EXCEPTION_NONE)) {
         current_syscall_error.type = seL4_FailedLookup;
@@ -108,26 +117,29 @@ lookupSlot_ret_t lookupSlotForCNodeOp(bool_t isSource, cap_t root, cptr_t capptr
     return ret;
 }
 
-lookupSlot_ret_t lookupSourceSlot(cap_t root, cptr_t capptr, word_t depth)
+lookupSlot_ret_t
+lookupSourceSlot(cap_t root, cptr_t capptr, unsigned int depth)
 {
     return lookupSlotForCNodeOp(true, root, capptr, depth);
 }
 
-lookupSlot_ret_t lookupTargetSlot(cap_t root, cptr_t capptr, word_t depth)
+lookupSlot_ret_t
+lookupTargetSlot(cap_t root, cptr_t capptr, unsigned int depth)
 {
     return lookupSlotForCNodeOp(false, root, capptr, depth);
 }
 
-lookupSlot_ret_t lookupPivotSlot(cap_t root, cptr_t capptr, word_t depth)
+lookupSlot_ret_t
+lookupPivotSlot(cap_t root, cptr_t capptr, unsigned int depth)
 {
     return lookupSlotForCNodeOp(true, root, capptr, depth);
 }
 
-resolveAddressBits_ret_t resolveAddressBits(cap_t nodeCap, cptr_t capptr, word_t n_bits)
+resolveAddressBits_ret_t
+resolveAddressBits(cap_t nodeCap, cptr_t capptr, unsigned int n_bits)
 {
     resolveAddressBits_ret_t ret;
-    word_t radixBits, guardBits, levelBits, guard;
-    word_t capGuard, offset;
+    unsigned int radixBits, guardBits, levelBits, offset;
     cte_t *slot;
 
     ret.bitsRemaining = n_bits;
@@ -139,27 +151,21 @@ resolveAddressBits_ret_t resolveAddressBits(cap_t nodeCap, cptr_t capptr, word_t
         return ret;
     }
 
+    guardBits = cap_cnode_cap_get_capCNodeGuardSize(nodeCap);
+    if (unlikely(guardBits > n_bits)) {
+        current_lookup_fault =
+            lookup_fault_guard_mismatch_new(0, n_bits, guardBits);
+        ret.status = EXCEPTION_LOOKUP_FAULT;
+        return ret;
+    }
+    n_bits -= guardBits;
+
     while (1) {
         radixBits = cap_cnode_cap_get_capCNodeRadix(nodeCap);
-        guardBits = cap_cnode_cap_get_capCNodeGuardSize(nodeCap);
-        levelBits = radixBits + guardBits;
+        levelBits = radixBits;
 
         /* Haskell error: "All CNodes must resolve bits" */
         assert(levelBits != 0);
-
-        capGuard = cap_cnode_cap_get_capCNodeGuard(nodeCap);
-
-        /* sjw --- the MASK(5) here is to avoid the case where n_bits = 32
-           and guardBits = 0, as it violates the C spec to >> by more
-           than 31 */
-
-        guard = (capptr >> ((n_bits - guardBits) & MASK(wordRadix))) & MASK(guardBits);
-        if (unlikely(guardBits > n_bits || guard != capGuard)) {
-            current_lookup_fault =
-                lookup_fault_guard_mismatch_new(capGuard, n_bits, guardBits);
-            ret.status = EXCEPTION_LOOKUP_FAULT;
-            return ret;
-        }
 
         if (unlikely(levelBits > n_bits)) {
             current_lookup_fault =

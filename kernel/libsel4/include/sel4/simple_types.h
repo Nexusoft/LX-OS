@@ -1,14 +1,18 @@
 /*
- * Copyright 2020, Data61, CSIRO (ABN 41 687 119 230)
+ * Copyright 2014, NICTA
  *
- * SPDX-License-Identifier: BSD-2-Clause
+ * This software may be distributed and modified according to the terms of
+ * the BSD 2-Clause license. Note that NO WARRANTY is provided.
+ * See "LICENSE_BSD2.txt" for details.
+ *
+ * @TAG(NICTA_BSD)
  */
 
-#pragma once
+#ifndef __LIBSEL4_SIMPLE_TYPES_H
+#define __LIBSEL4_SIMPLE_TYPES_H
 
 /* Get the architectural types seL4_{u}int{N} */
 #include <sel4/arch/simple_types.h>
-#include <sel4/sel4_arch/simple_types.h>
 
 /* Define boolean type and true/false */
 #define seL4_True 1
@@ -22,3 +26,4 @@ typedef seL4_Int8 seL4_Bool;
 #define seL4_Null ((void*)0)
 #endif // __cplusplus
 
+#endif // __LIBSEL4_SIMPLE_TYPES_H

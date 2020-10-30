@@ -1,25 +1,28 @@
 /*
- * Copyright 2017, Data61
- * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
- * ABN 41 687 119 230.
+ * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
  * the BSD 2-Clause license. Note that NO WARRANTY is provided.
  * See "LICENSE_BSD2.txt" for details.
  *
- * @TAG(DATA61_BSD)
+ * @TAG(NICTA_BSD)
  */
 
 #include <stdint.h>
 #include "mux.h"
-#include <utils/util.h>
 #include <platsupport/gpio.h>
-#include <platsupport/plat/gpio.h>
-#include <platsupport/plat/mux.h>
 #include "../../services.h"
 
+//#define MUX_DEBUG
+#ifdef MUX_DEBUG
+#define DMUX(...) printf("MUX: " __VA_ARGS__)
+#else
+#define DMUX(...) do{}while(0)
+#endif
+
+
 #define IMX6_IOMUXC_PADDR 0x020E0000
-#define IMX6_IOMUXC_SIZE  0x4000
+#define IMX6_IOMUXC_SIZE  0x1000
 
 #define IOMUXC_MUXCTL_OFFSET        0x4C
 #define IOMUXC_PADCTL_OFFSET        0x360
@@ -31,6 +34,7 @@
 /* NOTE: Daisy field is only 1 but for some registers */
 #define IOMUXC_IS_DAISY(x)   ((x) & 0x3)
 #define IOMUXC_IS_DAISY_MASK IOMUXC_IS_DAISY(0x3)
+
 
 struct imx6_iomuxc_regs {
     /*** GPR ***/
@@ -637,7 +641,7 @@ static struct imx6_mux {
     volatile struct imx6_iomuxc_regs* iomuxc;
 } _mux;
 
-static inline struct imx6_mux* get_mux_priv(const mux_sys_t* mux) {
+static inline struct imx6_mux* get_mux_priv(mux_sys_t* mux) {
     return (struct imx6_mux*)mux->priv;
 }
 
@@ -648,8 +652,9 @@ static inline void set_mux_priv(mux_sys_t* mux, struct imx6_mux* imx6_mux)
     mux->priv = imx6_mux;
 }
 
+
 static int
-imx6_mux_feature_enable(const mux_sys_t* mux, mux_feature_t mux_feature, UNUSED enum mux_gpio_dir mgd)
+imx6_mux_feature_enable(mux_sys_t* mux, enum mux_feature mux_feature)
 {
     struct imx6_mux* m;
     if (mux == NULL || mux->priv == NULL) {
@@ -660,7 +665,7 @@ imx6_mux_feature_enable(const mux_sys_t* mux, mux_feature_t mux_feature, UNUSED 
     assert(((int)&m->iomuxc->usdhc1_wp_on_select_input & 0xfff) == 0x94C);
     switch (mux_feature) {
     case MUX_I2C1:
-        ZF_LOGD("Muxing for I2C1\n");
+        DMUX("Muxing for I2C1\n");
         m->iomuxc->i2c1_scl_in_select_input  = IOMUXC_IS_DAISY(0x0);
         m->iomuxc->sw_mux_ctl_pad_eim_data21 = IOMUXC_MUXCTL_MODE(6)
                                                | IOMUXC_MUXCTL_FORCE_INPUT;
@@ -669,7 +674,7 @@ imx6_mux_feature_enable(const mux_sys_t* mux, mux_feature_t mux_feature, UNUSED 
                                                | IOMUXC_MUXCTL_FORCE_INPUT;
         return 0;
     case MUX_I2C2:
-        ZF_LOGD("Muxing for I2C2\n");
+        DMUX("Muxing for I2C2\n");
         m->iomuxc->i2c2_scl_in_select_input = IOMUXC_IS_DAISY(0x1);
         m->iomuxc->sw_mux_ctl_pad_key_col3  = IOMUXC_MUXCTL_MODE(4)
                                               | IOMUXC_MUXCTL_FORCE_INPUT;
@@ -678,7 +683,7 @@ imx6_mux_feature_enable(const mux_sys_t* mux, mux_feature_t mux_feature, UNUSED 
                                               | IOMUXC_MUXCTL_FORCE_INPUT;
         return 0;
     case MUX_I2C3:
-        ZF_LOGD("Muxing for I2C3\n");
+        DMUX("Muxing for I2C3\n");
         m->iomuxc->i2c3_scl_in_select_input = IOMUXC_IS_DAISY(0x2);
         m->iomuxc->sw_mux_ctl_pad_gpio05    = IOMUXC_MUXCTL_MODE(6)
                                               | IOMUXC_MUXCTL_FORCE_INPUT;
@@ -687,16 +692,9 @@ imx6_mux_feature_enable(const mux_sys_t* mux, mux_feature_t mux_feature, UNUSED 
                                               | IOMUXC_MUXCTL_FORCE_INPUT;
         return 0;
     case MUX_GPIO0_CLKO1:
-        ZF_LOGD("Muxing CLKO1 to MUX0\n");
+        DMUX("Muxing CLKO1 to MUX0\n");
         m->iomuxc->sw_mux_ctl_pad_gpio00    = IOMUXC_MUXCTL_MODE(0);
         return 0;
-
-    case MUX_UART1:
-        ZF_LOGD("Muxing for UART1\n");
-        m->iomuxc->sw_mux_ctl_pad_sd3_data6 = IOMUXC_MUXCTL_MODE(1);
-        m->iomuxc->uart1_uart_rx_data_select_input  = IOMUXC_IS_DAISY(3);
-        return 0;
-
     default:
         return -1;
     }
@@ -784,20 +782,11 @@ imx6_mux_enable_gpio(mux_sys_t* mux_sys, int gpio_id)
         break;
 
     default:
-        ZF_LOGD("Unable to mux GPIOID 0x%x\n", gpio_id);
+        DMUX("Unable to mux GPIOID 0x%x\n", gpio_id);
         return -1;
     }
     *reg = IOMUXC_MUXCTL_MODE(5);
     return 0;
-}
-
-static void *imx6_mux_get_vaddr(const mux_sys_t *mux) {
-    struct imx6_mux* m;
-    if (mux == NULL || mux->priv == NULL) {
-        return NULL;
-    }
-    m = get_mux_priv(mux);
-    return (void *)m->iomuxc;
 }
 
 static int
@@ -805,9 +794,9 @@ imx6_mux_init_common(mux_sys_t* mux)
 {
     set_mux_priv(mux, &_mux);
     mux->feature_enable = &imx6_mux_feature_enable;
-    mux->get_mux_vaddr = &imx6_mux_get_vaddr;
     return 0;
 }
+
 
 int
 imx6_mux_init(void* iomuxc, mux_sys_t* mux)
@@ -818,9 +807,12 @@ imx6_mux_init(void* iomuxc, mux_sys_t* mux)
     return imx6_mux_init_common(mux);
 }
 
+
 int
-mux_sys_init(ps_io_ops_t* io_ops, UNUSED void *dependencies, mux_sys_t* mux)
+mux_sys_init(ps_io_ops_t* io_ops, mux_sys_t* mux)
 {
     MAP_IF_NULL(io_ops, IMX6_IOMUXC, _mux.iomuxc);
     return imx6_mux_init_common(mux);
 }
+
+
