@@ -1,8 +1,8 @@
 ### Quick Start
 
-#### Building LLL-OS
+#### Building LX-OS
 
-In order to build LLL-OS's codebase:
+In order to build LX-OS's codebase:
 
 1. Read: https://wiki.sel4.systems/Getting_started#Setting_up_your_machine. Set up the environment
    (repo tool, cross compilers and build dependencies) as per the instructions on the page.
@@ -30,7 +30,7 @@ Overview
 
 The repository is organised as follows.
 
- * [`impl/apps`](impl/apps/): LLL-OS system and userland applications
+ * [`impl/apps`](impl/apps/): LX-OS system and userland applications
     * [`selfloader`](impl/apps/selfloader/): Bootstrap application, which is responsible for starting
       user processes.
     * [`process_server`](impl/apps/process_server/): The process server, which runs as the root
@@ -42,28 +42,28 @@ The repository is organised as follows.
     * [`timer_server`](impl/apps/timer_server/): The timer server, a userland driver process which
       manages the timer device and provides timer get time and sleep functionality.
     * [`terminal`](impl/apps/terminal/): The interactive terminal application.
-    * [`test_os`](impl/apps/test_os/): LLL-OS operating system level test suite, which tests the
+    * [`test_os`](impl/apps/test_os/): LX-OS operating system level test suite, which tests the
       operating system environment.
-    * [`test_user`](impl/apps/test_os/): LLL-OS user-level test application, which is responsible for
+    * [`test_user`](impl/apps/test_os/): LX-OS user-level test application, which is responsible for
       testing the operating system user environment.
     * [`snake`](impl/apps/snake/): Example snake game.
     * [`tetris`](impl/apps/tetris/): Example tetris game.
     * [`nethack`](impl/apps/nethack/): Port of Nethack 3.4.3 roguelike game.
- * [`impl/libs`](impl/libs/): LLL-OS system and userland applications
-    * [`libdatastruct`](impl/libs/libdatastruct/): LLL-OS library that provides simple C data structures such as
+ * [`impl/libs`](impl/libs/): LX-OS system and userland applications
+    * [`libdatastruct`](impl/libs/libdatastruct/): LX-OS library that provides simple C data structures such as
       vectors, hash tables and allocation tables.
-    * [`librefos`](impl/libs/librefos/): LLL-OS user and server shared definitions, RPC specifications and
+    * [`librefos`](impl/libs/librefos/): LX-OS user and server shared definitions, RPC specifications and
       generated stubs and low level helper libraries.
-    * [`librefossys`](impl/libs/librefossys/): LLL-OS library that implements some POSIX system calls using low-level
-      LLL-OS and thus allows the C library to work. This directory is intended to simplify LLL-OS 
+    * [`librefossys`](impl/libs/librefossys/): LX-OS library that implements some POSIX system calls using low-level
+      LLL-OS and thus allows the C library to work. This directory is intended to simplify LX-OS 
       userland applications and facilitate porting.
- * [`impl/docs`](impl/docs/): LLL-OS doxygen code documentation.
- * [`design`](design/): LLL-OS protocol design document.
+ * [`impl/docs`](impl/docs/): LX-OS doxygen code documentation.
+ * [`design`](design/): LX-OS protocol design document.
 
 License
 -------
 
 The files in this repository are released under standard open source
-licenses. LLL-OS code is released under the BSD license where possible and GPL for some
+licenses. LX-OS code is released under the BSD license where possible and GPL for some
 external software. Please see the individual file headers and
 [`LICENSE_BSD2.txt`](LICENSE_BSD2.txt) for details.
